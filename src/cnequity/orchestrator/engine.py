@@ -274,6 +274,7 @@ class JobEngine:
                                 wave.name,
                             )
 
+                self._persist_unaudited_findings(run_id, trade_date, results, context)
                 if had_error:
                     fallback_status = "failed"
                 elif had_warning:
@@ -321,6 +322,29 @@ class JobEngine:
                         run_id,
                         error_message="interrupted: worker exited without finish_run",
                     )
+
+    def _persist_unaudited_findings(
+        self,
+        run_id: str,
+        trade_date: date,
+        results: list[dict[str, Any]],
+        context: dict[str, Any],
+    ) -> None:
+        """Keep the steps' findings when this run did not write an audit file.
+
+        They travel in ``context`` and only ``run_audit`` used to write them
+        out. The scheduled groups run without ``audit`` and the later lake
+        audit has its own context, so a fallback a step reported — a cached
+        trading_status day, a stale valuation — reached no file at all.
+        """
+        findings = context.get("audit_findings") or []
+        if not findings:
+            return
+        if any(row.get("step") == "audit" and "error" not in row for row in results):
+            return
+        from cnequity.quality.audit import persist_step_findings
+
+        persist_step_findings(self.config, run_id, trade_date, findings)
 
     def run_step(
         self,
@@ -1469,7 +1493,7 @@ class JobEngine:
             # `_retry_run_locked` historically closes a terminal run with
             # batch status ``warning``. Reconcile that legacy spelling
             # after all retry/finalize receipts have been written.
-            if public_status != result.get("status"):
+            if auto_finalize and public_status != result.get("status"):
                 self.manifest.finish_run(
                     run_id,
                     public_status,
@@ -1694,6 +1718,7 @@ class JobEngine:
                 )
             )
 
+        self._persist_unaudited_findings(run_id, trade_date, results, context)
         status, still_missing = self._gate_on_missing_steps(
             run_id, self._retry_batch_status(run_id)
         )
@@ -1838,6 +1863,9 @@ class JobEngine:
                     error_message="interrupted by operator",
                 )
                 raise
+            except Exception:
+                self.manifest.interrupt_run(run_id, error_message="init resume failed")
+                raise
 
     def _resume_init_locked(
         self,
@@ -1873,6 +1901,7 @@ class JobEngine:
         )
 
         logger.info("Resuming init run %s", run_id)
+        self.manifest.resume_run(run_id)
         retry_result = self._retry_run(run_id, trade_date, auto_finalize=False)
 
         batches = self._init_execution_batches(run_id)

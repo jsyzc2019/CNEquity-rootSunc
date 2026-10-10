@@ -473,12 +473,23 @@ def _resolve_daily_bar_scope(config: Config, symbols: list[str]) -> list[str]:
 _ETF_PROFILE_MAX_AGE_DAYS = 14
 
 
+def _daily_fund_bar_symbols(config: Config, on: date, *, retry: bool = False) -> list[str]:
+    if not config.ingest_listed_funds:
+        return _eligible_etf_bar_symbols(config, on, retry=retry)
+    from cnequity.storage.instrument_catalog import listed_fund_symbols, load_curated_instruments
+
+    instruments = load_curated_instruments(config)
+    if instruments is None:
+        raise RuntimeError("fund bar scope unavailable: no committed instruments")
+    return listed_fund_symbols(instruments, on)
+
+
 def _eligible_etf_bar_symbols(config: Config, on: date, *, retry: bool = False) -> list[str]:
     """Extend bar ingestion only from a current, published ETF classification.
 
     The directory is an observed snapshot, never a historical eligibility
-    service. A missing or failed collector leaves the stock ingest untouched
-    and does not admit a fund code. The pinned read receipt makes the exact
+    service. A missing or failed collector fails the scope explicitly rather
+    than silently omitting funds. The pinned read receipt makes the exact
     classification used for the fetch independently replayable.
     """
     if not config.ingest_eligible_etfs:
@@ -495,24 +506,24 @@ def _eligible_etf_bar_symbols(config: Config, on: date, *, retry: bool = False) 
             logger.warning(
                 "ETF bar scope held after failed directory attempt %s", attempt.get("run_id")
             )
-            return []
+            raise RuntimeError("ETF bar scope unavailable after failed directory attempt")
     try:
         read = load_with_receipt("etf_profiles", config=config, end=on, require_replayable=True)
     except (ReadReceiptError, FileNotFoundError, ValueError) as exc:
         logger.warning("ETF bar scope unavailable: %s", exc)
-        return []
+        raise RuntimeError(f"ETF bar scope unavailable: {exc}") from exc
     frame = read.frame
     required = {"symbol", "as_of_date", "eligibility_status"}
     if not required.issubset(frame.columns) or frame.is_empty():
         logger.warning("ETF bar scope has no valid directory rows by %s", on)
-        return []
+        raise RuntimeError(f"ETF bar scope has no valid directory rows by {on}")
     current = frame.filter(pl.col("as_of_date") <= on)
     if current.is_empty():
-        return []
+        raise RuntimeError(f"ETF bar scope has no directory snapshot by {on}")
     observed = current["as_of_date"].max()
     if (on - observed).days > _ETF_PROFILE_MAX_AGE_DAYS:
         logger.warning("ETF bar scope held: directory dated %s is stale on %s", observed, on)
-        return []
+        raise RuntimeError(f"ETF bar scope directory dated {observed} is stale on {on}")
     return sorted(
         set(
             current.filter(
@@ -530,7 +541,7 @@ def _settle_official_etf_prelisting_debts(config: Config, on: date, run_id: str)
     sessions never existed. Save the pinned source and exact keys before
     removing them; source-empty or unverified price gaps remain owed.
     """
-    if not config.ingest_eligible_etfs:
+    if not (config.ingest_eligible_etfs or config.ingest_listed_funds):
         return None
     from cnequity.query import load_with_receipt
     from cnequity.query.receipt import ReadReceiptError
@@ -1460,7 +1471,7 @@ def step_daily_bars(config: Config, trade_date: date, run_id: str, context: dict
                     # A later directory failure stops new admissions, but it
                     # must not erase work already planned in this failed run.
                     etf_retry_scopes[spec_end] = set(
-                        _eligible_etf_bar_symbols(config, spec_end, retry=True)
+                        _daily_fund_bar_symbols(config, spec_end, retry=True)
                     )
                 eligible_etfs = etf_retry_scopes[spec_end]
                 symbols = [
@@ -1664,7 +1675,7 @@ def step_daily_bars(config: Config, trade_date: date, run_id: str, context: dict
     explicit_scope = (
         getattr(config, "_backfill_symbols", None) if getattr(config, "_backfill", False) else None
     )
-    catalog_etfs = set(_eligible_etf_bar_symbols(config, end)) if explicit_scope is None else set()
+    catalog_etfs = set(_daily_fund_bar_symbols(config, end)) if explicit_scope is None else set()
     known_symbols = load_symbols(config)
     symbols = (
         # An explicit repair scope is the operator's own request and is never
@@ -1686,12 +1697,17 @@ def step_daily_bars(config: Config, trade_date: date, run_id: str, context: dict
 
     spans = _instrument_spans(config)
     if explicit_scope is None:
+        new_instruments = context.get("new_instruments") or []
+        if config.ingest_listed_funds and new_instruments:
+            from cnequity.storage.instrument_catalog import listed_fund_symbols
+
+            catalog_etfs.update(listed_fund_symbols(pl.DataFrame(new_instruments), end))
         # A security listing today is in this run's instruments output but not
         # yet in curated, which is where the universe is read from; without
         # this its first session is never fetched (920201.BJ, 2026-09-24).
         discovered = [
             row
-            for row in context.get("new_instruments") or ()
+            for row in new_instruments
             if row.get("symbol")
             and (in_ingest_universe_symbol(row["symbol"], config) or row["symbol"] in catalog_etfs)
         ]
@@ -3206,22 +3222,19 @@ def _staged_daily_bar_missing_keys(
     observed_symbols = set(staged["symbol"].to_list())
     missing: set[tuple[str, date]] = set()
     metadata = _instrument_spans(config)
-    status_by_symbol: dict[str, dict[date, bool | None]] = {}
+    from cnequity.domain.trading_status import independent_suspension_keys
+
+    suspended: set[tuple[str, date]] = set()
     status = load_curated_trading_status(
         config,
         start=start,
         end=end,
         symbols=sorted(observed_symbols),
     )
-    if status is not None and not status.is_empty():
-        required_status = {"symbol", "trade_date", "is_trading"}
-        if required_status.issubset(status.columns):
-            for status_row in status.select(*sorted(required_status)).iter_rows(named=True):
-                status_by_symbol.setdefault(str(status_row["symbol"]), {})[
-                    status_row["trade_date"]
-                ] = status_row["is_trading"]
+    if status is not None:
+        suspended = set(independent_suspension_keys(status).iter_rows())
     # Suspensions this run learned from the vendor are staged but not yet
-    # curated, so they are not in `status_by_symbol` and would otherwise be
+    # curated, so they are not in `suspended` and would otherwise be
     # condemned here as interior gaps.
     learned = getattr(config, "_learned_suspensions", None)
     learned_suspensions: set[tuple[str, date]] = (
@@ -3237,7 +3250,7 @@ def _staged_daily_bar_missing_keys(
         missing.update(
             (row["symbol"], day)
             for day in expected - set(row["dates"])
-            if status_by_symbol.get(row["symbol"], {}).get(day) is not False
+            if (row["symbol"], day) not in suspended
             and (row["symbol"], day) not in learned_suspensions
         )
     # A symbol with no rows at all is handled by the explicit no-data/unknown
@@ -3814,11 +3827,9 @@ def _gapfill_missing_keys_via_baostock(
 
     by_symbol: dict[str, set[date]] = {}
     for symbol, session in missing_keys:
-        # Baostock covers Shanghai and Shenzhen only. A Beijing code comes back
-        # as a retried failure rather than an answer (measured: three live BJ
-        # names, three failures, one login cycle each), so sending them costs
-        # the sweep and evidences nothing.
-        if not is_tdx_servable(symbol):
+        # Its history covers SH/SZ stocks, not the ETF/LOF and index codes TDX
+        # can serve. An unsupported code returning empty proves no absence.
+        if not _baostock_stock(symbol):
             continue
         by_symbol.setdefault(symbol, set()).add(session)
     if not by_symbol:
@@ -4028,11 +4039,11 @@ def _learn_suspensions_from_baostock(
 
     if not missing or not config.sources.get("baostock", False):
         return set(), {"status": "disabled" if missing else "not_needed", "requests": 0}
-    # Baostock serves Shanghai and Shenzhen only; a Beijing code costs a
-    # retried failure and answers nothing.
-    symbols = sorted({symbol for symbol, _day in missing if is_tdx_servable(symbol)})
+    # Unsupported funds, indexes and BJ securities cannot supply suspension
+    # evidence merely because their codes can be requested through TDX.
+    symbols = sorted({symbol for symbol, _day in missing if _baostock_stock(symbol)})
     if not symbols:
-        return set(), {"status": "skipped", "requests": 0, "reason": "no SH/SZ key"}
+        return set(), {"status": "skipped", "requests": 0, "reason": "no SH/SZ stock key"}
     if len(symbols) > _BAOSTOCK_GAPFILL_MAX_SYMBOLS:
         return set(), {
             "status": "skipped",

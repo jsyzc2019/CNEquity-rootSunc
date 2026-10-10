@@ -28,9 +28,13 @@ from cnequity.domain.symbols import (
     parse_symbol,
 )
 from cnequity.domain.trading_status import (
+    CACHED_SOURCE,
+    CARRY_SESSIONS,
     DELISTED_SOURCE,
     STATUS_DELISTED,
-    STATUS_SUSPENDED,
+    impossible_delistings,
+    last_first_hand_status,
+    split_before_listing,
 )
 from cnequity.orchestrator.manifest import Manifest
 from cnequity.orchestrator.outcomes import (
@@ -56,6 +60,7 @@ from cnequity.quality.st_coverage import (
 from cnequity.steps.common import (
     BACKFILL_START,
     fetch_incremental_daily,
+    list_trading_dates,
     load_bar_universe,
     load_curated_instruments,
     load_symbols,
@@ -65,7 +70,17 @@ from cnequity.steps.http_common import write_fetched
 
 logger = logging.getLogger(__name__)
 
-_CACHED_TRADING_STATUS_MAX_AGE = timedelta(days=5)
+# Counted in sessions: a calendar-day limit expired the cache across every
+# National Day and Spring Festival break, which is exactly when it is needed.
+_CACHED_TRADING_STATUS_MAX_SESSIONS = CARRY_SESSIONS
+# Calendar span searched for those sessions; longer than any exchange closure.
+_CACHED_TRADING_STATUS_SEARCH_SPAN = timedelta(days=30)
+_CACHED_SOURCE = CACHED_SOURCE
+
+
+def _first_hand_status(history: pl.DataFrame) -> pl.DataFrame:
+    return last_first_hand_status(history.drop("fetched_at", strict=False))
+
 
 # Flush + checkpoint on the same boundary as Baostock's anti-blacklist batch.
 # A larger chunk used to discard up to ~200 symbols of in-memory evidence when
@@ -96,8 +111,11 @@ def step_instruments(config: Config, trade_date: date, run_id: str, context: dic
     beijing_gap = _require_beijing_instrument_scope(config, df, trade_date)
     if beijing_gap:
         findings.append(beijing_gap)
-    df = enrich_instrument_list_dates(config, df)
     df = _enrich_etf_list_dates_from_profiles(config, df, trade_date)
+    if config.ingest_listed_funds and config.sources.get("exchange", True):
+        df, listing_findings = _enrich_fund_list_dates_from_exchange(config, df, trade_date, run_id)
+        findings.extend(listing_findings)
+    df = enrich_instrument_list_dates(config, df)
     if getattr(config, "_backfill", False):
         try:
             df = _merge_delisted_instruments(config, df)
@@ -124,6 +142,53 @@ def step_instruments(config: Config, trade_date: date, run_id: str, context: dic
         )
         result.setdefault("context_updates", {})["audit_findings"] = findings
     return result
+
+
+def _enrich_fund_list_dates_from_exchange(
+    config: Config, instruments: pl.DataFrame, on: date, run_id: str
+) -> tuple[pl.DataFrame, list[dict]]:
+    from cnequity.adapters.eastmoney.instruments import _fill_list_dates
+    from cnequity.adapters.exchange.fund_listings import fetch_exchange_fund_listings
+    from cnequity.storage.raw_archive import RawPayloadArchive
+
+    missing = instruments.filter((pl.col("asset_type") == "etf") & pl.col("list_date").is_null())
+    if missing.is_empty():
+        return instruments, []
+    exchanges = {symbol.rsplit(".", 1)[1] for symbol in missing["symbol"].to_list()}
+    try:
+        dates, wire = fetch_exchange_fund_listings(config, exchanges=exchanges)
+        archive = RawPayloadArchive(
+            config.meta_root,
+            enabled=True,
+            datasets=["instruments"],
+            compression=config.raw_archive_compression,
+            max_payload_bytes=config.raw_archive_max_payload_bytes,
+        )
+        for url, payload, params, kind in wire:
+            archive.archive(
+                "instruments",
+                payload,
+                source="exchange",
+                run_id=run_id,
+                request_params=params,
+                url=url,
+                payload_format=kind,
+            )
+    except Exception as exc:
+        return instruments, [
+            {
+                "dataset": "instruments",
+                "severity": "warning",
+                "check": "fund_listing_dates_unavailable",
+                "message": str(exc),
+                "symbols": missing["symbol"].to_list(),
+            }
+        ]
+    wanted = set(missing["symbol"].to_list())
+    return _fill_list_dates(
+        instruments,
+        {symbol: listed for symbol, listed in dates.items() if symbol in wanted and listed <= on},
+    ), []
 
 
 def _enrich_etf_list_dates_from_profiles(
@@ -546,8 +611,9 @@ def _delisted_instruments(config: Config) -> pl.DataFrame:
             schema={"symbol": pl.Utf8, "delist_date": pl.Date, "risk_warning": pl.Boolean}
         )
     name_col = pl.col("name") if "name" in frame.columns else pl.lit(None, dtype=pl.Utf8)
+    impossible = impossible_delistings(frame)
     return (
-        frame.filter(pl.col("delist_date").is_not_null())
+        frame.filter(pl.col("delist_date").is_not_null() & ~pl.col("symbol").is_in(impossible))
         .select(
             "symbol",
             "delist_date",
@@ -693,6 +759,66 @@ def _drop_unlisted_codes(
     return kept, [finding], sh_sz_board
 
 
+def first_traded_dates(config: Config, symbols: list[str]) -> pl.DataFrame:
+    """``symbol / first_traded``: each code's earliest traded ``daily_bars`` session."""
+    schema = {"symbol": pl.Utf8, "first_traded": pl.Date}
+    root = config.curated_root / "daily_bars"
+    if not symbols:
+        return pl.DataFrame(schema=schema)
+    from cnequity.query.parquet_scan import dataset_has_parquet, scan_parquet_root
+
+    if not dataset_has_parquet(root):
+        return pl.DataFrame(schema=schema)
+    return (
+        scan_parquet_root(
+            root,
+            partition_col="trade_date",
+            symbols=sorted(symbols),
+            traded_only=True,
+            dataset="daily_bars",
+            meta_root=config.meta_root,
+        )
+        .group_by("symbol")
+        .agg(pl.col("trade_date").min().alias("first_traded"))
+        .collect()
+        .cast(schema)
+    )
+
+
+def _drop_before_listing(config: Config, df: pl.DataFrame) -> tuple[pl.DataFrame, list[dict]]:
+    """Remove rows stamped on sessions before a code's known listing date.
+
+    :func:`_drop_unlisted_codes` covers codes with no listing date yet; this
+    covers the ones TDX already dates, on every session a catch-up spans.
+    """
+    if df.is_empty() or "symbol" not in df.columns:
+        return df, []
+    from cnequity.steps.common import instrument_metadata
+
+    first_day = df.get_column("trade_date").min()
+    listings = instrument_metadata(config).filter(pl.col("list_date") > first_day)
+    listings = listings.filter(pl.col("symbol").is_in(df.get_column("symbol").unique().to_list()))
+    if listings.is_empty():
+        return df, []
+    listings = listings.join(
+        first_traded_dates(config, listings["symbol"].to_list()), on="symbol", how="left"
+    )
+    kept, dropped = split_before_listing(df, listings)
+    if dropped.is_empty():
+        return df, []
+    finding = {
+        "dataset": "trading_status",
+        "severity": "info",
+        "check": "trading_status_before_listing_dropped",
+        "message": (
+            f"{dropped.height} row(s) for {dropped['symbol'].n_unique()} code(s) fall before "
+            "the code's listing date; no status row written"
+        ),
+        "symbols": sorted(dropped["symbol"].unique().to_list()),
+    }
+    return kept, [finding]
+
+
 def _delisted_status_rows(
     delisted: pl.DataFrame, symbols: list[str], days: list[date]
 ) -> pl.DataFrame:
@@ -765,70 +891,67 @@ def step_trading_status(config: Config, trade_date: date, run_id: str, context: 
     # path below. See issue #3.
     fallback_days: list[date] = []
     fallback_errors: list[str] = []
+    # (day, from the exchange boards, carried forward, left without a row)
+    fallback_coverage: list[tuple[date, int, int, int]] = []
     cached_snapshot: pl.DataFrame | None = None
 
     def _cached_status(day: date) -> pl.DataFrame | None:
-        """Return the last curated status snapshot, conservatively expanded.
+        """Carry each symbol's last first-hand status forward, or None.
 
         trading_status is advisory for the daily signal gate. When EastMoney is
         temporarily unreachable, keeping known ST/halt labels is safer than
-        turning every name into ``normal``. Symbols absent from the cached
-        snapshot are marked suspended so an outage cannot add an unverified
-        name to the tradable universe.
+        turning every name into ``normal``. Only a first-hand reading from the
+        last ``_CACHED_TRADING_STATUS_MAX_SESSIONS`` sessions is carried: a row
+        this fallback wrote itself is not evidence, and chaining on it let one
+        partial day propagate. A symbol with no such reading gets no row rather
+        than a ``suspended`` one — that default published 4,863 trading names as
+        halted after National Day 2026. A missing row is what makes the strict
+        universe refuse the day.
         """
         nonlocal cached_snapshot
+        sessions = list_trading_dates(
+            config, day - _CACHED_TRADING_STATUS_SEARCH_SPAN, day - timedelta(days=1)
+        )[-_CACHED_TRADING_STATUS_MAX_SESSIONS:]
+        if not sessions:
+            return None
+        oldest = sessions[0]
         if cached_snapshot is None:
             try:
                 from cnequity.query.reader import load
 
+                # Bounded to the carry window; passing only ``end`` would
+                # decode the entire historical status lake (17M+ rows in a
+                # real full-market lake) during an outage.
                 history = load(
                     "trading_status",
                     data_root=config.data_root,
-                    # A cached fallback is accepted only when its latest
-                    # snapshot is at most five days old. Bound the read to
-                    # that same window; passing only ``end`` would decode the
-                    # entire historical status lake (17M+ rows in a real
-                    # full-market lake) during an outage.
-                    start=day - _CACHED_TRADING_STATUS_MAX_AGE,
+                    start=oldest,
                     end=day - timedelta(days=1),
                 )
             except Exception as exc:  # noqa: BLE001 — fallback is best effort
                 logger.warning("cached trading_status unavailable: %s", exc)
                 return None
-            if history.is_empty():
-                return None
-            latest = history.get_column("trade_date").max()
-            if latest is None or day - latest > _CACHED_TRADING_STATUS_MAX_AGE:
-                logger.warning(
-                    "cached trading_status is too old for %s: latest=%s max_age=%s",
-                    day,
-                    latest,
-                    _CACHED_TRADING_STATUS_MAX_AGE,
-                )
-                return None
-            columns = ["symbol", "is_trading", "status"]
-            if "risk_warning" in history.columns:
-                columns.append("risk_warning")
-            cached_snapshot = history.filter(pl.col("trade_date") == latest).select(columns)
+            cached_snapshot = _first_hand_status(history)
 
-        known = {
-            row["symbol"]: row for row in cached_snapshot.iter_rows(named=True) if row.get("symbol")
-        }
-        rows = []
-        for symbol in _live_symbols(day):
-            previous = known.get(symbol)
-            rows.append(
-                {
-                    "symbol": symbol,
-                    "trade_date": day,
-                    "is_trading": bool(previous["is_trading"]) if previous else False,
-                    "status": previous["status"] if previous else STATUS_SUSPENDED,
-                    # An outage must not clear a risk-warning label. Unknown
-                    # stays unknown rather than becoming a claim of "clean".
-                    "risk_warning": previous.get("risk_warning") if previous else None,
-                }
+        evidence = cached_snapshot.filter(
+            (pl.col("evidence_date") >= oldest) & pl.col("symbol").is_in(_live_symbols(day))
+        )
+        if evidence.is_empty():
+            logger.warning(
+                "no first-hand trading_status within %d session(s) before %s",
+                _CACHED_TRADING_STATUS_MAX_SESSIONS,
+                day,
             )
-        return pl.DataFrame(rows, schema_overrides={"risk_warning": pl.Boolean})
+            return None
+        return evidence.select(
+            "symbol",
+            pl.lit(day).alias("trade_date"),
+            "is_trading",
+            "status",
+            # An outage must not clear a risk-warning label. Unknown stays
+            # unknown rather than becoming a claim of "clean".
+            "risk_warning",
+        )
 
     def _fetch(day: date):
         """Vendor rows for the live universe plus this day's delisted rows.
@@ -938,7 +1061,9 @@ def step_trading_status(config: Config, trade_date: date, run_id: str, context: 
                     "trading_status: incomplete daily snapshot; " + "; ".join(details)
                 )
             frame = _beijing_status(config, frame, day, day_symbols)
-            cached_snapshot = frame.select("symbol", "is_trading", "status")
+            cached_snapshot = _first_hand_status(
+                frame.with_columns(pl.lit(day).alias("trade_date"))
+            )
             return frame
         except Exception as exc:  # noqa: BLE001 — EastMoney outage is advisory here
             # A second opinion before a stale one. The exchanges publish every
@@ -964,32 +1089,25 @@ def step_trading_status(config: Config, trade_date: date, run_id: str, context: 
                 raise
             fallback_days.append(day)
             fallback_errors.append(f"{day.isoformat()}: {exc}")
-            if covered and cached is not None:
+            parts = [exchange_rows] if covered else []
+            carried = 0
+            if cached is not None:
                 remainder = cached.filter(~pl.col("symbol").is_in(sorted(covered)))
-                logger.warning(
-                    "trading_status: EastMoney unavailable for %s; %d symbol(s) from the "
-                    "exchange boards, %d from the last curated snapshot",
-                    day,
-                    len(covered),
-                    remainder.height,
-                )
-                if remainder.is_empty():
-                    return exchange_rows
-                return pl.concat([exchange_rows, remainder], how="diagonal_relaxed")
-            if covered:
-                logger.warning(
-                    "trading_status: EastMoney unavailable for %s; %d symbol(s) from the "
-                    "exchange boards and no cached snapshot for the rest",
-                    day,
-                    len(covered),
-                )
-                return exchange_rows
+                carried = remainder.height
+                if carried:
+                    parts.append(remainder)
+            out = parts[0] if len(parts) == 1 else pl.concat(parts, how="diagonal_relaxed")
+            unanswered = len(expected_symbols - set(out.get_column("symbol").to_list()))
+            fallback_coverage.append((day, len(covered), carried, unanswered))
             logger.warning(
-                "trading_status: EastMoney and the exchange boards unavailable for %s; "
-                "using last curated snapshot",
+                "trading_status: EastMoney unavailable for %s; %d symbol(s) from the "
+                "exchange boards, %d carried from first-hand status, %d left without a row",
                 day,
+                len(covered),
+                carried,
+                unanswered,
             )
-            return cached
+            return out
 
     df, _findings = fetch_incremental_daily(
         config,
@@ -1005,6 +1123,8 @@ def step_trading_status(config: Config, trade_date: date, run_id: str, context: 
     # status — and the ST evidence receipt admits a board precisely because a
     # board is not an aggregator. Snapshot only: authority is unchanged.
     df, unlisted_findings, sh_sz_board = _drop_unlisted_codes(config, df, trade_date, context)
+    df, early_findings = _drop_before_listing(config, df)
+    unlisted_findings = [*unlisted_findings, *early_findings]
     try:
         captured = snapshot_trading_status_exchange(
             config,
@@ -1023,6 +1143,7 @@ def step_trading_status(config: Config, trade_date: date, run_id: str, context: 
             result["context_updates"] = {"audit_findings": _findings}
         return result
     findings = [*_findings, *unlisted_findings]
+    unanswered = sum(missing for *_, missing in fallback_coverage)
     if fallback_days:
         findings.append(
             {
@@ -1030,23 +1151,37 @@ def step_trading_status(config: Config, trade_date: date, run_id: str, context: 
                 "severity": "warning",
                 "check": "trading_status_cached_fallback",
                 "message": (
-                    f"EastMoney unavailable for {len(fallback_days)} day(s); reused the "
-                    "last curated status snapshot and conservatively suspended unknown symbols"
+                    f"EastMoney unavailable for {len(fallback_days)} day(s); used the exchange "
+                    "boards and each symbol's last first-hand status; "
+                    f"{unanswered} live symbol-day(s) have no status row"
                 ),
                 "days": [day.isoformat() for day in fallback_days],
+                "coverage": [
+                    {
+                        "trade_date": day.isoformat(),
+                        "exchange_boards": boards,
+                        "carried_forward": carried,
+                        "without_row": missing,
+                    }
+                    for day, boards, carried, missing in fallback_coverage
+                ],
                 "errors": fallback_errors[:3],
             }
         )
     # This adapter is an EastMoney current-state snapshot even though it is
     # exposed through the TDX facade. Preserve the actual evidence owner so
     # downstream PIT precedence never mistakes it for exchange history.
-    source = "eastmoney_cached" if fallback_days else "eastmoney"
+    source = _CACHED_SOURCE if fallback_days else "eastmoney"
     # Rows that named their own owner keep it — a delisting is a fact from
     # `instruments`, not the vendor's answer. Everything else is the snapshot.
     if "source" in df.columns:
         df = df.with_columns(pl.col("source").fill_null(source))
     df = with_provenance(df, source=source, data_version="v1")
     result = write_simple(config, run_id, "trading_status", df)
+    if fallback_days:
+        result["status"] = "warning"
+        if unanswered:
+            result["coverage_status"] = "partial"
     if findings:
         result["context_updates"] = {"audit_findings": findings}
     return result

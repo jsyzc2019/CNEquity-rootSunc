@@ -210,12 +210,18 @@ THS 官方估值快照只能从启用后按日积累，不能用旧日期重放�
 
 | 数据集 | 分区键 | 主键 | 语义 | 水位 | 主源 | 备注 |
 |--------|--------|------|------|------|------|------|
-| financial_statement_items | report_period | symbol, report_period, statement_type, item_code | by_date PIT | — | eastmoney | 按报告期分区；`cne backfill` 默认自 2001 起（`--start`/`--end` 分块）；PIT 同时受 `announce_date` 与 `fetched_at` 截止；baostock 不用于 FSI |
+| financial_statement_items | report_period | symbol, report_period, statement_type, item_code | by_date PIT | — | eastmoney | 按报告期分区；`cne backfill` 默认自 2001 起（`--start`/`--end` 分块）；日更保留实际公告版本并补明确标记的原始披露日重建版本；baostock 不用于 FSI |
 | valuation_metrics | trade_date | symbol, trade_date | snapshot | ✓ | eastmoney | 回填：baostock |
 | analyst_consensus | forecast_date | symbol, forecast_date | snapshot | ✓ | eastmoney | |
 | share_structure | change_date | symbol, change_date, announce_date | by_date PIT | — | eastmoney | 总股本/流通/限售/自由流通。**按变动日期扫，不是按报告期**：END_DATE 是股本变动日，不能只请求季末日期 |
 | shareholder_counts | count_date | symbol, count_date, announce_date | by_date PIT | — | eastmoney | 股东户数与户均持股，筹码集中度输入。**旬末/月末也披露**：不能只按季末日期筛选 |
 | top_holders | record_date | symbol, record_date, holder_scope, holder_rank, holder_name, announce_date | by_date PIT | — | eastmoney | 一张表两个口径：`holder_scope=total`（前十大股东）/ `float`（前十大流通股东）。披露日期不一定落在季末 |
+
+财报 DMSK 的 `NOTICE_DATE` 可能是比较期数据的再公告日。原始披露日从 LICO 解析；缺少对应 LICO 记录时保留较晚日期，不猜测原始日期。日更保留再公告版本，并仅为缺少原始日期版本的科目追加 `source=eastmoney_backfill` 重建值。重建数值可能经过重述：默认 `load(..., as_of=...)` 的 `best_effort` 可读，但返回 `pit_is_exact=false`；`pit_mode="strict"` 排除重建值且要求实际观察时间不晚于查询日期。
+
+已有数据可先运行 `cne repair financial-announcements` 预览，再加 `--apply` 发布保留旧版本的修复。它只修复有原始公告日期证据的已有科目；缺少的历史科目仍需 `cne backfill financial_statement_items --start <date> --end <date>` 按报告期补采。来源、科目及报告期的覆盖分别检查，不能由某一个报表齐全推断所有明细齐全。
+
+估值源以零表示缺失的 PE、PB、PS 和总/流通市值统一写空值；负估值比率仍保留。旧数据用 `cne repair missing-values valuation_metrics` 预览，加 `--apply` 发布新版本。
 
 ## L4 资金面
 
@@ -254,7 +260,13 @@ THS 官方估值快照只能从启用后按日积累，不能用旧日期重放�
 快照类仅积累「每日一份成员关系」，历史分位数需多日分区累积。
 
 历史回填（C2）：`cne backfill industry_members` = 申万 SwClass2021 月度（`classification_system=sw`，2020 起）；
-`cne backfill index_constituents` = 国证调样史（399001/399006，约 2021-12 起）。中证 000300/000905 仍仅日更 EM 快照。
+`cne backfill index_constituents` = 国证调样史（399001/399006，约 2021-12 起）。沪深 300、科创 50 等其他指数仍仅有采集后积累的 EM 快照。当前名单不能回填到更早日期，否则会产生幸存者偏差；EM 适配器只接受当前已收盘交易日。历史读取只使用当时已存的快照，早于最早快照的成员关系未知。
+
+EM 和国证调样史都不提供成分权重，`weight=null`，不能把它当成真实零权重或自动推断为等权。`cne repair missing-values index_constituents` 列出每个指数、来源的快照起止与数量，并预览将旧占位零改为空值；`--apply` 发布新版本，不制造缺失的历史成分或权重。
+
+`load("index_constituents", as_of="YYYY-MM-DD")` 对每个指数返回截止该日最近的一整份已存快照；较早快照中已被剔除的成员不会逐证券沿用，最早快照之前返回空表。用 `start`/`end` 读取多日快照序列。
+
+EM 响应若已包含尚未生效的调样行，会拒绝整份快照：删除未来新增行无法恢复已经从当前名单中消失的旧成员。调样生效后重试采集。
 
 ## L6 宏观
 

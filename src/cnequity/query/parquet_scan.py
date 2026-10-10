@@ -384,7 +384,7 @@ def collect_parquet_root(
 
 
 def lazy_row_count(lf: pl.LazyFrame) -> int:
-    if lf.collect_schema().names() == ():
+    if not lf.collect_schema().names():
         return 0
     return int(lf.select(pl.len()).collect().item())
 

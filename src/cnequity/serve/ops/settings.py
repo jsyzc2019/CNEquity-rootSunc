@@ -300,6 +300,16 @@ SETTINGS: tuple[Setting, ...] = (
         choices=_INGEST,
     ),
     Setting(
+        "ingest_listed_funds",
+        "universe",
+        "universe",
+        "ingest_listed_funds",
+        "bool",
+        "同时抓取已上市 ETF/LOF 日线",
+        "按证券目录采集基金行情，研究资格不影响采集；未知上市日期单独报告。默认关闭。",
+        False,
+    ),
+    Setting(
         "ingest_eligible_etfs",
         "universe",
         "universe",

@@ -547,7 +547,9 @@ def create_app(
             header = request.headers.get("authorization", "")
             supplied = header[7:] if header.lower().startswith("bearer ") else None
             supplied = supplied or request.query_params.get("token")
-            if supplied != expected:
+            if not supplied or not secrets.compare_digest(
+                supplied.encode("utf-8"), expected.encode("utf-8")
+            ):
                 from fastapi.responses import JSONResponse
 
                 return JSONResponse({"detail": "unauthorized"}, status_code=401)
@@ -745,6 +747,13 @@ def create_app(
         ] = None,
         symbol: Annotated[str | None, Query(description="e.g. 600519.SH")] = None,
         as_of: Annotated[date | None, Query(description="PIT cutoff on announce_date.")] = None,
+        pit_mode: Annotated[
+            str | None,
+            Query(
+                pattern="^(strict|best_effort)$",
+                description="With as_of; best_effort (default) keeps backfilled rows.",
+            ),
+        ] = None,
         adjust: Annotated[str | None, Query(pattern="^(hfq|qfq|total_return)$")] = None,
         # Capped rather than unbounded: this endpoint is a viewer, and a full
         # market-day of a wide dataset is not something to hand back by accident.
@@ -760,6 +769,7 @@ def create_app(
                     period=period,
                     symbol=symbol,
                     as_of=as_of,
+                    pit_mode=pit_mode,
                     adjust=adjust,
                     limit=limit,
                     offset=offset,

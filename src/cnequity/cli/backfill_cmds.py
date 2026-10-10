@@ -1087,6 +1087,8 @@ def _repair_outstanding(cfg, dataset: str, workers: int) -> dict:
         err=True,
     )
     failures: list[str] = []
+    followups: list[dict] = []
+    lineage_degraded = False
     passes = 0
     filled = 0
     fatal = False
@@ -1101,7 +1103,15 @@ def _repair_outstanding(cfg, dataset: str, workers: int) -> dict:
         cfg._backfill_start = date.fromisoformat(lo)
         cfg._backfill_end = date.fromisoformat(hi)
         cfg._backfill_workers = workers
+        window = (cfg._backfill_start, cfg._backfill_end)
+        before = _bar_fingerprint(cfg, window) if dataset == "daily_bars" else None
         out = _backfill_once(cfg, dataset)
+        if before is not None and out.get("status") != "failed":
+            summary = _follow_lineage(
+                out, lambda b=before, w=window, o=out: _after_daily_bars(cfg, b, w, o)
+            )
+            followups.append({"month": month, **summary})
+            lineage_degraded |= summary.get("status") in {"failed", "warning", "degraded"}
         passes += 1
         if out.get("status") not in ("success", "warning", "degraded"):
             failures.append(f"{month}: {out.get('status')}")
@@ -1125,9 +1135,12 @@ def _repair_outstanding(cfg, dataset: str, workers: int) -> dict:
         if fatal or (failures and not filled)
         else "warning"
         if settled["still_owed"]
+        else "degraded"
+        if lineage_degraded
         else "success",
         "passes": passes,
         "failed_passes": failures,
+        "followups": followups,
         "outstanding": settled,
         "result_schema_version": 2,
         "execution_status": "failed" if fatal or (failures and not filled) else "completed",

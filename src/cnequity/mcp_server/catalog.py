@@ -162,6 +162,13 @@ TOOLS: list[dict] = [
                     "the one current then. For studying restatements; it double-counts "
                     "a fact in any cross-sectional screen.",
                 },
+                "pit_mode": {
+                    "type": "string",
+                    "enum": ["best_effort", "strict"],
+                    "description": "best_effort (default) also returns rows a later "
+                    "backfill recorded, flagged pit_is_exact=false; strict keeps only "
+                    "rows the lake held by as_of, which is none for a backfilled history.",
+                },
                 "limit": _LIMIT,
                 "offset": _OFFSET,
             },

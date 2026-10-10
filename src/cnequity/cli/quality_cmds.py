@@ -293,7 +293,7 @@ def _tip_scope(cfg, catalog: pl.DataFrame, dataset: str = "daily_bars") -> dict 
 
 @cli.command()
 @config_option
-@click.option("--run-id", default=None)
+@click.option("--run-id", multiple=True, help="运行 ID；可重复指定，合并运行证据并审计一次。")
 @click.option(
     "--full",
     "full",
@@ -324,7 +324,7 @@ def _tip_scope(cfg, catalog: pl.DataFrame, dataset: str = "daily_bars") -> dict 
 )
 def audit(
     config_path: str,
-    run_id: str | None,
+    run_id: tuple[str, ...],
     full: bool,
     research_start: str | None,
     research_end: str | None,
@@ -452,9 +452,9 @@ def audit(
 
     manifest = Manifest(cfg.manifest_path)
     latest = manifest.latest_run() if not run_id else None
-    rid = run_id or (latest["run_id"] if latest else "manual")
+    rid = run_id[-1] if run_id else (latest["run_id"] if latest else "manual")
 
-    severities: dict = {}
+    severities: dict = {"related_run_ids": list(dict.fromkeys(run_id))} if run_id else {}
     n = run_audit(cfg, rid, shanghai_today(), severities)
     by_severity = severities.get("audit_by_severity", {})
     errors = int(by_severity.get("error", 0))
@@ -1629,27 +1629,43 @@ def _check_quality(cfg, *, full: bool) -> tuple[int, str | None]:
 
         click.echo("  正在重跑全湖审计（读每个历史分区）…")
         health = lake_health(cfg, shanghai_today())
-        errors = int(health["findings_by_severity"].get("error", 0))
-        click.echo(f"  全湖审计（刚刚）：{errors} error")
-        for finding in health["error_findings"][:10]:
-            click.echo(f"    [error] {finding.get('dataset', ''):22} {finding.get('message', '')}")
-        if errors:
-            code, note = 1, f"全湖审计有 {errors} 条 error"
+        health_errors = _health_errors(health, coverage_only)
+        click.echo(f"  全湖审计（刚刚）：{len(health_errors)} error")
+        label = "全湖审计"
     else:
         snapshot = quality_root / "health-latest.json"
+        health_errors = []
         if snapshot.exists():
             health = json.loads(snapshot.read_text(encoding="utf-8"))
             age = (datetime.now() - datetime.fromtimestamp(snapshot.stat().st_mtime)).days
-            errors = int(health.get("findings_by_severity", {}).get("error", 0))
+            health_errors = _health_errors(health, coverage_only)
             click.echo(
-                f"  全湖审计快照（{health.get('trade_date')}，{age} 天前）：{errors} error"
-                "；加 --full 立即重跑"
+                f"  全湖审计快照（{health.get('trade_date')}，{age} 天前）："
+                f"{len(health_errors)} error；加 --full 立即重跑"
             )
         else:
             click.echo("  还没有全湖审计快照；加 --full 立即生成")
+        label = "全湖审计快照"
+    for finding in [f for f in health_errors if f][:10]:
+        click.echo(f"    [error] {finding.get('dataset', ''):22} {finding.get('message', '')}")
+    if health_errors:
+        found = f"{label}有 {len(health_errors)} 条 error"
+        code, note = 1, found if note is None else f"{note}，{found}"
     if not runs and not full:
         return 2, "没有审计记录，质量证明不了（加 --full 立即审计）"
     return code, note
+
+
+def _health_errors(health: dict, coverage_only) -> list[dict]:
+    """Quality errors in a whole-lake audit, without the coverage-only ones.
+
+    A snapshot from before ``error_findings`` was recorded has only counts;
+    those count as errors with nothing to list.
+    """
+    if "error_findings" not in health:
+        count = int(health.get("findings_by_severity", {}).get("error", 0))
+        return [{} for _ in range(count)]
+    return [f for f in health["error_findings"] if not coverage_only(f)]
 
 
 def _check_size(cfg) -> None:

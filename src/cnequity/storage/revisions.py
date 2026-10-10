@@ -22,7 +22,12 @@ from typing import Any
 
 from cnequity.domain.datasets import DATASETS
 from cnequity.file_lock import lake_mutation_lock
-from cnequity.storage.atomic import replace_with_retry, swap_with_backup, write_json_atomic
+from cnequity.storage.atomic import (
+    fsync_dir,
+    replace_with_retry,
+    swap_with_backup,
+    write_json_atomic,
+)
 from cnequity.storage.file_copy import copy2_isolated
 from cnequity.storage.state import StateStore
 
@@ -528,6 +533,10 @@ class RevisionStore:
                             sha256=sha256_file(stored),
                         )
                     )
+            # Every copy is already synced; their directory entries are not.
+            created = {temporary, *(path for path in temporary.rglob("*") if path.is_dir())}
+            for directory in sorted(created, key=lambda path: len(path.parts), reverse=True):
+                fsync_dir(directory)
             # Rename only after every file has been copied.  Readers never see
             # ``temporary`` because the pointer is published later.
             replace_with_retry(temporary, destination)

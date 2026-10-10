@@ -138,6 +138,8 @@ class Config:
     # Keep this off by default so existing A-share lakes do not acquire a
     # fund-wide fetch obligation merely by upgrading.
     ingest_eligible_etfs: bool = False
+    # Fetch exchange-listed ETF/LOF quotes independently of research eligibility.
+    ingest_listed_funds: bool = False
     # How many trailing sessions the per-symbol Sina leg reconciles on a daily
     # run. TDX has no Beijing route, so all ~580 BJ symbols come through that
     # one-request-per-symbol endpoint; running daily_bars' full 5-session
@@ -915,6 +917,9 @@ def load_config(path: str | Path) -> Config:
     ingest_eligible_etfs = raw.get("universe", {}).get("ingest_eligible_etfs", False)
     if not isinstance(ingest_eligible_etfs, bool):
         raise ValueError("[universe].ingest_eligible_etfs must be true or false")
+    ingest_listed_funds = raw.get("universe", {}).get("ingest_listed_funds", False)
+    if not isinstance(ingest_listed_funds, bool):
+        raise ValueError("[universe].ingest_listed_funds must be true or false")
 
     cfg = Config(
         data_root=data_root,
@@ -976,6 +981,7 @@ def load_config(path: str | Path) -> Config:
         ths_official_backfill_enabled=ths_official_backfill_enabled,
         ingest_universe=str(raw.get("universe", {}).get("ingest", "all_a")).strip().lower(),
         ingest_eligible_etfs=ingest_eligible_etfs,
+        ingest_listed_funds=ingest_listed_funds,
         bj_history_lookback_days=int(
             raw.get("sources", {}).get("sina_bars", {}).get("reconciliation_lookback_days", 1)
         ),

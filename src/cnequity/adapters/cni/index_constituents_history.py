@@ -263,7 +263,7 @@ def expand_cni_constituents_as_of(
                 pl.col("index_symbol"),
                 pl.col("symbol"),
                 pl.lit(as_of).alias("as_of_date"),
-                pl.lit(0.0).alias("weight"),
+                pl.lit(None, dtype=pl.Float64).alias("weight"),
             )
             .unique(subset=["index_symbol", "symbol", "as_of_date"], keep="last")
         )

@@ -247,6 +247,44 @@ def test_resume_does_not_advance_past_a_still_failing_phase(cfg, monkeypatch):
     assert calls == ["corporate_actions"]
 
 
+def test_resume_does_not_finish_the_parent_before_remaining_phases(cfg, monkeypatch):
+    init_data_layout(cfg)
+    from cnequity.orchestrator import engine as eng_mod
+    from cnequity.orchestrator.registry import StepEntry
+
+    cfg.init_phases = ["phase1_reference", "phase3_index_and_status"]
+    monkeypatch.setitem(eng_mod.INIT_PHASE_STEPS, "phase1_reference", ["instruments"])
+    monkeypatch.setitem(eng_mod.INIT_PHASE_STEPS, "phase3_index_and_status", ["trading_status"])
+    engine = JobEngine(cfg)
+    manifest = engine.manifest
+    run_id = manifest.start_run("init", {"phases": cfg.init_phases, "trade_date": "2024-06-28"})
+    manifest.start_batch(run_id, "done", "instruments", "instruments")
+    manifest.finish_batch(run_id, "done", "success")
+    manifest.finish_run(run_id, "failed", error_message="interrupted between phases")
+    events = []
+    original_finish = manifest.finish_run
+
+    def finish(rid, status, *args, **kwargs):
+        events.append(("finish", status))
+        return original_finish(rid, status, *args, **kwargs)
+
+    def get_step(name):
+        def execute(*args):
+            row = manifest.get_run(run_id)
+            assert row["status"] == "running"
+            assert row["finished_at"] is None
+            events.append(("step", name))
+            return {"rows_read": 1, "rows_written": 1}
+
+        return StepEntry(fn=execute, group="test", requires_workers=False)
+
+    monkeypatch.setattr(manifest, "finish_run", finish)
+    monkeypatch.setattr(eng_mod, "get_step", get_step)
+    result = engine.resume_init(date(2024, 6, 28), run_id=run_id)
+    assert result["status"] == "success"
+    assert events == [("step", "trading_status"), ("finish", "success")]
+
+
 def test_retry_runs_missing_init_steps(cfg):
     init_data_layout(cfg)
     manifest = Manifest(cfg.manifest_path)

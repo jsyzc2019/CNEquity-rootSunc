@@ -285,6 +285,28 @@ def test_adj_factor_dates_skip_placeholder_only_symbols(tmp_path):
     assert bars.height == 2
 
 
+@pytest.mark.parametrize("later_volume", [0, 100])
+def test_factor_dates_respect_delisting_unless_traded_prices_contradict_it(tmp_path, later_volume):
+    cfg = Config(data_root=tmp_path / "lake")
+    bars = cfg.curated_root / "daily_bars"
+    bars.mkdir(parents=True)
+    days = [date(2024, 6, 26), date(2024, 6, 27), date(2024, 6, 28)]
+    pl.DataFrame(
+        {"symbol": ["600519.SH"] * 3, "trade_date": days, "volume": [100, 0, later_volume]}
+    ).write_parquet(bars / "part.parquet")
+    instruments = cfg.curated_root / "instruments"
+    instruments.mkdir(parents=True)
+    pl.DataFrame({"symbol": ["600519.SH"], "delist_date": [days[1]]}).write_parquet(
+        instruments / "part.parquet"
+    )
+
+    expected = days if later_volume else days[:2]
+    assert _load_daily_bar_dates(cfg)["trade_date"].to_list() == expected
+    # The append-only path must use the same window as the full derive.
+    incremental = _load_daily_bar_dates(cfg, start=days[2])
+    assert incremental["trade_date"].to_list() == (days[2:] if later_volume else [])
+
+
 def test_factor_continuity_findings_flags_break():
     from cnequity.derive.adj_factors import _factor_continuity_findings
 

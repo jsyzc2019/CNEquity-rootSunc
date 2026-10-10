@@ -28,7 +28,10 @@ class ExperimentRetirement:
         self.artifacts = ArtifactStore(store)
 
     def _references(self, registry: dict) -> None:
-        if reference_fingerprint(registry["reference_roots"]) != registry["reference_fingerprint"]:
+        if (
+            reference_fingerprint(registry["reference_roots"], meta_root=self.store.meta)
+            != registry["reference_fingerprint"]
+        ):
             raise LifecycleError("References changed; refresh the lifecycle import")
 
     def _unfinished(self) -> list[Path]:

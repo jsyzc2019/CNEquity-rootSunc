@@ -1150,6 +1150,24 @@ def test_audit_with_run_id(cfg_path, monkeypatch):
     assert "2 条 findings" in result.output
 
 
+def test_audit_multiple_run_ids_are_collected_in_one_pass(cfg_path, monkeypatch):
+    calls = []
+
+    def audit(cfg, rid, day, context):
+        calls.append((rid, context["related_run_ids"]))
+        context["audit_by_severity"] = {"error": 1}
+        context["audit_error_findings"] = [{"message": "early group error"}]
+        return 1
+
+    monkeypatch.setattr("cnequity.cli.quality_cmds.run_audit", audit)
+    result = CliRunner().invoke(
+        cli, ["audit", "--config", cfg_path, "--run-id", "core", "--run-id", "research"]
+    )
+    assert result.exit_code == 1
+    assert calls == [("research", ["core", "research"])]
+    assert "early group error" in result.output
+
+
 def test_per_run_audit_exits_non_zero_on_error_findings(cfg_path, monkeypatch):
     """It is used as a gate, so recording an error and reporting success is a
     gate that never fires."""

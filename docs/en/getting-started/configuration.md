@@ -100,7 +100,7 @@ Main sources and request channels in the template:
 | `backfill` (ths_official) | **Off** by default. It changes the lake's contents, so it must be turned on explicitly. Holding credentials, enabling the source and allowing it to modify data are three separate decisions |
 | `api_key` (ths_official) | Prefer the environment variable `HITHINK_FINANCE_API_KEY` over writing it into the config |
 
-The fetch settings in `cne serve` only change `enabled` for TDX, EastMoney, Sina daily bars, Baostock, the BSE website, THS pages and CNINFO, plus EastMoney's `push2_paused`. The minute-bar, trade-tick and futures switches and `[universe] ingest` / `ingest_eligible_etfs` are on that page too. Before confirming, it lists the differences, and it backs up before writing; intervals, budgets, breakers and credentials are left untouched. The environment variable `CNE_PUSH2_PAUSED=1` still takes precedence over the pause switch in the config.
+The fetch settings in `cne serve` only change `enabled` for TDX, EastMoney, Sina daily bars, Baostock, the BSE website, THS pages and CNINFO, plus EastMoney's `push2_paused`. The minute-bar, trade-tick and futures switches and `[universe] ingest` / `ingest_listed_funds` / `ingest_eligible_etfs` are on that page too. Before confirming, it lists the differences, and it backs up before writing; intervals, budgets, breakers and credentials are left untouched. The environment variable `CNE_PUSH2_PAUSED=1` still takes precedence over the pause switch in the config.
 
 Template request intervals (conservative client-side settings, not a guarantee of a safe quota on the source side):
 
@@ -196,10 +196,7 @@ Default config: `daily_bars` (TDX primary / EM fallback), `corporate_actions` (E
 
 ST, suspended, CDR and delisted names are kept under every value — dropping them is exactly the survivorship bias this lake exists to avoid.
 
-`instruments` returns every code TDX lists, of which about a quarter are ETF/LOF/fund quote codes:
-no research definition ever selects them, and no configured source provides them reliably. Putting them into the daily update
-would take up a quarter of the fetch volume, trip the EastMoney and Sina breakers with codes nobody needs, and leave unfillable
-`symbol×session` keys for the coverage gate — which then refuses to write that day to disk.
+Explicitly enabling `[universe].ingest_listed_funds = true` adds listed ETF/LOF from the security master to daily fetching; research eligibility only filters research selections. Known prelisting and post-delisting sessions are excluded. Unknown listing dates are still requested and listed separately in per-security coverage; they cannot certify completeness. An unreadable catalog fails explicitly, and empty source responses remain gaps. This switch takes precedence over the legacy `ingest_eligible_etfs`. The legacy switch still fetches only research-eligible ETFs, but a failed, missing or more than 14-day-old eligibility catalog now raises an error.
 
 ## `[job.daily.waves]`
 

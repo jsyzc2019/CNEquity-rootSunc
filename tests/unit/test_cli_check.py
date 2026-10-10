@@ -77,6 +77,63 @@ def test_audit_errors_fail_the_check(lake, monkeypatch):
     assert "最近一次审计有 1 条 error" in result.output
 
 
+def _health(lake: str, payload: dict):
+    root = load_config(lake).meta_root / "quality"
+    root.mkdir(parents=True, exist_ok=True)
+    (root / "health-latest.json").write_text(
+        json.dumps({"trade_date": "2026-09-30", **payload}), encoding="utf-8"
+    )
+
+
+def test_errors_in_the_whole_lake_snapshot_fail_the_check(lake, monkeypatch):
+    """A clean latest run does not vouch for history the snapshot found broken."""
+    _status_exits(monkeypatch, 0)
+    _findings(lake, [])
+    _health(
+        lake,
+        {
+            "findings_by_severity": {"error": 1},
+            "error_findings": [
+                {"severity": "error", "dataset": "corporate_actions", "message": "gap"}
+            ],
+        },
+    )
+
+    result = CliRunner().invoke(cli, ["check", "--config", lake])
+
+    assert result.exit_code == 1
+    assert "[error] corporate_actions" in result.output
+    assert "全湖审计快照有 1 条 error" in result.output
+
+
+def test_a_count_only_snapshot_still_fails_on_errors(lake, monkeypatch):
+    _status_exits(monkeypatch, 0)
+    _findings(lake, [])
+    _health(lake, {"findings_by_severity": {"error": 2}})
+
+    result = CliRunner().invoke(cli, ["check", "--config", lake])
+
+    assert result.exit_code == 1
+    assert "全湖审计快照有 2 条 error" in result.output
+
+
+def test_full_audit_errors_fail_the_check(lake, monkeypatch):
+    _status_exits(monkeypatch, 0)
+    _findings(lake, [])
+    monkeypatch.setattr(
+        "cnequity.quality.audit.lake_health",
+        lambda cfg, day: {
+            "findings_by_severity": {"error": 1},
+            "error_findings": [{"severity": "error", "dataset": "daily_bars", "message": "x"}],
+        },
+    )
+
+    result = CliRunner().invoke(cli, ["check", "--full", "--config", lake])
+
+    assert result.exit_code == 1
+    assert "全湖审计有 1 条 error" in result.output
+
+
 def test_stale_data_fails_even_when_quality_is_clean(lake, monkeypatch):
     _status_exits(monkeypatch, 1)
     _findings(lake, [])

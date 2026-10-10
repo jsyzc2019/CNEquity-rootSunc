@@ -210,12 +210,18 @@ The two intraday datasets share one set of quality checks: duplicate primary key
 
 | Dataset | Partition key | Primary key | Semantics | Watermark | Primary source | Notes |
 |--------|--------|------|------|------|------|------|
-| financial_statement_items | report_period | symbol, report_period, statement_type, item_code | by_date PIT | — | eastmoney | Partitioned by report period; `cne backfill` starts from 2001 by default (chunked with `--start`/`--end`); PIT is cut off by both `announce_date` and `fetched_at`; baostock is not used for FSI |
+| financial_statement_items | report_period | symbol, report_period, statement_type, item_code | by_date PIT | — | eastmoney | Partitioned by report period; `cne backfill` starts from 2001 by default (chunked with `--start`/`--end`); daily ingestion retains observed announcements and adds explicitly marked original-disclosure reconstructions; baostock is not used for FSI |
 | valuation_metrics | trade_date | symbol, trade_date | snapshot | ✓ | eastmoney | Backfill: baostock |
 | analyst_consensus | forecast_date | symbol, forecast_date | snapshot | ✓ | eastmoney | |
 | share_structure | change_date | symbol, change_date, announce_date | by_date PIT | — | eastmoney | Total shares / float / restricted / free float. **Scanned by change date, not by report period**: END_DATE is the share-change date, so requesting only quarter-end dates is not enough |
 | shareholder_counts | count_date | symbol, count_date, announce_date | by_date PIT | — | eastmoney | Number of shareholders and average holding per account, an input for ownership concentration. **Also disclosed at ten-day-period and month ends**: do not filter by quarter-end dates only |
 | top_holders | record_date | symbol, record_date, holder_scope, holder_rank, holder_name, announce_date | by_date PIT | — | eastmoney | One table, two scopes: `holder_scope=total` (top 10 shareholders) / `float` (top 10 float shareholders). Disclosure dates do not necessarily fall at quarter end |
+
+DMSK `NOTICE_DATE` may describe a later republication of comparative figures. LICO supplies the original disclosure date; without a matching LICO record the later date is retained. Daily ingestion preserves the republication and adds `source=eastmoney_backfill` only for items lacking an original-date vintage. Reconstructed values may be restated: default `load(..., as_of=...)` best-effort reads expose them with `pit_is_exact=false`; `pit_mode="strict"` excludes reconstructions and requires observation no later than the query date.
+
+Preview existing-data repairs with `cne repair financial-announcements`, then add `--apply` to publish a retained revision. This only reconstructs existing items with original-date evidence. Missing historical items still require report-period collection with `cne backfill financial_statement_items --start <date> --end <date>`. Check coverage separately by source, item and report period; one complete statement does not establish complete detail coverage.
+
+Vendor zero placeholders in PE, PB, PS and total/float market cap are stored as null; negative valuation ratios remain valid. Preview old-data repairs with `cne repair missing-values valuation_metrics`, then add `--apply` to publish a retained revision.
 
 ## L4 Capital flows
 
@@ -254,7 +260,13 @@ watermarks and compact never need to know which path was taken.
 Snapshot datasets accumulate only "one membership record per day"; historical percentiles need partitions accumulated over many days.
 
 Historical backfill (C2): `cne backfill industry_members` = Shenwan SwClass2021 monthly (`classification_system=sw`, from 2020);
-`cne backfill index_constituents` = CNI sample-adjustment history (399001/399006, from about 2021-12). CSI 000300/000905 still has only the daily EM snapshot.
+`cne backfill index_constituents` = CNI sample-adjustment history (399001/399006, from about 2021-12). Other indices, including CSI 300 and STAR 50, only accumulate EM snapshots after collection starts. Current membership cannot be backdated without survivorship bias; the EM adapter accepts only the current closed session. Historical reads use retained snapshots, and membership before the earliest snapshot is unknown.
+
+Neither EM nor CNI adjustment history supplies weights: `weight=null` means unavailable and must not be treated as a real zero or inferred equal weight. `cne repair missing-values index_constituents` reports each index/source's snapshot range and count and previews replacement of old zero placeholders. `--apply` publishes a retained revision without inventing historical membership or weights.
+
+`load("index_constituents", as_of="YYYY-MM-DD")` returns each index's latest whole retained snapshot on or before that date. Removed members are not carried forward individually, and dates before the earliest snapshot return an empty table. Use `start`/`end` to read a multi-date snapshot series.
+
+An EM response containing a future adjustment rejects the whole snapshot: removing future additions cannot recover old members already absent from the current roster. Retry collection once the adjustment takes effect.
 
 ## L6 Macro
 

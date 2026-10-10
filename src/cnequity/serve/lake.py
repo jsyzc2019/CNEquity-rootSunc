@@ -1216,6 +1216,7 @@ class LakeView:
         period: str | None = None,
         symbol: str | None = None,
         as_of: date | None = None,
+        pit_mode: str | None = None,
         adjust: str | None = None,
         limit: int = 200,
         offset: int = 0,
@@ -1249,6 +1250,7 @@ class LakeView:
             kwargs["symbols"] = [symbol]
         if as_of:
             kwargs["as_of"] = as_of
+            kwargs["pit_mode"] = pit_mode or "best_effort"
         if adjust:
             kwargs["adjust"] = adjust
 

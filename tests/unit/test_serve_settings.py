@@ -87,6 +87,7 @@ def test_the_whitelist_is_the_page_and_daily_has_no_range():
         "futures",
         "futures_minute",
         "ingest",
+        "ingest_listed_funds",
         "ingest_eligible_etfs",
     ]
     for op_id in ("daily.full", "daily.group", "daily.stale"):

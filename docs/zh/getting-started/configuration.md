@@ -100,7 +100,7 @@ cne config validate --config configs/cnequity.toml
 | `backfill`（ths_official） | 默认 **关**。它会改变湖里的内容，所以必须显式打开。持有凭证、启用源、允许它改数据是三个决定 |
 | `api_key`（ths_official） | 建议用环境变量 `HITHINK_FINANCE_API_KEY` 而非写进配置 |
 
-`cne serve` 的取数设置只改通达信、东财、新浪日线、Baostock、北交所官网、同花顺页面和巨潮的 `enabled`，以及东财的 `push2_paused`。分钟线、分笔、期货开关和 `[universe] ingest` / `ingest_eligible_etfs` 也在那一页。确认前先列出差异，写入前备份；间隔、预算、熔断和凭据不动。环境变量 `CNE_PUSH2_PAUSED=1` 仍优先于配置里的暂停开关。
+`cne serve` 的取数设置只改通达信、东财、新浪日线、Baostock、北交所官网、同花顺页面和巨潮的 `enabled`，以及东财的 `push2_paused`。分钟线、分笔、期货开关和 `[universe] ingest` / `ingest_listed_funds` / `ingest_eligible_etfs` 也在那一页。确认前先列出差异，写入前备份；间隔、预算、熔断和凭据不动。环境变量 `CNE_PUSH2_PAUSED=1` 仍优先于配置里的暂停开关。
 
 模板请求间隔（客户端保守设置，不是源方安全配额保证）：
 
@@ -196,10 +196,7 @@ cne config validate --config configs/cnequity.toml
 
 ST、停牌、CDR 和已退市的名字在任何取值下都会保留 —— 丢掉它们正是这个湖要避免的幸存者偏差。
 
-`instruments` 会返回 TDX 列出的全部代码，其中约四分之一是 ETF/LOF/基金行情代码：
-没有任何研究口径会选中它们，也没有哪个已配置的源能稳定提供它们。把它们放进日更
-会占掉四分之一的抓取量，用没人需要的代码触发东财和新浪的熔断，并把填不上的
-`symbol×session` 键留给覆盖门禁 —— 门禁随后拒绝为当天落盘。
+显式开启 `[universe].ingest_listed_funds = true` 后，日更按证券目录追加已上市 ETF/LOF，研究资格只用于筛选。已知上市前和退市后的日期不抓；未知上市日期仍尝试取数，并在逐证券覆盖报告中单独列出，不能据此声称完整。目录读取失败会报错，来源空响应保留为缺口。这个开关优先于旧的 `ingest_eligible_etfs`。旧开关仍只采集研究资格合格的 ETF，但资格目录失败、缺失或超过 14 天时现在会明确报错。
 
 ## `[job.daily.waves]`
 

@@ -67,7 +67,13 @@ def source_overrides(config: Config) -> dict[str, dict]:
     return overrides if isinstance(overrides, dict) else {}
 
 
-def _baostock_stock(symbol: str) -> bool:
+def baostock_factor_symbol(symbol: str) -> bool:
+    """Whether Baostock's adjust-factor table can replace this security's series.
+
+    The table is Shanghai main board and STAR, plus Shenzhen main board and
+    ChiNext. Funds, Beijing and anything else stay on Sina: there is no series
+    here to switch them to.
+    """
     code, _, exchange = symbol.partition(".")
     if exchange == "SH":
         return code.startswith(("60", "688"))
@@ -236,7 +242,7 @@ def arbitrate_factor_sources(
 
     contradictions, _ = factor_action_contradictions(config)
     contradictions = contradictions.filter(
-        pl.col("symbol").map_elements(_baostock_stock, return_dtype=pl.Boolean)
+        pl.col("symbol").map_elements(baostock_factor_symbol, return_dtype=pl.Boolean)
     )
     if symbols:
         contradictions = contradictions.filter(pl.col("symbol").is_in(symbols))
@@ -364,6 +370,8 @@ def arbitrate_factor_sources(
     report.update(
         judged=judged.height,
         verdicts=verdicts,
+        unanswered=failed,
+        asked=names,
         switch=switch.get_column("symbol").to_list(),
         sina_wrong_unproven=unproven.height,
         switch_detail={
@@ -425,4 +433,65 @@ def record_source_overrides(config: Config, report: dict) -> list[str]:
                 **report["switch_detail"].get(symbol, {}),
             }
         state[SOURCE_OVERRIDES_FIELD] = json.loads(json.dumps(overrides, default=str))
+    return switched
+
+
+def latest_factor_arbitration(config: Config) -> dict:
+    """The newest arbitration evidence file, or an empty dict when there is none."""
+    folder = config.meta_root / "quality" / "evidence"
+    if not folder.is_dir():
+        return {}
+    found = sorted(folder.glob("adj_factor_source_arbitration-*.json"))
+    if not found:
+        return {}
+    try:
+        payload = json.loads(found[-1].read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def settle_recent_unstepped_factors(
+    config: Config,
+    trade_date: date,
+    *,
+    fetch=None,
+) -> list[str]:
+    """Switch recent unstepped stocks onto Baostock when the proof allows it.
+
+    Called from the daily factor derive, before the audit gate. A vendor
+    failure is logged and leaves the series on Sina: arbitration is how a
+    proven miss gets repaired, and it must not fail a day on its own.
+    Symbols Baostock's factor table does not cover are left untouched.
+    """
+    if fetch is None and not config.sources.get("baostock", False):
+        return []
+    try:
+        from cnequity.quality.cross_checks import recent_unstepped_actions
+
+        silent = recent_unstepped_actions(config, trade_date)
+        if silent.is_empty():
+            return []
+        names = sorted(
+            {
+                symbol
+                for symbol in silent.get_column("symbol").to_list()
+                if baostock_factor_symbol(symbol)
+            }
+        )
+        if not names:
+            return []
+        report = arbitrate_factor_sources(config, symbols=names, fetch=fetch)
+        switched = record_source_overrides(config, report)
+    except Exception:
+        logger.warning(
+            "factor arbitration: could not settle recent unstepped factors", exc_info=True
+        )
+        return []
+    if switched:
+        logger.info(
+            "factor arbitration: switched %d recent unstepped symbol(s) to baostock: %s",
+            len(switched),
+            ", ".join(switched[:_SAMPLE]),
+        )
     return switched

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import errno
 import json
 import os
 import sys
@@ -28,12 +29,53 @@ class RollbackIncompleteError(RuntimeError):
     """A swap failed and putting the original back failed too; data sits in a backup."""
 
 
+# Filesystems that cannot sync a directory say so with one of these.
+_DIR_SYNC_UNSUPPORTED = {errno.EINVAL, errno.ENOTSUP, errno.EOPNOTSUPP, errno.EBADF}
+
+
+def fsync_file(path: Path | str) -> None:
+    """Flush one file's data and metadata to stable storage.
+
+    Windows rejects fsync on a read-only descriptor, while a copy that
+    inherited a read-only mode cannot be reopened for writing on POSIX.
+    """
+    if IS_WINDOWS:
+        with open(path, "r+b") as handle:
+            os.fsync(handle.fileno())
+        return
+    fd = os.open(path, os.O_RDONLY)
+    try:
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+
+
+def fsync_dir(path: Path | str) -> None:
+    """Make the entries created or renamed in *path* durable.
+
+    Windows cannot open a directory for this and orders renames itself.
+    """
+    if IS_WINDOWS:
+        return
+    fd = os.open(path, os.O_RDONLY)
+    try:
+        os.fsync(fd)
+    except OSError as exc:
+        if exc.errno not in _DIR_SYNC_UNSUPPORTED:
+            raise
+    finally:
+        os.close(fd)
+
+
 def replace_with_retry(tmp: Path | str, path: Path | str) -> None:
-    """``os.replace`` that rides out transient Windows sharing denials."""
+    """``os.replace`` that rides out transient Windows sharing denials.
+
+    The parent directory is synced afterwards, so the rename survives a
+    crash rather than only the renamed file's contents.
+    """
     for attempt in range(_REPLACE_ATTEMPTS):
         try:
             os.replace(tmp, path)
-            return
         except PermissionError as exc:
             if attempt + 1 < _REPLACE_ATTEMPTS:
                 time.sleep(_REPLACE_BACKOFF_SEC * (2**attempt))
@@ -49,6 +91,9 @@ def replace_with_retry(tmp: Path | str, path: Path | str) -> None:
                 None,
                 str(path),
             ) from exc
+        else:
+            fsync_dir(Path(path).parent)
+            return
 
 
 def swap_with_backup(staged: Path, target: Path, backup: Path) -> None:
@@ -89,10 +134,7 @@ def write_parquet_atomic(path: Path, df: pl.DataFrame, **kwargs) -> Path:
     tmp = Path(tmp_name)
     try:
         df.write_parquet(tmp, **kwargs)
-        # Windows rejects fsync on a read-only file descriptor with EBADF.
-        # Reopen read/write so the durability barrier works on every platform.
-        with tmp.open("r+b") as handle:
-            os.fsync(handle.fileno())
+        fsync_file(tmp)
         replace_with_retry(tmp, path)
         return path
     except Exception:

@@ -136,6 +136,8 @@ EN: dict[str, str] = {
     "不含北交所": "Excluding BSE",
     "全部代码（含 ETF/LOF）": "All codes (incl. ETF/LOF)",
     "同时抓取符合条件的 ETF 日线": "Also fetch eligible ETF daily bars",
+    "同时抓取已上市 ETF/LOF 日线": "Also fetch listed ETF/LOF daily bars",
+    "按证券目录采集基金行情，研究资格不影响采集；未知上市日期单独报告。默认关闭。": "Fetch fund quotes from the security master independently of research eligibility; unknown listing dates are reported separately. Off by default.",
     "额外抓取最近可回放、且交易所目录判定合格的 ETF 日线。默认关闭。": "Also fetch daily bars for ETFs that are recently replayable and qualify per the exchange directory. Off by default.",
     "开": "On",
     "关": "Off",

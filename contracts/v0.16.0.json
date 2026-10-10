@@ -3341,12 +3341,12 @@
         "reconciliation_lookback_mode": "calendar",
         "required": true,
         "row_grain": null,
-        "schema_version": 1,
+        "schema_version": 2,
         "source_retired_date": null,
         "tier": "L4",
         "unit_contract": {
           "holding_mv": "CNY",
-          "holding_ratio": "fraction",
+          "holding_ratio": "percent",
           "holding_shares": "share"
         },
         "watermark": false
@@ -3391,12 +3391,12 @@
         "source": "string",
         "symbol": "string"
       },
-      "schema_version": 1,
+      "schema_version": 2,
       "source_retired_date": null,
       "tier": "L4",
       "unit_contract": {
         "holding_mv": "CNY",
-        "holding_ratio": "fraction",
+        "holding_ratio": "percent",
         "holding_shares": "share"
       },
       "watermark": false
@@ -7235,7 +7235,7 @@
       "watermark": true
     }
   },
-  "fingerprint": "b250cfec48cc2d96e64813ef4ceac08acf709b9a595d6b1681993c6518f492cd",
+  "fingerprint": "7a9e5f00fd79d6ac737b42ba704c0ce9c0799c8a48ec9b0ac8287fd9de97697d",
   "format": "cnequity.dataset-contract",
   "pit_contract": {
     "modes": [

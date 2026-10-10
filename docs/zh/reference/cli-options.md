@@ -7,7 +7,7 @@
 | 参数 | 默认值 | 说明 |
 |---|---|---|
 | `--config` | `configs/cnequity.toml` | 配置文件路径。 |
-| `--run-id` | `—` | — |
+| `--run-id` | `—` | 运行 ID；可重复指定，合并运行证据并审计一次。 |
 | `--full` | `False` | 整个湖的健康快照（当前状态 + 新鲜度），而不是某一次 run 的文件。 |
 | `--research-start` | `—` | 严格校验从这一天开始的研究窗口（需要 --full）。 |
 | `--quality-only` | `False` | 配合 --full：只按质量 error 判门禁；调度新鲜度请另外用 status 检查。 |
@@ -217,6 +217,34 @@
 | `--config` | `configs/cnequity.toml` | 配置文件路径。 |
 | `--apply` | `False` | 向 Baostock 补取并发布新版本；默认只离线输出计划。 |
 
+## `cne repair daily-bar-coverage`
+
+| 参数 | 默认值 | 说明 |
+|---|---|---|
+| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--apply` | `False` | 按已提交数据结清北交所整日欠账和已证明的上市前欠账；默认只预览。 |
+
+## `cne repair financial-announcements`
+
+| 参数 | 默认值 | 说明 |
+|---|---|---|
+| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--apply` | `False` | 追加明确标记的原始公告日重建版本；默认只预览。 |
+
+## `cne repair fund-factors`
+
+| 参数 | 默认值 | 说明 |
+|---|---|---|
+| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--apply` | `False` | 按已记录的拆分、转增条款发布修正因子，保留旧版本；默认只预览。 |
+
+## `cne repair fund-listing-dates`
+
+| 参数 | 默认值 | 说明 |
+|---|---|---|
+| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--apply` | `False` | 归档交易所目录并发布缺失的基金上市日期；默认只预览。 |
+
 ## `cne repair layout`
 
 | 参数 | 默认值 | 说明 |
@@ -224,6 +252,21 @@
 | `dataset` | `—` | 必填；位置参数 |
 | `--config` | `configs/cnequity.toml` | 配置文件路径。 |
 | `--apply` | `False` | 写入并发布新版本；默认只输出计划。 |
+
+## `cne repair misdated-valuation`
+
+| 参数 | 默认值 | 说明 |
+|---|---|---|
+| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--apply` | `False` | 向东财 datacenter 取数并发布新版本；默认只离线输出计划。 |
+
+## `cne repair missing-values`
+
+| 参数 | 默认值 | 说明 |
+|---|---|---|
+| `dataset` | `—` | 必填；位置参数 |
+| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--apply` | `False` | 将缺失值占位零改为空值并发布新版本；默认只预览。 |
 
 ## `cne repair orphan-symbols`
 
@@ -237,6 +280,31 @@
 | 参数 | 默认值 | 说明 |
 |---|---|---|
 | `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--apply` | `False` | 核验后发布新版本；默认只输出计划。 |
+
+## `cne repair status-listing-window`
+
+| 参数 | 默认值 | 说明 |
+|---|---|---|
+| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--apply` | `False` | 核验后发布新版本；默认只输出计划。 |
+
+## `cne repair status-outages`
+
+| 参数 | 默认值 | 说明 |
+|---|---|---|
+| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--start` | `—` | 必填；窗口起点（YYYY-MM-DD）。 |
+| `--end` | `—` | 必填；窗口终点（YYYY-MM-DD）。 |
+| `--apply` | `False` | 核验后发布新版本；默认只输出计划。 |
+
+## `cne repair status-traded`
+
+| 参数 | 默认值 | 说明 |
+|---|---|---|
+| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--start` | `—` | 必填；成交状态补缺起点（YYYY-MM-DD）。 |
+| `--end` | `—` | 必填；成交状态补缺终点（YYYY-MM-DD）。 |
 | `--apply` | `False` | 核验后发布新版本；默认只输出计划。 |
 
 ## `cne repair valuation-basis`

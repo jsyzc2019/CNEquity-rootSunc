@@ -127,6 +127,18 @@ soft_failed=()
 # parallel arrays: group name → OK|FAILED|…  (bash 3.2 compatible, no assoc arrays)
 summary_names=()
 summary_status=()
+audit_run_ids=""
+audit_scope_failed=0
+
+record_audit_runs() {
+  local ids
+  if ids="$("$PY" -m cnequity.orchestrator.scheduler_audit "$1" 2>>"$LOG")"; then
+    audit_run_ids="${audit_run_ids}${audit_run_ids:+ }${ids}"
+  else
+    log "cannot identify runs for the health audit"
+    audit_scope_failed=1
+  fi
+}
 
 for g in $GROUP_LIST; do
   log "--- group: $g ---"
@@ -156,6 +168,7 @@ for g in $GROUP_LIST; do
       soft_failed+=("$g")
     fi
   fi
+  record_audit_runs "$group_output"
   rm -f "$group_output"
 done
 
@@ -173,8 +186,9 @@ if [[ "$STALE_RETRY" == "1" ]]; then
     log "something is stale; waiting ${STALE_RETRY_DELAY_SEC}s before re-fetching"
     sleep "$STALE_RETRY_DELAY_SEC"
     log "--- stale retry ---"
+    retry_output="$(mktemp "$LOG_DIR/retry-output.XXXXXX")" || exit 1
     if "$CNE" run daily --stale-only --groups "$GROUP_LIST" --config "$CONFIG" \
-      ${DATE_ARGS[@]+"${DATE_ARGS[@]}"} >>"$LOG" 2>&1; then
+      ${DATE_ARGS[@]+"${DATE_ARGS[@]}"} >"$retry_output" 2>>"$LOG"; then
       log "stale retry OK"
       stale_retry_status="OK"
     else
@@ -184,6 +198,9 @@ if [[ "$STALE_RETRY" == "1" ]]; then
       # still down after the wait is not something this run can fix.
       soft_failed+=("stale-retry")
     fi
+    cat "$retry_output" >>"$LOG"
+    record_audit_runs "$retry_output"
+    rm -f "$retry_output"
   fi
 fi
 
@@ -198,8 +215,8 @@ for g in $GROUP_LIST; do
 done
 freshness_check=0
 [[ -n "$health_groups" ]] && freshness_check=1
-health_failed=0
-if ! CNE_GROUPS="$health_groups" CNE_FRESHNESS_CHECK="$freshness_check" \
+health_failed="$audit_scope_failed"
+if ! CNE_GROUPS="$health_groups" CNE_FRESHNESS_CHECK="$freshness_check" CNE_AUDIT_RUN_IDS="$audit_run_ids" \
   "$REPO_ROOT/scripts/scheduler/health_notify.sh" >>"$LOG" 2>&1; then
   log "health check reported problems"
   health_failed=1

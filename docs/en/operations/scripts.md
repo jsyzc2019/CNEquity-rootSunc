@@ -34,7 +34,7 @@ backup_meta.sh
 cne run clean
 ```
 
-In a later window, the separate `stale_pipeline.sh` catches up only the snapshot datasets that are still behind, sharing the scheduler lock with the main daily update. The lock lives in `{data.root}/locks` and is the same lock used by the `cne serve` operations page; `CNE_SCHEDULER_LOCK_DIR` or `CNE_LOCK_DIR` changes the directory. The main script keeps the old in-process wait switch for compatibility, but it is off by default. See [runbook · closing catch-up](runbook.md#closing-catch-up).
+In a later window, the separate `stale_pipeline.sh` catches up only the snapshot datasets that are still behind, sharing the scheduler lock with the main daily update. The lock lives in `{data.root}/locks` and is the same lock used by the `cne serve` operations page; `CNE_SCHEDULER_LOCK_DIR` or `CNE_LOCK_DIR` changes the directory. The lock records the host, PID and process start identity. Only verified dead local owners are reclaimed automatically; remote owners, legacy markers without host identity, and ownerless directories require maintainer verification before removal. The main script keeps the old in-process wait switch for compatibility, but it is off by default. See [runbook · closing catch-up](runbook.md#closing-catch-up).
 
 **Environment variables** (`CNE_CONFIG` / `CNE_LOG_DIR` are also read by `cne` itself; the rest are read only by this script): `CNE_CONFIG`, `CNE_LOG_DIR` (long-running commands also write their own log here), `CNE_GROUPS`,
 `CNE_GATE_GROUPS` (default `core`; failures are marked gate, other groups are marked soft),

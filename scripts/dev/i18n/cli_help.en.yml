@@ -1,6 +1,10 @@
 # English for every Click option help text, keyed by the Chinese original.
 # scripts/dev/sync_docs.py renders docs/en/reference/cli-options.md from it;
 # --check fails when a help text changes and its entry is missing.
+"将缺失值占位零改为空值并发布新版本；默认只预览。": "Replace missing-value zero placeholders with nulls and publish a retained revision; preview only by default."
+"追加明确标记的原始公告日重建版本；默认只预览。": "Append explicitly marked original-disclosure reconstructions; preview only by default."
+"成交状态补缺起点（YYYY-MM-DD）。": "Start of the traded-status repair window (YYYY-MM-DD)."
+"成交状态补缺终点（YYYY-MM-DD）。": "End of the traded-status repair window (YYYY-MM-DD)."
 "配置文件路径。": "Path to the config file."
 "整个湖的健康快照（当前状态 + 新鲜度），而不是某一次 run 的文件。": "Health snapshot of the whole lake (current state + freshness), not the files of a single run."
 "严格校验从这一天开始的研究窗口（需要 --full）。": "Strictly validate the research window starting on this date (requires --full)."
@@ -40,6 +44,7 @@
 "仅 daily_bars：成交额缺失、为 0 或量额单位错位的沪深股票行，用 Baostock 同日行整行替换；开高低收须在半分钱内一致，不一致或未提供的保留原值。需要 --start/--end。": "daily_bars only: replace Shanghai/Shenzhen stock rows whose turnover is missing, zero or has misaligned volume/amount units with the whole same-day Baostock row; OHLC must agree within half a cent, otherwise or if unavailable the original values are kept. Requires --start/--end."
 "仅 valuation_metrics：东财快照中断时，用东财 datacenter 估值报表补东财最后一个完整日之后、今天之前的 --start/--end 窗口；全市场取全才写入。": "valuation_metrics only: when the EastMoney snapshot is interrupted, fill the --start/--end window after EastMoney's last complete day and before today from the EastMoney datacenter valuation report; writes only when the whole market is retrieved."
 "立即重跑全湖审计（读每个历史分区，大湖可能要数小时）；默认读最近一次的审计结果。": "Rerun the full-lake audit now (reads every historical partition; can take hours on a large lake); by default reads the latest audit result."
+"运行 ID；可重复指定，合并运行证据并审计一次。": "Run ID; repeat to merge evidence from these runs into one audit."
 "按研究包给出窗口、缺口和下一步。可重复。指定后，缺数据或历史 ST 未覆盖会使退出码变差。": "Report window, gaps and next steps per research pack. Repeatable. When given, missing data or uncovered historical ST worsens the exit code."
 "action=create 时覆盖已存在的配置文件。": "With action=create: overwrite an existing config file."
 "action=create 时设置 [data].root（默认把 ./data/cnequity 解析成绝对路径）。": "With action=create: set [data].root (defaults to ./data/cnequity resolved to an absolute path)."
@@ -94,6 +99,9 @@
 "向 Baostock 补取并发布新版本；默认只离线输出计划。": "Fetch from Baostock and publish a new version; by default only prints the plan offline."
 "写入并发布新版本；默认只输出计划。": "Write and publish a new version; by default only prints the plan."
 "核验后发布新版本；默认只输出计划。": "Publish a new version after verification; by default only prints the plan."
+"窗口起点（YYYY-MM-DD）。": "Window start (YYYY-MM-DD)."
+"窗口终点（YYYY-MM-DD）。": "Window end (YYYY-MM-DD)."
+"向东财 datacenter 取数并发布新版本；默认只离线输出计划。": "Fetch from the EastMoney datacenter and publish a new version; by default only prints the plan offline."
 "兼容选项；现在所有清理均只预览。": "Compatibility option; all cleanup is now preview-only."
 "预览超过这么多天、且 manifest 里没有记录的孤儿 staging。": "Preview orphan staging older than this many days that is not recorded in the manifest."
 "预览超过这么多天的 meta/source_snapshots run_id 目录（每个数据集 / 源的最新一份始终保留）。": "Preview meta/source_snapshots run_id directories older than this many days (the latest one per dataset / source is always kept)."
@@ -185,3 +193,7 @@
 "配合 --runs：要求连续多少个交易日（默认 20）。": "With --runs: number of consecutive trading days required (default 20)."
 "配合 --runs：截止日期 YYYY-MM-DD（含）。": "With --runs: cutoff date YYYY-MM-DD (inclusive)."
 "配合 --runs：连续天数门禁没过就退出 1。": "With --runs: exit 1 if the consecutive-days gate fails."
+"按已提交数据结清北交所整日欠账和已证明的上市前欠账；默认只预览。": "Retire BSE session debts and proven pre-listing debts using committed data; preview by default."
+"按已记录的拆分、转增条款发布修正因子，保留旧版本；默认只预览。": "Publish corrected factors from recorded split and transfer terms, retaining the old revision; preview by default."
+
+"归档交易所目录并发布缺失的基金上市日期；默认只预览。": "Archive exchange directories and publish missing fund listing dates; preview by default."

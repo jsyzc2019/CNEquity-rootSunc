@@ -199,7 +199,7 @@ def load_with_receipt(
     request = {key: _request_value(options[key]) for key in request_keys if key in options}
     pit_mode = options.get("pit_mode") if dataset in PIT_DATASETS else "not_applicable"
     if dataset in PIT_DATASETS and pit_mode is None:
-        pit_mode = "compatibility"
+        pit_mode = "best_effort"
     payload: dict[str, Any] = {
         "schema_version": 1,
         "dataset": dataset,

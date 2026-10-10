@@ -739,7 +739,7 @@ def load_negative_evidence(
     # normal empty-cache path. Re-read with identity before returning evidence.
     if not store.get_negative_evidence(dataset, now=now):
         return []
-    identity = _instrument_identity(config, metadata)
+    identity = _negative_evidence_identity(config, dataset, metadata)
     return store.get_negative_evidence(
         dataset,
         identity=identity,
@@ -779,9 +779,21 @@ def record_negative_evidence(
         dataset,
         entries,
         ttl_days=negative_evidence_ttl_days(config, dataset),
-        identity=_instrument_identity(config, metadata),
+        identity=_negative_evidence_identity(config, dataset, metadata),
         now=now,
     )
+
+
+def _negative_evidence_identity(
+    config: Config, dataset: str, metadata: pl.DataFrame | None
+) -> dict:
+    identity = _instrument_identity(config, metadata)
+    if dataset == "daily_bars":
+        # Before v2, EastMoney data:null could contribute an empty-source vote;
+        # before v3, unsupported fund codes could supply a Baostock empty vote.
+        # Old votes cannot certify absence after the response contract changes.
+        identity["source_response_contract"] = 3
+    return identity
 
 
 def negative_evidence_covers(
@@ -864,6 +876,7 @@ def classify_daily_bar_ownership(
     late list_date looks exactly the same and hides a real listing.
     """
     from cnequity.domain.symbols import is_etf_symbol, parse_symbol
+    from cnequity.domain.trading_status import independent_suspension_keys
 
     out = DailyBarOwnership()
     normalized_spans = {
@@ -876,7 +889,9 @@ def classify_daily_bar_ownership(
     )
     sessions = set(trading_sessions or ())
     status_by_symbol: dict[str, dict[date, bool | None]] = {}
+    suspended: set[tuple[str, date]] = set()
     if trading_status is not None and not trading_status.is_empty():
+        suspended = set(independent_suspension_keys(trading_status).iter_rows())
         required = {"symbol", "trade_date", "is_trading"}
         if required.issubset(trading_status.columns):
             for row in trading_status.select("symbol", "trade_date", "is_trading").iter_rows(
@@ -887,8 +902,16 @@ def classify_daily_bar_ownership(
                 if not normalized or not isinstance(raw_day, date):
                     continue
                 value = row["is_trading"]
-                status_by_symbol.setdefault(normalized, {})[raw_day] = (
-                    bool(value) if value is not None else None
+                by_day = status_by_symbol.setdefault(normalized, {})
+                # A positive observation cannot be overwritten merely because
+                # a conflicting row happens to be visited last.
+                previous = by_day.get(raw_day)
+                by_day[raw_day] = (
+                    True
+                    if previous is True or value is True
+                    else False
+                    if previous is False or value is False
+                    else None
                 )
     evidence = list(negative_evidence or ())
     for symbol in symbols:
@@ -928,7 +951,7 @@ def classify_daily_bar_ownership(
             # A missing session in the status table is unknown, not a silent
             # non-trading assertion. False is accepted only when every
             # requested exchange session is explicitly covered.
-            if sessions.issubset(status) and all(status[day] is False for day in sessions):
+            if all((normalized, day) in suspended for day in sessions):
                 out.expected_no_data.append(normalized)
                 out.no_data_reasons[normalized] = "trading_status_non_trading"
                 continue

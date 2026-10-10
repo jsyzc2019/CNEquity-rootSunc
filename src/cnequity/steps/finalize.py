@@ -319,6 +319,18 @@ def _update_watermarks(
     for dataset, pcol in _watermarked_datasets():
         if datasets is not None and dataset not in datasets:
             continue
+        if dataset == "daily_bars":
+            from cnequity.storage.coverage import (
+                resolved_bj_session_dates,
+                resolved_prelisting_keys,
+            )
+
+            state.clear_missing_dates(
+                dataset, resolved_bj_session_dates(config, state.get_payload(dataset))
+            )
+            state.clear_outstanding_keys(
+                dataset, resolved_prelisting_keys(config, state.get_outstanding_keys(dataset))
+            )
         max_dt = _watermark_date_for(config, dataset, pcol)
         if max_dt is not None:
             state.update_max_date(dataset, max_dt)
@@ -946,7 +958,14 @@ def _compact_locked(config: Config, trade_date: date, run_id: str, context: dict
 def step_derive_adj_factors(config: Config, trade_date: date, run_id: str, context: dict) -> dict:
     from cnequity.derive.adj_factors import AdjFactorsDeriveError, compute_adj_factors
 
-    rebackfill = context.get("symbols_to_rebackfill") or []
+    rebackfill = list(context.get("symbols_to_rebackfill") or [])
+    from cnequity.derive.factor_arbitration import settle_recent_unstepped_factors
+
+    # Before the audit gate. A price-proven miss switches onto Baostock and is
+    # refreshed below; a miss Baostock cannot repair stays a warning.
+    switched = settle_recent_unstepped_factors(config, trade_date)
+    if switched:
+        rebackfill = sorted(set(rebackfill) | set(switched))
     from cnequity.storage.revisions import RevisionStore
 
     derived_revisions = RevisionStore(

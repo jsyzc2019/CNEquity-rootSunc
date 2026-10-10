@@ -40,6 +40,7 @@ def test_daily_bar_ownership_accepts_all_false_status_as_expected_no_data():
             "symbol": ["600001.SH", "600001.SH"],
             "trade_date": sessions,
             "is_trading": [False, False],
+            "source": ["baostock", "baostock"],
         }
     )
 

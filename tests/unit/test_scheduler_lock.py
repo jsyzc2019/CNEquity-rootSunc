@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import sys
@@ -14,6 +15,7 @@ from cnequity.config.bootstrap import path_for_toml
 from cnequity.orchestrator.scheduler_lock import (
     SchedulerLockError,
     _proc_state,
+    host_identity,
     lock_directory,
     pid_alive,
     scheduler_lock,
@@ -48,10 +50,39 @@ def test_a_dead_owner_is_reclaimed_and_a_live_one_blocks(tmp_path):
     root = tmp_path / "locks"
     stale = root / "daily.lock"
     stale.mkdir(parents=True)
-    (stale / "pid").write_text(f"{2**31 - 1}\n", encoding="utf-8")
+    (stale / "pid").write_text(
+        json.dumps({"pid": 2**31 - 1, "host": host_identity(), "start": "old"}), encoding="utf-8"
+    )
     with scheduler_lock(root, "daily"):
         assert scheduler_lock_holder(root, "daily") == os.getpid()
     assert scheduler_lock_holder(root, "daily") is None
+
+
+@pytest.mark.parametrize(
+    "marker", ["99999999", '{"pid":99999999,"host":"other-host","start":"old"}']
+)
+def test_remote_and_legacy_owners_are_not_reclaimed(tmp_path, marker):
+    directory = tmp_path / "daily.lock"
+    directory.mkdir()
+    (directory / "pid").write_text(marker)
+    assert scheduler_lock_holder(tmp_path, "daily") == 99999999
+    with pytest.raises(SchedulerLockError) as caught:
+        with scheduler_lock(tmp_path, "daily"):
+            pass
+    assert caught.value.code == 1
+    assert (directory / "pid").read_text() == marker
+
+
+def test_reused_local_pid_does_not_keep_a_dead_owners_lock(tmp_path, monkeypatch):
+    directory = tmp_path / "daily.lock"
+    directory.mkdir()
+    (directory / "pid").write_text(
+        json.dumps({"pid": os.getpid(), "host": host_identity(), "start": "old"})
+    )
+    monkeypatch.setattr("cnequity.orchestrator.scheduler_lock.process_start", lambda pid: "new")
+    with scheduler_lock(tmp_path, "daily"):
+        assert json.loads((directory / "pid").read_text())["start"] == "new"
+    assert not directory.exists()
 
 
 def test_another_process_blocks_until_it_exits(tmp_path):

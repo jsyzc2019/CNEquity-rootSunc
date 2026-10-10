@@ -205,6 +205,31 @@ def _load_daily_bar_dates(
         bars = bars.filter(pl.col("symbol").is_in(traded_symbols))
         if bars.is_empty():
             return _EMPTY_BAR_DATES.clone()
+    # Historical prices keep retired securities in full derives. Their later
+    # zero-volume placeholders must not create factors after the catalogue's
+    # retirement window. A traded quote beyond that date contradicts the
+    # catalogue, so retain that symbol for investigation instead of clipping it.
+    from cnequity.storage.instrument_catalog import load_curated_instruments
+
+    instruments = load_curated_instruments(config)
+    if instruments is not None and "delist_date" in instruments.columns:
+        bounds = instruments.filter(pl.col("delist_date").is_not_null()).select(
+            "symbol", pl.col("delist_date").alias("_delist")
+        )
+        if "volume" in bars.columns:
+            contradicted = (
+                bars.filter(pl.col("volume").fill_null(0) > 0)
+                .join(bounds, on="symbol")
+                .filter(pl.col("trade_date") > pl.col("_delist"))
+                .select("symbol")
+                .unique()
+            )
+            bounds = bounds.join(contradicted, on="symbol", how="anti")
+        bars = (
+            bars.join(bounds, on="symbol", how="left")
+            .filter(pl.col("_delist").is_null() | (pl.col("trade_date") <= pl.col("_delist")))
+            .drop("_delist")
+        )
     return bars.select(["symbol", "trade_date"]).unique().sort(["symbol", "trade_date"])
 
 
@@ -864,7 +889,9 @@ def _unit_split_terms(actions: pl.DataFrame) -> pl.DataFrame:
     )
 
 
-def _action_terms(config: Config, symbols: list[str], start: date, end: date) -> pl.DataFrame:
+def _action_terms(
+    config: Config, symbols: list[str], start: date, end: date, *, read_context=None
+) -> pl.DataFrame:
     """Per (symbol, ex_date) corporate-action terms over the compared window.
 
     ``action_type`` is part of the primary key, so one ex-date can carry a
@@ -887,12 +914,15 @@ def _action_terms(config: Config, symbols: list[str], start: date, end: date) ->
     files no cash row, which is the divergence this was meant to silence.
     """
     from cnequity.query.parquet_scan import dataset_has_parquet, scan_parquet_root
+    from cnequity.storage.read_context import read_root
 
-    root = config.curated_root / "corporate_actions"
-    if not dataset_has_parquet(root):
+    root = read_root(config, "corporate_actions", read_context)
+    if not dataset_has_parquet(root, committed=False):
         return _EMPTY_ACTION_TERMS.clone()
     actions = dedupe_lazy_by_primary_key(
-        scan_parquet_root(root, partition_col="ex_date", start=start, end=end, symbols=symbols),
+        scan_parquet_root(
+            root, partition_col="ex_date", start=start, end=end, symbols=symbols, committed=False
+        ),
         "corporate_actions",
     ).collect()
     if actions.is_empty() or not {"symbol", "ex_date"}.issubset(actions.columns):
@@ -1915,6 +1945,18 @@ def _compute_adj_factors_locked(
     out = pl.concat(frames, how="diagonal_relaxed").unique(subset=_ADJ_PK, keep="last")
     out, computed_findings = _apply_computed_factors(config, out)
     findings.extend(computed_findings)
+    from cnequity.derive.fund_factors import apply_fund_share_factors
+
+    out, fund_findings = apply_fund_share_factors(config, out)
+    findings.extend(
+        {
+            "dataset": "adj_factors",
+            "check": "fund_share_factor",
+            "severity": "warning" if "reason" in item else "info",
+            **item,
+        }
+        for item in fund_findings
+    )
     findings.extend(_factor_continuity_findings(out))
     findings.extend(_corporate_action_crosscheck_findings(config, out))
     findings.extend(_pre_close_step_findings(config, out))

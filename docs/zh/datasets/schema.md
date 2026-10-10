@@ -151,6 +151,21 @@
 
 `status` 表示交易状态，`risk_warning` 表示风险警示，两者独立。停牌不能清除 ST 标志；已知退市证券不应被作为正常交易证券处理。
 
+`derived_traded` 表示已提交日线证明当天有实际成交（成交量大于零），不是一手状态快照。
+它只补已知上市期间、没有任何状态行的股票或 ETF 键，写 `normal`、`is_trading=true`，
+`risk_warning=null`。`normal` 不表示“确认非 ST”。可信的当日一手状态优先于此派生行；
+它不参与东财中断时的一手记录沿用，也不生成历史 ST 覆盖凭证。零成交量、未知成交量、
+未知上市日期和上市期间之外的日线不会生成此类行；已有矛盾状态需另行修复。
+
+历史快照只覆盖本湖开始采集之后的日期，不能根据第一条状态记录宣称此前完整。
+`cne check --full` 的 `trading_state_historical_coverage` 按资产类别及月份统计成交键，
+包括每只证券首次状态记录之前的历史；缺状态、派生成交、ST 未知和排除原因分别报告。
+该报告只检查有成交的键，不证明停牌日期或全部历史 ST 已完整覆盖。
+
+用 `cne repair status-traded --start YYYY-MM-DD --end YYYY-MM-DD` 离线预览补缺，
+核对后加 `--apply` 发布并保留旧版本。建议按年或月分段；执行时重新核对当前已提交版本。
+严格的历史股票池读取仍需独立 ST 证据，成交补行不会解除该要求。
+
 **读旧湖不会出错。** 旧行把 ST 编码成 `status="st"`，`validate_dataframe` 在读入时
 自动升级（见 `cnequity/domain/trading_status.py`）。把物理 schema 统一过来跑：
 
@@ -825,7 +840,7 @@ PIT 查询过滤 `announce_date <= as_of`。
 | index_symbol | string | 如 ``000300.SH`` |
 | symbol | string | 成分股 |
 | as_of_date | date | 快照 / 调样日 |
-| weight | float64 | 权重（百分比或比率，依源） |
+| weight | float64 | 权重比例，可空；当前东财与国证调样史不提供权重，写 null |
 | source | string | 溯源 |
 | data_version | string | 溯源 |
 | fetched_at | timestamp | 溯源 |

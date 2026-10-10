@@ -530,7 +530,7 @@ def clean(
     """预览过期数据，不执行物理删除；删除须在 serve 运维网页确认。
 
     \b
-    「可清理」是指：run 处于终态（success/warning/failed）、所有批次都已落定，
+    「可清理」是指：run 处于终态（success/warning/degraded/failed）、所有批次都已落定，
     并且记录过一次成功的 compact。没跑完或从没 compact 过的 staging 会留着等重试，
     --force 只扩大预览范围。来源快照和日志也仅预览，全部 bytes_freed 为 0。
     历史版本和登记试验可在 serve 存储运维页确认删除；其他资源暂仅报告。
@@ -586,6 +586,9 @@ def clean(
                 "force_removed_run_ids": [],
                 "force_candidate_run_ids": result.force_removed_run_ids,
                 "skipped_run_ids": result.skipped_run_ids,
+                "skipped_reasons": result.skipped_reasons,
+                "staging_inventory": result.inventory,
+                "staging_run_count": len(result.inventory),
                 "bytes_freed": 0,
                 "logical_bytes_selected": (
                     result.bytes_freed

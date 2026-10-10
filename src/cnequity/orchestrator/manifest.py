@@ -358,6 +358,19 @@ class Manifest:
             )
         return run_id
 
+    def resume_run(self, run_id: str) -> None:
+        """Reopen a locked run while keeping its identity and published totals."""
+        with self._connect() as conn:
+            conn.execute(
+                """
+                UPDATE ingestion_runs
+                SET status = 'running', execution_status = 'running',
+                    finished_at = NULL, error_message = NULL
+                WHERE run_id = ?
+                """,
+                (run_id,),
+            )
+
     def finish_run(
         self,
         run_id: str,

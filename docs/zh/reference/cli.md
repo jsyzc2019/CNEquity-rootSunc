@@ -513,6 +513,13 @@ cne derive trading_status --start 2001-01-01 --end 2001-12-31
 | `corporate-action-gaps` | 补上新浪与 Baostock 因子都有台阶、湖里却没有记录的除权事件，依据最近一次 `cne derive adj_factor_source` 的证据。附近 10 天内日期错开的记录，若条款能解释台阶就移到台阶日；其余按证券和年份向 Baostock 取分红，按生效交易日匹配，只收条款能解释台阶的行；Baostock 也解释不了的，再到巨潮查发行人的重整转增公告，公告写明的除权参考价能解释台阶才记为 `reorg_transfer`。这是本组唯一会访问数据源的命令：计划仍离线，`--apply` 才请求 Baostock 和巨潮 |
 | `orphan-symbols` | 删除 `daily_bars` 中从未出现的证券在 `adj_factors` 与 `corporate_actions` 里的行：早年作为净值序列误入的场外基金（519xxx）行情已清理，因子和分红却残留；未采集行情的上市基金也在其列。这些行没有可复权的价格，只会被报成因子与公司行为矛盾。按数据集各发布一个新版本 |
 | `stale-suspensions` | 删除 `trading_status` 中已被实际成交日线否定的推断停牌（`derived_bar_gap`）：某次运行漏抓行情时，缺口曾被误记为停牌；行情补齐后同一天有成交的日线即证明该行错误。独立来源的停牌不受影响 |
+| `status-outages --start --end` | 按现行规则重建东财不可用期间写入的 `trading_status` 行（`eastmoney_cached`）。旧版兜底会沿用自己写的缓存行，长假会让缓存过期，并把没有记录的证券记成停牌。窗口内的缓存行全部删除；当天主源答复的证券不到前几个交易日一半的交易所，没有其他记录的证券沿用前 5 个交易日内最近的一手记录，并保留该记录的抓取时间，因此 Baostock 历史与日线缺口推断的停牌仍然优先。没有一手记录的证券不写行 |
+| `status-listing-window` | 删除 `trading_status` 中落在证券上市日之前、或没有退市记录支撑的行。旧版合并曾把尚无日线的新证券推断为退市，状态步骤随后在它们上市后的头几个交易日写入 `derived_delisted`；东财也会把尚未上市的代码报成正常交易。`derived_delisted` 行只在当前 `instruments` 仍记有不早于上市日、且不晚于该行的退市日时保留；上市日之前的行一律删除，除非日线在上市日之前就有成交（这时上市日有误）。不补写行。发布新版本，旧版本保留 |
+| `status-traded --start --end` | 默认只读预览：用已提交日线的正成交量补已知上市期间、缺状态行的股票/ETF 键，来源 `derived_traded`，ST 保持 null。已有状态不覆盖；`--apply` 重新核对当前版本后发布并保留旧版本。建议按年或月分段 |
+| `fund-listing-dates` | 从完整的上交所、深交所 ETF/LOF 当前目录补未知上市日期，独立于研究资格。预览也请求来源；`--apply` 归档响应、经修复门禁发布新版本，保留已有日期及旧版本，不把首根日线当上市日 |
+| `fund-factors` | 离线预览 ETF/LOF 已记录拆分、转增的漏跳；从原始来源序列重建完整历史，保留其他来源台阶和现金分红口径。`--apply` 经修复门禁发布 `derived_fund_actions` 并保留旧版本。条款冲突或缺少原始序列时不猜补 |
+| `daily-bar-coverage` | 逐证券复查 `bj_session_incomplete` 整日欠账；仅按已提交日线的正成交量或独立停牌证据结清已知上市区间。`--apply` 更新覆盖元数据和水位，保存输入版本及收据，不改日线。同样结清已提交且不与成交历史矛盾的上市日期所证明的上市前欠账；未知上市日期仍由逐证券覆盖报告列为未核实 |
+| `misdated-valuation` | 替换 `valuation_metrics` 中盖错交易日的 push2 快照行。快照不带日期，只描述抓取时最近一个已收盘的交易日；抓取时刻对应的交易日与行上日期不同的行，`--apply` 时删除，并在同一版本中换成东财 datacenter 按该日期发布的估值；datacenter 没有的键不再保留错误的行。计划离线，`--apply` 才请求 datacenter |
 | `valuation-basis` | 统一 `valuation_metrics` 口径：push2 动态市盈率移入 `pe_dynamic`；Baostock 流通市值由成交均价口径换算为收盘价口径，无法核对的保留原值并标为 `vwap_x_turn_implied_shares`；总市值按 `share_structure` 当日有效总股本重建，无记录的标为年末股本估算 |
 
 ```bash
@@ -524,7 +531,7 @@ cne repair layout futures_bars --apply
 
 | 选项 | 说明 |
 |------|------|
-| `--run-id` | 指定 run 的 findings（默认最近 run） |
+| `--run-id` | 指定 run 的 findings（默认最近 run）；可重复指定，合并这些运行的步骤证据并执行一次湖审计 |
 | `--full` | 湖级健康快照（非 per-run 文件） |
 | `--quality-only` | 配合 `--full`：只对质量 error 设门禁；调度新鲜度另用 `cne status` 单独查 |
 | `--research-start YYYY-MM-DD` | 与 `--full` 合用；严格验证所选历史宇宙，未通过时退出 1 |
@@ -630,7 +637,7 @@ cne verify --derivatives --dataset futures_bars --start 2026-09-01 --end 2026-09
 一条命令验收整个湖，依次给出：
 
 1. **新鲜度与覆盖**：与 `cne status --datasets --gate` 相同，含最新交易日截面核对和未完成的 init；
-2. **数据质量**：最近一次 run 的审计（error 会列出）和最近的全湖审计快照及其年龄；
+2. **数据质量**：最近一次 run 的审计和最近的全湖审计快照及其年龄，两者的 error 都会列出并计入退出码；
 3. **规模**：数据集、行数和体积，统计表过期时先自动重算。
 
 | 选项 | 说明 |
@@ -687,6 +694,8 @@ init 不属于任何调度组，因此不受 `--groups` 豁免；截面校验则
 
 输出 `dry_run: true`、`confirmation_required: "serve_storage_page"`。`removed` / `removed_run_ids` 等实际删除字段为空或 0，`bytes_freed` 全部为 0；候选见 `candidate_run_ids`、`candidate_run_dirs`、`candidates`，账面大小见 `logical_bytes_selected`。历史版本与登记试验的物理删除入口在 serve 存储运维页；staging、来源快照和日志目前仅报告，不提供网页删除。
 
+预览另返回 `staging_inventory`、`staging_run_count` 和 `skipped_reasons`，逐运行列出状态、大小、年龄、未完成批次和候选/保留原因。正在重试的运行由运行锁保护；`--force` 不绕过运行锁或 hold。未完成批次不会仅因年老或存在更新的成功运行而自动淘汰。
+
 ## cne storage
 
 版本生命周期包括引用登记、不可变计划、原地观察期和维护窗口下的物理回收。满 7 天不会自动删除。试验目录可先归档再退出原位置；外部读取须由操作者停止。
@@ -711,7 +720,7 @@ init 不属于任何调度组，因此不受 `--groups` 豁免；截面校验则
 
 每个子命令接受 `--config`。版本 `OBJECT_ID` 为当前湖内的 `revision/<dataset>/<revision_id>`；计划另外绑定湖身份及 metadata 根，不能直接在另一个湖使用。被引用但暂时缺失的版本也可通过清单登记保护，以便恢复后继续受到保护。
 
-引用清单 schema 为 `schema_version: 1`，包含绝对 `meta_root`、`holds`（对象 ID 到非空理由列表）、`reference_roots`（绝对目录及可选的相对 `exclude` 列表）、`reference_fingerprint` 和可选 `experiments`。集成程序可用 `cnequity.storage.lifecycle.reference_files()` 枚举引用源，分类后生成 holds，并用 `reference_fingerprint()` 计算文件集合及 SHA-256 的指纹。导入只校验清单是否仍对应这些文件，不代替引用语义审核；排除项和外部未登记消费者需由操作者核实。
+引用清单 schema 为 `schema_version: 1`，包含绝对 `meta_root`、`holds`（对象 ID 到非空理由列表）、`reference_roots`（绝对目录及可选的相对 `exclude` 列表）、`reference_fingerprint` 和可选 `experiments`。集成程序可用 `cnequity.storage.lifecycle.reference_files()` 枚举引用源，分类后生成 holds，并用 `reference_fingerprint()` 计算文件集合及 SHA-256 的指纹；两者都传 `meta_root=` 湖的 `meta` 目录。以该目录为根时，湖每次运行都会改写的内容（来源缓存、`state`、`checkpoints`、`quality`、`source_snapshots`、衍生品抓取记录等，完整列表见 `RUNTIME_META_PATHS`）不计入引用，否则任何一次运行都会让导入失效，清理随即拒绝执行。导入只校验清单是否仍对应这些文件，不代替引用语义审核；排除项和外部未登记消费者需由操作者核实。
 
 新增、删除或修改引用文件都会阻止旧计划继续标记，须重新审核并导入。重复导入保留已有 hold。当前没有自动解除 hold 的命令；改变保留承诺需要单独审核。无收据、缺少完整文件清单或缺少当前指针的目录不会成为清理候选。
 

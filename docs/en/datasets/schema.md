@@ -151,6 +151,27 @@ the [SZSE ETF list](https://fund.szse.cn/marketdata/etf/) and the [SZSE fund lis
 
 `status` is the trading status and `risk_warning` is the risk warning; the two are independent. A suspension cannot clear the ST flag, and a security known to be delisted must not be treated as trading normally.
 
+`derived_traded` means committed daily bars prove a print on that date (positive volume),
+rather than a first-hand status snapshot. It fills only stock/ETF keys with a known
+listed life and no existing status row, setting `normal`, `is_trading=true`, and
+`risk_warning=null`. `normal` does not mean confirmed non-ST. Authoritative session
+records take precedence; these derived rows are excluded from the EastMoney outage
+carry and do not establish historical ST coverage. Zero or unknown volume, unknown
+listing dates, and bars outside the listed life cannot generate these rows. Existing
+contradictory statuses need a separate repair.
+
+Historical snapshots cover dates collected by this lake; a first status row does
+not establish coverage of earlier history. `cne check --full` reports
+`trading_state_historical_coverage` by asset class and month, including dates before
+each security's first status. Missing status, derived prints, unknown ST, and
+exclusion reasons are counted separately. This report covers printed keys only;
+it does not prove complete suspension history or historical ST coverage.
+
+Preview offline with `cne repair status-traded --start YYYY-MM-DD --end YYYY-MM-DD`,
+then add `--apply` after reviewing the plan. Apply recomputes against current committed
+inputs, publishes a new version and preserves the old one. Use annual or monthly
+windows. Strict historical universe reads still require independent ST evidence.
+
 **Reading an old lake does not fail.** Old rows encode ST as `status="st"`, and `validate_dataframe` upgrades them
 automatically on read (see `cnequity/domain/trading_status.py`). To bring the physical schema in line, run:
 
@@ -825,7 +846,7 @@ and `actual_date` is filled in after actual disclosure (null before then).
 | index_symbol | string | e.g. ``000300.SH`` |
 | symbol | string | Constituent |
 | as_of_date | date | Snapshot / rebalance date |
-| weight | float64 | Weight (percentage or ratio, depending on source) |
+| weight | float64 | Weight as a fraction, nullable; current EastMoney and CNI adjustment history supply no weights and store null |
 | source | string | Provenance |
 | data_version | string | Provenance |
 | fetched_at | timestamp | Provenance |

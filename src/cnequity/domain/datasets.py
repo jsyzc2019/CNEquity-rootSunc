@@ -217,7 +217,7 @@ _UNIT_CONTRACT_DEFAULTS: dict[str, UnitContract] = {
     "share_unlock_schedule": {"unlock_shares": "share", "unlock_ratio": "fraction"},
     "institutional_holdings": {
         "holding_shares": "share",
-        "holding_ratio": "fraction",
+        "holding_ratio": "percent",
         "holding_mv": "CNY",
     },
     "analyst_consensus": {
@@ -1265,6 +1265,7 @@ _SPECS = [
     DatasetSpec(
         "institutional_holdings",
         primary_source="eastmoney",
+        schema_version=2,
         tier="L4",
         partition_col="report_period",
         partition_granularity="quarter",
