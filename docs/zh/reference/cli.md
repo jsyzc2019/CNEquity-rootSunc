@@ -692,7 +692,7 @@ init 不属于任何调度组，因此不受 `--groups` 豁免；截面校验则
 | `--reconcile-after-seconds` | 覆盖对账静默窗口，默认取 `[orchestrator].batch_stale_seconds` |
 | `--force` | 将未 cleanup-ready 的 staging 也列入预览，不删除、不降级批次 |
 
-输出 `dry_run: true`、`confirmation_required: "serve_storage_page"`。`removed` / `removed_run_ids` 等实际删除字段为空或 0，`bytes_freed` 全部为 0；候选见 `candidate_run_ids`、`candidate_run_dirs`、`candidates`，账面大小见 `logical_bytes_selected`。历史版本与登记试验的物理删除入口在 serve 存储运维页；staging、来源快照和日志目前仅报告，不提供网页删除。
+输出 `dry_run: true`、`confirmation_required: "serve_storage_page"`。`removed` / `removed_run_ids` 等实际删除字段为空或 0，`bytes_freed` 全部为 0；候选见 `candidate_run_ids`、`candidate_run_dirs`、`candidates`，账面大小见 `logical_bytes_selected`。历史版本、登记试验和已成功 compact 且无未完成批次的终态 staging 可在 serve 存储运维页勾选、审核并确认删除。确认时重新核验运行锁、引用保留、运行状态和逐文件指纹；执行只处理原清单，并保留可恢复的删除收据。orphan、未合并和有未完成批次的 staging 不在网页删除范围，来源快照和日志仍仅报告。
 
 预览另返回 `staging_inventory`、`staging_run_count` 和 `skipped_reasons`，逐运行列出状态、大小、年龄、未完成批次和候选/保留原因。正在重试的运行由运行锁保护；`--force` 不绕过运行锁或 hold。未完成批次不会仅因年老或存在更新的成功运行而自动淘汰。
 

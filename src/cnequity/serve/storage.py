@@ -19,8 +19,9 @@ from cnequity.config import Config
 from cnequity.storage.lifecycle import LifecycleError, LifecycleStore, _read, digest
 from cnequity.storage.lifecycle.experiments import ExperimentRetirement
 from cnequity.storage.lifecycle.purge import eligible, unfinished
+from cnequity.storage.lifecycle.staging import StagingRetirement
 
-Kind = Literal["revisions", "experiments"]
+Kind = Literal["revisions", "experiments", "staging"]
 Phase = Literal["mark", "purge"]
 APPROVAL_SECONDS = 600
 
@@ -164,9 +165,12 @@ class StorageMaintenance:
                     "reasons": reasons,
                 }
             )
+        objects.extend(StagingRetirement(self.config).inspect())
         events = [
             {
-                "kind": "experiments" if p.parent.name == "experiment-purges" else "revisions",
+                "kind": {"experiment-purges": "experiments", "staging-purges": "staging"}.get(
+                    p.parent.name, "revisions"
+                ),
                 "plan_id": p.stem,
             }
             for p in unfinished(self.store)
@@ -265,10 +269,26 @@ class StorageMaintenance:
         object_ids: list[str] | None = None,
     ) -> dict:
         def prepare():
-            if resume_plan_id:
+            if kind == "staging":
+                retirement = StagingRetirement(self.config)
+                if phase != "purge" or (resume_plan_id and object_ids):
+                    raise LifecycleError("Staging only supports a deletion review")
+                if object_ids is not None and (not object_ids or len(object_ids) > 200):
+                    raise LifecycleError("请选择 1 到 200 个 staging 运行。")
+                if resume_plan_id:
+                    if not any(
+                        p.stem == resume_plan_id and p.parent.name == "staging-purges"
+                        for p in unfinished(self.store)
+                    ):
+                        raise LifecycleError("只能重新审核同一未完成删除记录。")
+                    plan = retirement.read_plan(resume_plan_id)
+                else:
+                    plan = retirement.plan(phase=phase, selected_ids=object_ids)
+            elif resume_plan_id:
                 if phase != "purge" or not any(
                     p.stem == resume_plan_id
-                    and (p.parent.name == "experiment-purges") == (kind == "experiments")
+                    and p.parent.name
+                    == ("experiment-purges" if kind == "experiments" else "purges")
                     for p in unfinished(self.store)
                 ):
                     raise LifecycleError("只能重新审核同一未完成删除记录。")
@@ -319,6 +339,8 @@ class StorageMaintenance:
                         "object_id": o["object_id"],
                         "label": f"{o['dataset']} · 第 {o['revision']} 版"
                         if kind == "revisions"
+                        else o["label"]
+                        if kind == "staging"
                         else Path(o["path"]).name,
                         "logical_bytes": o["logical_bytes"],
                     }
@@ -372,6 +394,8 @@ class StorageMaintenance:
                         if review["phase"] == "purge"
                         else self.store.mark(plan_id)
                     )
+                elif review["kind"] == "staging":
+                    result = StagingRetirement(self.config).apply(plan_id, maintenance=maintenance)
                 else:
                     result = ExperimentRetirement(self.store).apply(
                         plan_id, maintenance=maintenance, manifest=self.config.manifest_path

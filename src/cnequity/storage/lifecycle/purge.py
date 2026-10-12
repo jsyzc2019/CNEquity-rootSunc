@@ -55,7 +55,7 @@ def check_idle(manifest: Path) -> None:
 
 def unfinished(store) -> list[Path]:
     found = []
-    for name in ("purges", "experiment-purges"):
+    for name in ("purges", "experiment-purges", "staging-purges"):
         events = store.root / name
         _reject_symlink_path(events)
         found.extend(

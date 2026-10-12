@@ -533,7 +533,8 @@ def clean(
     「可清理」是指：run 处于终态（success/warning/degraded/failed）、所有批次都已落定，
     并且记录过一次成功的 compact。没跑完或从没 compact 过的 staging 会留着等重试，
     --force 只扩大预览范围。来源快照和日志也仅预览，全部 bytes_freed 为 0。
-    历史版本和登记试验可在 serve 存储运维页确认删除；其他资源暂仅报告。
+    历史版本、登记试验和已成功合并且无未完成批次的 staging 可在 serve 存储运维页确认删除。
+    orphan 暂存、来源快照和日志暂仅报告。
     """
     if dry_run and reconcile_runs:
         raise click.UsageError(
