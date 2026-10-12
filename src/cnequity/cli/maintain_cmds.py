@@ -376,21 +376,15 @@ def derive(
             )
             click.echo(json.dumps(outcome, indent=2, default=str, ensure_ascii=False))
     elif name == "adj_factor_source":
-        from cnequity.derive.factor_arbitration import (
-            arbitrate_factor_sources,
-            record_source_overrides,
-        )
+        from cnequity.derive.factor_arbitration import arbitrate_factor_sources
+        from cnequity.storage.repairs.adj_factors import repair_adj_factors
 
         report = arbitrate_factor_sources(cfg)
-        if apply_changes and report.get("switch"):
-            switched = record_source_overrides(cfg, report)
-            with _published_derive(cfg, "adj_factors") as outcome:
-                result = compute_adj_factors(cfg, refresh_symbols=switched)
-                outcome["rows_written"] = result.rows
-                if result.failed:
-                    outcome["status"] = "degraded"
-            report["applied"] = True
-            report["rows_rewritten"] = result.rows
+        if apply_changes:
+            repair_result = repair_adj_factors(cfg, apply=True)
+            report["repair"] = repair_result
+            report["applied"] = repair_result["applied"]
+            report["rows_rewritten"] = repair_result["rows"]
         else:
             report["applied"] = False
         report.pop("switch_detail", None)

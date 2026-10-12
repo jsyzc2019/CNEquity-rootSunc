@@ -243,6 +243,7 @@ class RowPage(BaseModel):
     total: int = Field(description="Rows matching the filter, before paging.")
     offset: int
     limit: int
+    adjustment: dict[str, Any] | None = None
 
 
 class RunFailure(BaseModel):

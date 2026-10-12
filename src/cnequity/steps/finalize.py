@@ -170,6 +170,7 @@ def _publish_derived_revision(
     *,
     input_revisions: dict | None = None,
     coverage_status: str = "unknown",
+    factor_findings: list[dict] | None = None,
 ) -> dict | None:
     """Publish one immutable COW generation for a derived dataset."""
     from cnequity.domain.contracts import contract_fingerprint, dataset_contract
@@ -211,6 +212,14 @@ def _publish_derived_revision(
             raise RuntimeError(
                 f"publication gate blocked {dataset}: {publication.get('report_path')}"
             )
+        factor_metadata = {}
+        if dataset == "adj_factors" and factor_findings:
+            previous = revisions.latest(dataset)
+            proofs = dict(previous.metadata.get("factor_event_proofs", {})) if previous else {}
+            for item in factor_findings:
+                if item.get("check") == "stock_event_factor" and "correction" in item:
+                    proofs[f"{item['symbol']}|{item['trade_date']}"] = item
+            factor_metadata["factor_event_proofs"] = proofs
         contract = dataset_contract(dataset)
         revision = revisions.commit(
             dataset,
@@ -227,6 +236,7 @@ def _publish_derived_revision(
                     key: publication.get(key) for key in ("mode", "blocked", "report_path")
                 },
                 "changed_files_count": len(changed),
+                **factor_metadata,
             },
             _locked=True,
         )
@@ -991,6 +1001,7 @@ def step_derive_adj_factors(config: Config, trade_date: date, run_id: str, conte
             before_files,
             input_revisions=input_revisions,
             coverage_status="partial" if result.failed else "unknown",
+            factor_findings=result.findings,
         )
     except Exception as exc:
         _record_dataset_result(
@@ -1244,6 +1255,7 @@ def step_derive_industry_index(
 )
 def step_audit(config: Config, trade_date: date, run_id: str, context: dict) -> dict:
     from cnequity.quality.audit import run_audit
+    from cnequity.quality.factor_policy import factor_advisory
     from cnequity.quality.publication import coverage_only
 
     findings = run_audit(config, run_id, trade_date, context)
@@ -1251,6 +1263,7 @@ def step_audit(config: Config, trade_date: date, run_id: str, context: dict) -> 
     errors = int(by_severity.get("error", 0))
     coverage_errors = sum(coverage_only(item) for item in context.get("audit_error_findings", []))
     errors -= coverage_errors
+    errors -= sum(factor_advisory(item) for item in context.get("audit_error_findings", []))
 
     # This step depends on `compact`, so by the time it runs the rows are
     # already in curated: the audit has never been able to *prevent* anything,

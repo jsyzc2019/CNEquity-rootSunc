@@ -784,6 +784,17 @@ def _apply_adjustment(
             f"adj_factors has no {STORED_ADJUST_TYPE!r} rows; re-run derive (ADR-0004)"
         )
 
+    from cnequity.quality.factor_diagnostics import factor_read_quality
+    from cnequity.storage.read_context import read_root
+
+    quality = factor_read_quality(
+        config, bars, factor_root=read_root(config, "adj_factors", read_context), factors=factors
+    )
+    if quality.get("related_event_count"):
+        logger.warning(
+            "%d historical factor event(s) remain unresolved; adjusted prices remain available",
+            quality["related_event_count"],
+        )
     factors = factors.select(["symbol", "trade_date", "factor"])
 
     if adjust == "qfq":

@@ -780,6 +780,12 @@ class RevisionStore:
             generation_files=generation_files,
             pointer_path=self.pointer_path(dataset).relative_to(self.meta_root).as_posix(),
         )
+        if dataset == "adj_factors":
+            previous = self.latest(dataset)
+            if previous is not None:
+                for key in ("factor_source_overrides", "factor_event_proofs"):
+                    if key not in receipt.metadata and key in previous.metadata:
+                        receipt.metadata[key] = previous.metadata[key]
 
         try:
             # Receipt first makes an interrupted copy/publish recoverable but

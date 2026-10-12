@@ -668,7 +668,9 @@ function rowTable(page, primaryKey) {
     .map((r) => `<tr>${r.map((v) => `<td>${v === null ? '<span class="muted">null</span>' : esc(v)}</td>`).join("")}</tr>`)
     .join("");
   const shown = `${page.offset + 1}-${page.offset + page.rows.length} / ${fmt(page.total)}`;
-  return `<div class="scroll"><table class="rows"><tr>${head}</tr>${body}</table></div>
+  const quality = page.adjustment;
+  const factorNote = quality ? `<p class="muted">${tr("复权来源", "Factor sources")}: ${esc(Object.keys(quality.factor_sources || {}).join(", ") || "—")} · ${quality.diagnostics_assessed ? tr(`已知待核实事件 ${quality.related_event_count || 0} 个`, `${quality.related_event_count || 0} known unresolved events`) : tr("该版本的历史事件尚未核验", "Historical events for this revision have not been assessed")} · ${tr("因子覆盖不代表历史准确性；提示不影响取数。", "Factor coverage does not certify historical accuracy; diagnostics do not block reads.")}</p>` : "";
+  return `${factorNote}<div class="scroll"><table class="rows"><tr>${head}</tr>${body}</table></div>
     <div class="controls">
       <button id="q-prev" ${page.offset === 0 ? "disabled" : ""}>${tr("上一页", "Previous")}</button>
       <button id="q-next" ${page.offset + page.limit >= page.total ? "disabled" : ""}>${tr("下一页", "Next")}</button>

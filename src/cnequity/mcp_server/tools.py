@@ -142,13 +142,21 @@ class LakeEmpty(ToolError):
     """
 
 
-def _read(config: Config, dataset: str, **kwargs: Any) -> pl.DataFrame:
+def _read(
+    config: Config, dataset: str, *, receipt_sink: dict | None = None, **kwargs: Any
+) -> pl.DataFrame:
     # config is threaded through explicitly rather than left to load()'s
     # auto-detection: the fallback resolves ./configs/cnequity.toml from the
     # working directory, and an MCP server is started by a client from whatever
     # directory it happens to be in. Getting that wrong reads a different lake
     # and answers confidently from it.
     try:
+        if receipt_sink is not None:
+            from cnequity.query import load_with_receipt
+
+            result = load_with_receipt(dataset, config=config, **kwargs)
+            receipt_sink.update(result.receipt)
+            return result.frame
         return load(dataset, config=config, **kwargs)
     except (ReaderError, UniverseCoverageError) as exc:
         if "no parquet data" in str(exc):
@@ -355,10 +363,12 @@ def query_bars(
         raise ToolError(f"universe must be 'all_a', 'all_a_sh_sz' or omitted, got {universe!r}")
 
     origin = "lake"
+    read_receipt = {}
     try:
         df = _read(
             config,
             dataset,
+            receipt_sink=read_receipt if adjust else None,
             start=start,
             end=end,
             symbols=_symbols(symbols),
@@ -394,6 +404,8 @@ def query_bars(
     payload["adjust"] = adjust
     payload["universe"] = universe
     payload["origin"] = origin
+    if "adjustment" in read_receipt:
+        payload["adjustment"] = read_receipt["adjustment"]
     if origin == "live":
         payload["warning"] = live.LIVE_WARNING
         return payload

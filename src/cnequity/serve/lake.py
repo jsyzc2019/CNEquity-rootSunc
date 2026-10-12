@@ -1255,7 +1255,15 @@ class LakeView:
             kwargs["adjust"] = adjust
 
         try:
-            frame = load(dataset, **kwargs)
+            adjustment = None
+            if adjust:
+                from cnequity.query import load_with_receipt
+
+                result = load_with_receipt(dataset, **kwargs)
+                frame = result.frame
+                adjustment = result.receipt.get("adjustment")
+            else:
+                frame = load(dataset, **kwargs)
         except ReaderError as exc:
             raise ValueError(str(exc)) from exc
 
@@ -1272,6 +1280,7 @@ class LakeView:
             "total": total,
             "offset": offset,
             "limit": limit,
+            "adjustment": adjustment,
         }
 
     def heatmap(self, *, days: int = 90) -> dict:

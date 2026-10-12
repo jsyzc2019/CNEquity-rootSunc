@@ -22,8 +22,6 @@ def fund_share_series(
     a halt take effect on resumption; distinct conversions compose by product.
     The first observed factor level is retained.
     """
-    from cnequity.derive.adj_factors import _align_factors_to_bars
-
     if (
         vendor.is_empty()
         or vendor.filter(
@@ -31,7 +29,16 @@ def fund_share_series(
         ).height
     ):
         raise ValueError("original vendor fund factors missing or invalid")
-    series = _align_factors_to_bars(bars, "_", vendor, "hfq").select("trade_date", "factor")
+    series = (
+        bars.select("trade_date")
+        .sort("trade_date")
+        .join_asof(
+            vendor.select("trade_date", "factor").sort("trade_date"),
+            on="trade_date",
+            strategy="backward",
+        )
+        .drop_nulls("factor")
+    )
     if series.is_empty() or terms.is_empty():
         return series, []
     if series.filter(~pl.col("factor").is_finite() | (pl.col("factor") <= 0)).height:
@@ -136,7 +143,7 @@ def fund_share_series(
 
 
 def apply_fund_share_factors(
-    config, out: pl.DataFrame, *, read_context=None
+    config, out: pl.DataFrame, *, read_context=None, start=None, end=None
 ) -> tuple[pl.DataFrame, list[dict]]:
     """Rebuild each touched fund from full raw history before selecting its slice."""
     from cnequity.derive.adj_factors import _action_terms
@@ -156,6 +163,10 @@ def apply_fund_share_factors(
         return out, []
     symbols = scope["symbol"].unique().sort().to_list()
     terms = _action_terms(config, symbols, date.min, date.max, read_context=read_context)
+    if start:
+        terms = terms.filter(pl.col("ex_date") >= start)
+    if end:
+        terms = terms.filter(pl.col("ex_date") <= end)
     if terms.is_empty():
         return out, []
     action_symbols = (
@@ -213,6 +224,11 @@ def apply_fund_share_factors(
                 findings.append({"symbol": symbol, "reason": "original vendor factors unavailable"})
                 continue
             raw = available.unique("trade_date", keep="last").select("trade_date", "factor")
+        published = (
+            stored.filter(pl.col("symbol") == symbol) if not stored.is_empty() else pl.DataFrame()
+        )
+        if (start or end) and not published.is_empty() and SOURCE in published["source"].to_list():
+            raw = published.select("trade_date", "factor")
         series, events = fund_share_series(
             bars.filter(pl.col("symbol") == symbol),
             raw,
@@ -220,8 +236,9 @@ def apply_fund_share_factors(
             tolerance_bps=config.adj_factors_crosscheck_tolerance_bps,
         )
         findings.extend({"symbol": symbol, **event} for event in events)
-        if any("reason" in event for event in events):
-            continue
+        from cnequity.derive.stock_factors import preserve_pending_steps
+
+        series = preserve_pending_steps(series, published, events, SOURCE)
         if any("correction" in event for event in events):
             corrected.append(series.with_columns(pl.lit(symbol).alias("symbol")))
     if not corrected:

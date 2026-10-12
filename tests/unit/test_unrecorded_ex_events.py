@@ -226,7 +226,7 @@ def test_a_fund_miss_is_a_warning_because_baostock_cannot_switch_it(tmp_path):
     assert (finding["symbol"], finding["trade_date"]) == ("159327.SZ", SESSIONS[2].isoformat())
 
 
-def test_an_unarbitrated_stock_miss_still_fails_the_gate(tmp_path):
+def test_an_unarbitrated_stock_miss_is_advisory(tmp_path):
     from cnequity.quality.cross_checks import unstepped_corporate_action_findings
 
     cfg = _lake(
@@ -238,7 +238,7 @@ def test_an_unarbitrated_stock_miss_still_fails_the_gate(tmp_path):
 
     (finding,) = unstepped_corporate_action_findings(cfg, SESSIONS[-1])
 
-    assert finding["severity"] == "error"
+    assert finding["severity"] == "warning"
     assert finding["symbol"] == "600001.SH"
 
 
@@ -279,6 +279,7 @@ def _closes(cfg: Config, symbol: str, closes: list[float]) -> None:
                 "high": [close],
                 "low": [close],
                 "close": [close],
+                "pre_close": [close],
                 "volume": [100.0],
                 "amount": [close * 100],
             }

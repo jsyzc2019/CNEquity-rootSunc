@@ -109,6 +109,8 @@ bulk research should still use the Python API. This endpoint requires every read
 
 ### Exceptions
 
+`strict_adj` and `adj_is_exact` describe factor coverage only, not historical accuracy. The `adjustment` summary from `load_with_receipt()` reports sources and advisory historical diagnostics for the revision read; unavailable diagnostics are unassessed.
+
 `ReaderError` (a subclass of `ValueError`): unknown dataset, no data, strict_adj failure, and so on.
 
 ## scan()

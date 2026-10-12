@@ -229,6 +229,28 @@ def load_with_receipt(
             "exact_counts": _counts(frame, "pit_is_exact"),
         },
     }
+    if options.get("adjust") and dataset in ADJUSTABLE_DATASETS:
+        from cnequity.quality.factor_diagnostics import factor_read_quality
+        from cnequity.query.reader import _read_dataset
+        from cnequity.storage.read_context import ReadContext
+
+        context = ReadContext.capture(cfg, ("adj_factors",), pins)
+        factors = None
+        if not frame.is_empty():
+            try:
+                factors = _read_dataset(
+                    cfg,
+                    "adj_factors",
+                    symbols=frame["symbol"].unique().to_list(),
+                    start=frame["trade_date"].min(),
+                    end=frame["trade_date"].max(),
+                    read_context=context,
+                )
+            except (OSError, ValueError, pl.exceptions.PolarsError):
+                pass  # Optional diagnostics cannot invalidate a successful read.
+        payload["adjustment"] = factor_read_quality(
+            cfg, frame, factor_root=context.roots["adj_factors"], factors=factors
+        )
     canonical = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     payload["receipt_id"] = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
     return ReadResult(frame=frame, receipt=payload)

@@ -22,6 +22,7 @@
 | `cne profile list` | 无 | 列出内置范围 |
 | `cne profile show` | 无 | 显示内置范围 |
 | `cne query` | 条件 | SQL 读湖；按需数据缓存未命中或刷新时取数 |
+| `cne repair adj-factors` | 仅 --refresh-sources 联网 | 默认离线预览并保存计划；--apply 发布有证据支持的修正、保留旧版本和未解决提示，分批保存历史进度 |
 | `cne repair corporate-action-gaps` | --apply 时 | 默认离线预览；--apply 按缺口查询 Baostock 与巨潮资讯，核验后发布新版本并保留旧版本 |
 | `cne repair daily-bar-coverage` | 无 | 默认只读预览；--apply 按已提交数据结清北交所整日欠账及已证明的上市前欠账并刷新覆盖水位，保存证据收据，不改日线 |
 | `cne repair financial-announcements` | 无 | 默认只读预览；--apply 追加有 LICO 原始披露日证据的财报重建版本，经修复门禁发布并保留已有版本 |

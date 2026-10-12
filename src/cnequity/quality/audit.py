@@ -740,6 +740,9 @@ def run_audit(config: Config, run_id: str, trade_date: date, context: dict | Non
 
 def _profile_adjusted_findings(config: Config, findings: list[dict]) -> list[dict]:
     """Keep sample-lake synthetic rows visible without declaring setup broken."""
+    from cnequity.quality.factor_policy import advisory_factor_findings
+
+    findings = advisory_factor_findings(findings)
     if getattr(config, "lake_profile", None) != "sample":
         return findings
     adjusted: list[dict] = []

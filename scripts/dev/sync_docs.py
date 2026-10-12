@@ -360,6 +360,10 @@ EFFECTS: dict[str, tuple[str, str]] = {
         "无",
         "默认只读预览；--apply 用已提交成交日线补缺失状态键，ST 保持未知，发布新版本并保留旧版本",
     ),
+    "repair adj-factors": (
+        "仅 --refresh-sources 联网",
+        "默认离线预览并保存计划；--apply 发布有证据支持的修正、保留旧版本和未解决提示，分批保存历史进度",
+    ),
     "repair fund-factors": (
         "无",
         "默认只读预览；--apply 从原始来源序列补入已记录基金拆分和转增，经修复门禁发布并保留旧版本",

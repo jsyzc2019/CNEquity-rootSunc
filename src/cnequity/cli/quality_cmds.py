@@ -1610,7 +1610,9 @@ def _check_quality(cfg, *, full: bool) -> tuple[int, str | None]:
     )
     if runs:
         payload = json.loads(runs[0].read_text(encoding="utf-8"))
-        findings = payload.get("findings", [])
+        from cnequity.quality.factor_policy import advisory_factor_findings
+
+        findings = advisory_factor_findings(payload.get("findings", []))
         errors = [f for f in findings if f.get("severity") == "error" and not coverage_only(f)]
         warnings = sum(f.get("severity") == "warning" for f in findings)
         click.echo(
@@ -1665,7 +1667,9 @@ def _health_errors(health: dict, coverage_only) -> list[dict]:
     if "error_findings" not in health:
         count = int(health.get("findings_by_severity", {}).get("error", 0))
         return [{} for _ in range(count)]
-    return [f for f in health["error_findings"] if not coverage_only(f)]
+    from cnequity.quality.factor_policy import factor_advisory
+
+    return [f for f in health["error_findings"] if not coverage_only(f) and not factor_advisory(f)]
 
 
 def _check_size(cfg) -> None:

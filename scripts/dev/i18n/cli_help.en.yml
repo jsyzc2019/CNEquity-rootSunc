@@ -197,3 +197,11 @@
 "按已记录的拆分、转增条款发布修正因子，保留旧版本；默认只预览。": "Publish corrected factors from recorded split and transfer terms, retaining the old revision; preview by default."
 
 "归档交易所目录并发布缺失的基金上市日期；默认只预览。": "Archive exchange directories and publish missing fund listing dates; preview by default."
+
+"应用可确定的因子修正并保留旧版本；未解决项只作提示。": "Publish supported factor corrections and retain old revisions; unresolved events remain advisory."
+"联网补取独立因子证据；默认仅使用本地缓存。": "Fetch independent factor evidence; uses local caches only by default."
+"逗号分隔的证券代码；默认分批检查历史问题。": "Comma-separated symbols; checks historical issues in bounded batches by default."
+"待修事件起点（YYYY-MM-DD）；累计影响延续到其后。": "Start of the event window (YYYY-MM-DD); cumulative effects continue afterward."
+"待修事件终点（YYYY-MM-DD）；累计影响延续到其后。": "End of the event window (YYYY-MM-DD); cumulative effects continue afterward."
+"每批最多检查的证券数；应用后保存历史进度。": "Maximum symbols per batch; saves historical progress after applying."
+"应用指定预览的计划标识；输入变化时要求重新预览。": "Require the specified preview plan ID; changed inputs require a new preview."

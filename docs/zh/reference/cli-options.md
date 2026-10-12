@@ -210,6 +210,19 @@
 | `--symbol` | `—` | 按需抓取的标的代码 |
 | `--refresh` | `False` | 抓取前先刷新按需缓存（需要同时给 --dataset 和 --symbol）。 |
 
+## `cne repair adj-factors`
+
+| 参数 | 默认值 | 说明 |
+|---|---|---|
+| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--apply` | `False` | 应用可确定的因子修正并保留旧版本；未解决项只作提示。 |
+| `--refresh-sources` | `False` | 联网补取独立因子证据；默认仅使用本地缓存。 |
+| `--symbols` | `—` | 逗号分隔的证券代码；默认分批检查历史问题。 |
+| `--start` | `—` | 待修事件起点（YYYY-MM-DD）；累计影响延续到其后。 |
+| `--end` | `—` | 待修事件终点（YYYY-MM-DD）；累计影响延续到其后。 |
+| `--max-symbols` | `100` | 每批最多检查的证券数；应用后保存历史进度。 |
+| `--plan` | `—` | 应用指定预览的计划标识；输入变化时要求重新预览。 |
+
 ## `cne repair corporate-action-gaps`
 
 | 参数 | 默认值 | 说明 |

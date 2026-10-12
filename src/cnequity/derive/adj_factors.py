@@ -339,9 +339,10 @@ def _overridden_symbols(config: Config) -> frozenset[str]:
     from cnequity.derive.factor_arbitration import source_overrides
 
     path = config.meta_root / "state" / "adj_factors.json"
+    pointer = config.meta_root / "revisions" / "adj_factors" / "current.json"
     try:
-        stamp = path.stat().st_mtime
-    except FileNotFoundError:
+        stamp = max(p.stat().st_mtime for p in (path, pointer) if p.exists())
+    except ValueError:
         return frozenset()
     memo = _OVERRIDE_MEMO.get(path)
     if memo is None or memo[0] != stamp:
@@ -498,7 +499,9 @@ def _uncovered_symbols(config: Config) -> set[str]:
         ).collect()
         if "asset_type" in instruments.columns:
             priced = set(
-                instruments.filter(pl.col("asset_type").is_in(["stock", "etf"]))["symbol"].to_list()
+                instruments.filter(pl.col("asset_type").is_in(["stock", "etf", "lof"]))[
+                    "symbol"
+                ].to_list()
             )
             # An explicit asset_type column is authoritative even when the
             # current catalog contains no priced assets (for example an ETF-only
@@ -988,8 +991,16 @@ def _action_terms(
     cash = per_source.group_by(["symbol", "ex_date"]).agg(
         pl.col("_dividend").max().alias("_dividend")
     )
-    return dilution.join(cash, on=["symbol", "ex_date"], how="left").join(
-        split_terms, on=["symbol", "ex_date"], how="left"
+    return (
+        dilution.join(cash, on=["symbol", "ex_date"], how="left")
+        .join(split_terms, on=["symbol", "ex_date"], how="left")
+        .join(
+            actions.group_by("symbol", "ex_date").agg(
+                pl.col("source").drop_nulls().unique().alias("_term_sources")
+            ),
+            on=["symbol", "ex_date"],
+            how="left",
+        )
     )
 
 
@@ -1956,6 +1967,18 @@ def _compute_adj_factors_locked(
             **item,
         }
         for item in fund_findings
+    )
+    from cnequity.derive.stock_factors import apply_stock_event_factors
+
+    out, stock_findings = apply_stock_event_factors(config, out)
+    findings.extend(
+        {
+            "dataset": "adj_factors",
+            "check": "stock_event_factor",
+            "severity": "warning" if "reason" in item else "info",
+            **item,
+        }
+        for item in stock_findings
     )
     findings.extend(_factor_continuity_findings(out))
     findings.extend(_corporate_action_crosscheck_findings(config, out))

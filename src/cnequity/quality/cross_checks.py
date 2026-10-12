@@ -2523,25 +2523,8 @@ def _unstepped_severity(
     unanswered: set[str],
     asked: set[str],
 ) -> str:
-    """Error only for a Baostock stock whose miss is unarbitrated or price-proven.
-
-    A fund, a Beijing security, a symbol Baostock did not answer, or a verdict
-    that does not prove Sina wrong must not fail `audit_gate=block`: there is
-    no series switch that would repair it, and the miss stays visible as a
-    warning. A price-proven miss stays an error until the refreshed Baostock
-    series actually steps.
-    """
-    from cnequity.derive.factor_arbitration import baostock_factor_symbol
-
-    verdict = verdicts.get((symbol, ex_date))
-    if not baostock_factor_symbol(symbol) or symbol in unanswered:
-        return "warning"
-    if verdict is None and symbol in asked:
-        return "warning"
-    if verdict is None:
-        return "error"
-    proven = verdict.get("verdict") == "sina_missed_step" and bool(verdict.get("price_confirms"))
-    return "error" if proven else "warning"
+    """Unresolved factor semantics never fail a run, with or without a peer."""
+    return "warning"
 
 
 def unstepped_corporate_action_findings(config: Config, trade_date: date) -> list[dict]:
@@ -2549,9 +2532,8 @@ def unstepped_corporate_action_findings(config: Config, trade_date: date) -> lis
 
     The reverse of `unrecorded_ex_event`. The daily derive already asks
     Baostock to arbitrate these and switches a stock when the price proves
-    Sina missed the step. What remains is an error only in that proven case;
-    everything else is a warning, so `audit_gate=block` does not fail the run
-    on a miss Baostock cannot repair.
+    Sina missed the step. Remaining disagreements are advisory, including
+    unarbitrated stocks and independently confirmed misses.
     """
     silent = recent_unstepped_actions(config, trade_date)
     if silent.is_empty():

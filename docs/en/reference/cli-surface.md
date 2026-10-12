@@ -22,6 +22,7 @@ Checked against the Click command registry by `scripts/dev/sync_docs.py`. “Whe
 | `cne profile list` | none | Lists built-in scopes |
 | `cne profile show` | none | Shows a built-in scope |
 | `cne query` | conditional | SQL reads the lake; fetches data on an on-demand cache miss or refresh |
+| `cne repair adj-factors` | --refresh-sources only | Offline preview with a saved plan by default; --apply publishes supported corrections, retains old revisions and unresolved diagnostics, and saves bounded historical progress |
 | `cne repair corporate-action-gaps` | with --apply | Offline preview by default; --apply queries Baostock and CNINFO per gap, publishes a new version after verification and keeps the old one |
 | `cne repair daily-bar-coverage` | none | Read-only preview by default; --apply retires BSE session debts and proven pre-listing debts using committed data and refreshes coverage watermarks, retaining evidence receipts without changing bars |
 | `cne repair financial-announcements` | none | Read-only preview by default; --apply appends financial reconstructions with LICO original-disclosure evidence, publishes through the repair gate and retains existing vintages |

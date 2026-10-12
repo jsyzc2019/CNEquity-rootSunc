@@ -73,3 +73,5 @@ ths-official capture: ["when run", "Calls the credentialed source and writes com
 ths-official repair-bars: ["when run", "Fetches even in a dry run; --apply writes repairs"]
 ths-official resource-sectors: ["when run", "Fetches even in a dry run; --apply writes staging"]
 verify: ["conditional", "Local validation by default; --repair accesses sources and repairs"]
+
+repair adj-factors: ["--refresh-sources only", "Offline preview with a saved plan by default; --apply publishes supported corrections, retains old revisions and unresolved diagnostics, and saves bounded historical progress"]

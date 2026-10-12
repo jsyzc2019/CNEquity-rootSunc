@@ -109,6 +109,8 @@ PIT 模式/质量、请求窗口与实际行的日期边界。`receipt_id` 是�
 
 ### 异常
 
+`strict_adj` 和 `adj_is_exact` 仅描述因子覆盖，不能证明历史因子正确。`load_with_receipt()` 的 `adjustment` 摘要提供所读版本的来源与非阻断历史诊断；无诊断时标为未评估。
+
 `ReaderError`（`ValueError` 子类）：未知数据集、无数据、strict_adj 失败等。
 
 ## scan()

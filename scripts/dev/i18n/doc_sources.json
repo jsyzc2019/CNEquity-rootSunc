@@ -8,8 +8,8 @@
   "datasets/contract.md": "5774a13a697a6238c7b25c514d934b50d89242ac168fe26df17a9d48b39dcebc",
   "datasets/query-guide.md": "916ee77d491865db6cc7a12b058c9fc2fb25ca3b983aa1aaf6d5e44f66c3e62e",
   "datasets/schema.md": "927dc420afeb9b343a58fd25066b9a154e4676bc44890da5d79db067169549d2",
-  "datasets/sources.md": "fe87320270ab39e217b4757da2e267e2b825cfddad38e799891ec800f830f1a2",
-  "getting-started/configuration.md": "f9b47e273d61962d4fa45fe62efc35a8def19ef990d2f1cc7b06561b7106d08b",
+  "datasets/sources.md": "524e1fab84cf085ab94a9e40a63374202c0d16c8695e577946a77475074671b1",
+  "getting-started/configuration.md": "cda9ee2303e13bd5ad672dc4277e566f16b75341ec0951f530dcbc2f235b3a36",
   "getting-started/initialization.md": "8c32b608697546ac069ba937e020d0fe92eb9ca191b915f789fa29d1c08af60a",
   "getting-started/installation.md": "a233c2c47e9e38a137a82a1a83803bc67a6ea0a9526723314a2435ec1f32bd7b",
   "getting-started/quickstart.md": "b31b5037a64c173c6cd310322453a313e0bfd4ae4e39625db74b0803e039092c",
@@ -27,8 +27,8 @@
   "recipes/minute-bars-15-30-60.md": "a5f794398c1251fb098af1c5d8fe112cfea4ea9e04da18b29ccc516edee93396",
   "recipes/pit-rebalance.md": "7e65b17daf54e4dc879d82e7e58dece1240eeeb34181ba0340be72d5ce56c197",
   "recipes/research-baseline.md": "a9216742cd28278a00681b2f17e38b9bdac46ecea6afa3880f3469f609121780",
-  "reference/cli.md": "061449c83f50e5a6000a83edaa82ac969f7d91a5631a4d8f60a6d059cc85e779",
+  "reference/cli.md": "7545645e580c74efd0460e73cfda7482d2d916066f3f02855a9a00aac37e3e66",
   "reference/mcp.md": "9fbb9443155f2649c7a9ee1b631b68b7b847a96e445df5f8175dcd09ac9e3f89",
-  "reference/python-api.md": "d7bc3efb69fd99f0120c88ea2cc69e133b63e0cde9a2fb4c5e6ca498f1d859b5",
+  "reference/python-api.md": "85341ad9b2553d82930e855384292a3f63df7fb72742af5f345658917e3b4409",
   "reference/universe-profiles.md": "636609ade6d037059f939b7463a598e2a2d3c42f429947f1c3843416bd54a32d"
 }

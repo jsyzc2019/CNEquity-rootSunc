@@ -64,6 +64,43 @@ def fund_factors(config_path: str, apply: bool):
     _emit(repair_fund_factors(_cfg(config_path), apply=apply))
 
 
+@repair.command("adj-factors")
+@config_option
+@click.option("--apply", is_flag=True, help="应用可确定的因子修正并保留旧版本；未解决项只作提示。")
+@click.option("--refresh-sources", is_flag=True, help="联网补取独立因子证据；默认仅使用本地缓存。")
+@click.option("--symbols", default=None, help="逗号分隔的证券代码；默认分批检查历史问题。")
+@click.option("--start", default=None, help="待修事件起点（YYYY-MM-DD）；累计影响延续到其后。")
+@click.option("--end", default=None, help="待修事件终点（YYYY-MM-DD）；累计影响延续到其后。")
+@click.option(
+    "--max-symbols",
+    default=100,
+    type=click.IntRange(min=1),
+    show_default=True,
+    help="每批最多检查的证券数；应用后保存历史进度。",
+)
+@click.option("--plan", default=None, help="应用指定预览的计划标识；输入变化时要求重新预览。")
+def adj_factors(config_path, apply, refresh_sources, symbols, start, end, max_symbols, plan):
+    """统一修复股票因子与 ETF/LOF 份额折算；默认离线预览并保存计划。"""
+    from cnequity.cli._shared import comma_values, parse_date_option
+    from cnequity.storage.repairs.adj_factors import repair_adj_factors
+
+    try:
+        _emit(
+            repair_adj_factors(
+                _cfg(config_path),
+                apply=apply,
+                refresh_sources=refresh_sources,
+                symbols=comma_values(symbols, "--symbols"),
+                start=parse_date_option(start, "--start"),
+                end=parse_date_option(end, "--end"),
+                max_symbols=max_symbols,
+                plan_id=plan,
+            )
+        )
+    except (ValueError, RuntimeError) as exc:
+        raise click.ClickException(str(exc)) from exc
+
+
 @repair.command("fund-listing-dates")
 @config_option
 @click.option("--apply", is_flag=True, help="归档交易所目录并发布缺失的基金上市日期；默认只预览。")
