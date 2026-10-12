@@ -330,6 +330,9 @@ def _update_watermarks(
         if datasets is not None and dataset not in datasets:
             continue
         if dataset == "daily_bars":
+            from cnequity.storage.fund_no_print import reconcile_no_print_coverage
+
+            reconcile_no_print_coverage(config)
             from cnequity.storage.coverage import (
                 resolved_bj_session_dates,
                 resolved_prelisting_keys,

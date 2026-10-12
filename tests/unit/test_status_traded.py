@@ -269,6 +269,12 @@ def test_null_volume_and_newer_zero_volume_are_not_print_evidence(lake):
     )
     pl.concat([frame, newer]).write_parquet(root / "part.parquet")
     _commit(lake, "daily_bars")
+    # Rounded-zero quantities with positive turnover cannot erase actual
+    # prints. A genuine zero-volume/zero-amount observation remains distinct.
+    assert repair_status_traded(lake, start=D1, end=D2)["rows"] == 4
+    newer = newer.with_columns(pl.lit(0.0).alias("amount"))
+    pl.concat([frame, newer]).write_parquet(root / "part.parquet")
+    _commit(lake, "daily_bars")
     assert repair_status_traded(lake, start=D1, end=D2)["rows"] == 0
     frame.with_columns(pl.lit(None, dtype=pl.Int64).alias("volume")).write_parquet(
         root / "part.parquet"

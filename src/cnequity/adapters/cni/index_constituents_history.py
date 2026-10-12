@@ -121,6 +121,12 @@ def fetch_cni_index_adjustments(
     def parse(content: bytes) -> pl.DataFrame:
         if not content:
             raise CniAdjustmentPayloadError(f"CNI adjustment response for {index_symbol} is empty")
+        missing_notice = f"{_index_code(index_symbol)}的样本历史调样文件不存在！".encode()
+        if content.strip() == missing_notice:
+            raise CniAdjustmentPayloadError(
+                f"CNI publisher does not serve adjustment history for {index_symbol}; "
+                "historical coverage is unresolved, and current constituents cannot replace it"
+            )
         if len(content) < 100:
             raise CniAdjustmentPayloadError(
                 f"CNI adjustment response for {index_symbol} is truncated"

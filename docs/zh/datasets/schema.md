@@ -840,7 +840,7 @@ PIT 查询过滤 `announce_date <= as_of`。
 | index_symbol | string | 如 ``000300.SH`` |
 | symbol | string | 成分股 |
 | as_of_date | date | 快照 / 调样日 |
-| weight | float64 | 权重比例，可空；当前东财与国证调样史不提供权重，写 null |
+| weight | float64 | 权重比例，可空；东财与国证调样史缺失时写 null；官方权重文件百分数转比例，总和约 1 |
 | source | string | 溯源 |
 | data_version | string | 溯源 |
 | fetched_at | timestamp | 溯源 |

@@ -56,6 +56,7 @@ from cnequity.steps.common import (
     load_symbols,
     record_negative_evidence,
 )
+from cnequity.storage.fund_no_print import approved_no_print_keys
 from cnequity.storage.state import StateStore
 
 logger = logging.getLogger(__name__)
@@ -199,6 +200,7 @@ def _classify_daily_scope(
         trading_status=status,
         trading_sessions=sessions,
         negative_evidence=evidence,
+        no_print_keys=approved_no_print_keys(config, start=start, end=end),
     )
 
 
@@ -1241,6 +1243,101 @@ def _turnover_replacements(
     return fresh.join(accepted, on=["symbol", "trade_date"], how="semi"), counts
 
 
+def _authority_turnover_replacements(stored, fresh, quotes):
+    """Confirm raw prices independently; keep the entire BaoStock bar.
+
+    SZSE report turnover includes a broader transaction scope, so only its
+    exact dated OHLC is admissible here, never its quantities or amounts.
+    """
+    if stored.is_empty() or quotes.is_empty():
+        return fresh.head(0)
+    prices = ("open", "high", "low", "close")
+    candidates = fresh.filter(
+        pl.col("volume").is_finite()
+        & (pl.col("volume") > 0)
+        & pl.col("amount").is_finite()
+        & (pl.col("amount") > 0)
+        & (pl.col("amount") / pl.col("volume")).is_between(
+            pl.col("low") * 0.98, pl.col("high") * 1.02
+        )
+    ).join(stored.select("symbol", "trade_date"), on=["symbol", "trade_date"], how="semi")
+    confirmed = (
+        candidates.join(
+            quotes.select(
+                "symbol", "trade_date", *[pl.col(c).alias(f"_authority_{c}") for c in prices]
+            ),
+            on=["symbol", "trade_date"],
+        )
+        .filter(
+            pl.all_horizontal(
+                pl.col(c).is_finite()
+                & (pl.col(c) > 0)
+                & (
+                    (pl.col(c) - pl.col(f"_authority_{c}")).abs()
+                    <= _TURNOVER_REPAIR_PRICE_TOLERANCE
+                )
+                for c in prices
+            )
+        )
+        .select("symbol", "trade_date")
+    )
+    return candidates.join(confirmed, on=["symbol", "trade_date"], how="semi")
+
+
+def _peer_turnover_replacements(stored, fresh, peer):
+    """Select whole bars using a second price reading for conflicts.
+
+    EastMoney can truncate stock volume to lots and round amounts. Agreement
+    tolerances never replace BaoStock's published quantity with an estimate.
+    """
+    fields = ("open", "high", "low", "close", "volume", "amount")
+
+    def usable(frame):
+        return frame.filter(
+            pl.all_horizontal(pl.col(c).is_finite() & (pl.col(c) > 0) for c in fields)
+            & (pl.col("low") <= pl.min_horizontal("open", "close"))
+            & (pl.col("high") >= pl.max_horizontal("open", "close"))
+            & (pl.col("amount") / pl.col("volume")).is_between(
+                pl.col("low") * 0.98, pl.col("high") * 1.02
+            )
+        )
+
+    empty = fresh.head(0)
+    if stored.is_empty() or peer.is_empty():
+        return empty, empty
+    peer = usable(peer)
+    fresh = usable(fresh)
+    prices = fields[:4]
+    keys = ["symbol", "trade_date"]
+    readings = stored.select(*keys, *prices).join(
+        peer.select(*keys, *[pl.col(c).alias(f"_peer_{c}") for c in fields]), on=keys
+    )
+    unchanged = readings.filter(
+        pl.all_horizontal(
+            (pl.col(c) - pl.col(f"_peer_{c}")).abs() <= _TURNOVER_REPAIR_PRICE_TOLERANCE
+            for c in prices
+        )
+    ).select(keys)
+    corroborated = (
+        fresh.join(readings.select(*keys, *[f"_peer_{c}" for c in fields]), on=keys)
+        .filter(
+            pl.all_horizontal(
+                (pl.col(c) - pl.col(f"_peer_{c}")).abs() <= _TURNOVER_REPAIR_PRICE_TOLERANCE
+                for c in prices
+            )
+            & (pl.col("volume") - pl.col("_peer_volume")).is_between(0, 99)
+            & (
+                (pl.col("amount") - pl.col("_peer_amount")).abs()
+                <= pl.max_horizontal(pl.lit(1.0), pl.col("amount").abs() * 2e-7)
+            )
+        )
+        .select(keys)
+    )
+    bao = fresh.join(corroborated, on=keys, how="semi")
+    em = peer.join(unchanged, on=keys, how="semi").join(corroborated, on=keys, how="anti")
+    return bao, em
+
+
 def repair_daily_bar_turnover(
     config: Config,
     start: date,
@@ -1266,6 +1363,15 @@ def repair_daily_bar_turnover(
     totals: dict[str, int] = dict.fromkeys(
         ("rows_checked", "rows_unserved", "rows_disagreeing", "rows_replaced"), 0
     )
+    peer_review = getattr(config, "_turnover_peer_review", False)
+    if peer_review and not (
+        config.sources.get("eastmoney", True)
+        or config.sources.get("exchange", True)
+        or config.tdx_enabled
+    ):
+        raise ValueError(
+            "turnover peer review requires an enabled exchange, TDX or EastMoney source"
+        )
     failed: set[str] = set()
     rows_written = 0
     # Find every defect first, then ask baostock once per stock for the years
@@ -1311,6 +1417,9 @@ def repair_daily_bar_turnover(
         groups.setdefault((row["first"], row["last"]), []).append(row["symbol"])
     batch = 0
     stopped: str | None = None
+    authority_failures = []
+    rows_authority_confirmed = 0
+    rows_tdx_confirmed = 0
     for (first, last), names in groups.items():
         lo, hi = max(start, date(first, 1, 1)), min(end, date(last, 12, 31))
         for offset in range(0, len(names), _TURNOVER_REPAIR_BATCH):
@@ -1346,9 +1455,117 @@ def repair_daily_bar_turnover(
             )
             target = stored.filter(pl.col("symbol").is_in(chunk)).drop("_defect")
             replacement, counts = _turnover_replacements(target, fresh)
+            peer_replacement = fresh.head(0)
+            tdx_replacement = fresh.head(0)
+            if peer_review and counts["rows_replaced"] < target.height:
+                from cnequity.adapters.eastmoney.bars import fetch_daily_bars
+                from cnequity.adapters.exchange.turnover_prices import (
+                    fetch_exchange_turnover_prices,
+                )
+
+                unresolved = target.join(
+                    replacement.select("symbol", "trade_date"),
+                    on=["symbol", "trade_date"],
+                    how="anti",
+                )
+                quotes, failures = fetch_exchange_turnover_prices(
+                    unresolved, config=config, run_id=run_id
+                )
+                authority_failures.extend(failures)
+                authoritative = _authority_turnover_replacements(unresolved, fresh, quotes)
+                rows_authority_confirmed += authoritative.height
+                replacement = pl.concat([replacement, authoritative], how="diagonal_relaxed")
+                unresolved = unresolved.join(
+                    authoritative.select("symbol", "trade_date"),
+                    on=["symbol", "trade_date"],
+                    how="anti",
+                )
+                if not unresolved.is_empty() and config.tdx_enabled:
+                    from cnequity.adapters.tdx_protocol.client import fetch_daily_bars as fetch_tdx
+                    from cnequity.storage.raw_archive import RawPayloadArchive
+
+                    tdx_names = unresolved["symbol"].unique().sort().to_list()
+                    try:
+                        tdx_peer = fetch_tdx(tdx_names, lo, hi, config=config, backfill=True)
+                    except Exception as exc:  # noqa: BLE001 — peer failure retains confirmed bars
+                        authority_failures.append(
+                            {"source": "tdx_protocol", "scope": tdx_names, "error": str(exc)}
+                        )
+                        tdx_peer = pl.DataFrame()
+                    if not tdx_peer.is_empty():
+                        # Native decoder output is not exact HTTP wire bytes.
+                        # Record its normalized format and request scope honestly.
+                        RawPayloadArchive(
+                            config.meta_root, enabled=True, datasets=["daily_bars"]
+                        ).archive(
+                            "daily_bars",
+                            tdx_peer.write_json().encode(),
+                            source="tdx_protocol",
+                            run_id=run_id,
+                            request_params={
+                                "symbols": tdx_names,
+                                "start": str(lo),
+                                "end": str(hi),
+                                "backfill": True,
+                            },
+                            payload_format="normalized_json",
+                        )
+                    extra, tdx_replacement = _peer_turnover_replacements(
+                        unresolved, fresh, tdx_peer
+                    )
+                    rows_tdx_confirmed += extra.height + tdx_replacement.height
+                    replacement = pl.concat([replacement, extra], how="diagonal_relaxed")
+                    accepted_tdx = pl.concat(
+                        [
+                            extra.select("symbol", "trade_date"),
+                            tdx_replacement.select("symbol", "trade_date"),
+                        ]
+                    )
+                    unresolved = unresolved.join(
+                        accepted_tdx, on=["symbol", "trade_date"], how="anti"
+                    )
+                peer = (
+                    fetch_daily_bars(
+                        unresolved["symbol"].unique().sort().to_list(), lo, hi, config=config
+                    )
+                    if not unresolved.is_empty() and config.sources.get("eastmoney", True)
+                    else fresh.head(0)
+                )
+                extra, peer_replacement = _peer_turnover_replacements(unresolved, fresh, peer)
+                replacement = pl.concat([replacement, extra], how="diagonal_relaxed")
+                accepted = pl.concat(
+                    [
+                        replacement.select("symbol", "trade_date"),
+                        peer_replacement.select("symbol", "trade_date"),
+                        tdx_replacement.select("symbol", "trade_date"),
+                    ]
+                )
+                remaining = target.join(accepted, on=["symbol", "trade_date"], how="anti")
+                _, counts = _turnover_replacements(remaining, fresh)
+                counts.update(rows_checked=target.height, rows_replaced=accepted.height)
             for key, value in counts.items():
                 totals[key] += value
             batch += 1
+            if not tdx_replacement.is_empty():
+                out = write_fetched(
+                    config,
+                    run_id,
+                    "daily_bars",
+                    tdx_replacement,
+                    source="tdx_protocol",
+                    batch_id=f"turnover-tdx-{batch:04d}",
+                )
+                rows_written += int(out.get("rows_written", 0))
+            if not peer_replacement.is_empty():
+                out = write_fetched(
+                    config,
+                    run_id,
+                    "daily_bars",
+                    peer_replacement,
+                    source="eastmoney",
+                    batch_id=f"turnover-peer-{batch:04d}",
+                )
+                rows_written += int(out.get("rows_written", 0))
             if replacement.is_empty():
                 continue
             out = write_fetched(
@@ -1381,6 +1598,10 @@ def repair_daily_bar_turnover(
                 f"{totals['rows_checked']} stock row(s) with unusable turnover"
             ),
             "source": "baostock",
+            "peer_review": peer_review,
+            "rows_authority_confirmed": rows_authority_confirmed,
+            "rows_tdx_confirmed": rows_tdx_confirmed,
+            "authority_failures": authority_failures,
             "defects": by_defect,
             **totals,
         }
@@ -1507,6 +1728,7 @@ def step_daily_bars(config: Config, trade_date: date, run_id: str, context: dict
                 trading_status=status,
                 trading_sessions=sessions,
                 negative_evidence=evidence,
+                no_print_keys=approved_no_print_keys(config, start=spec_start, end=spec_end),
             )
             ownership.generic.extend(routed.generic)
             ownership.delegated_delisted.extend(routed.delegated_delisted)
@@ -1731,6 +1953,7 @@ def step_daily_bars(config: Config, trade_date: date, run_id: str, context: dict
         ),
         trading_sessions=list_trading_dates(config, start, end),
         negative_evidence=load_negative_evidence(config, "daily_bars", metadata=metadata),
+        no_print_keys=approved_no_print_keys(config, start=start, end=end),
     )
     _record_delegated_ownership_batch(
         config,
@@ -2038,6 +2261,7 @@ def _certify_missing_daily_symbols(
         trading_status=status,
         trading_sessions=sessions,
         negative_evidence=evidence,
+        no_print_keys=approved_no_print_keys(config, start=start, end=end),
     )
     certified = {
         str(symbol).strip().upper() for symbol in (explicit_no_data or ()) if str(symbol).strip()
@@ -3233,6 +3457,7 @@ def _staged_daily_bar_missing_keys(
     )
     if status is not None:
         suspended = set(independent_suspension_keys(status).iter_rows())
+    no_print = approved_no_print_keys(config, start=start, end=end)
     # Suspensions this run learned from the vendor are staged but not yet
     # curated, so they are not in `suspended` and would otherwise be
     # condemned here as interior gaps.
@@ -3252,6 +3477,7 @@ def _staged_daily_bar_missing_keys(
             for day in expected - set(row["dates"])
             if (row["symbol"], day) not in suspended
             and (row["symbol"], day) not in learned_suspensions
+            and (row["symbol"], day) not in no_print
         )
     # A symbol with no rows at all is handled by the explicit no-data/unknown
     # classifier.  This helper is specifically the interior partial-evidence

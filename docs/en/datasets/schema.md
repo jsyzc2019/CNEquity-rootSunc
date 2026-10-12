@@ -846,7 +846,7 @@ and `actual_date` is filled in after actual disclosure (null before then).
 | index_symbol | string | e.g. ``000300.SH`` |
 | symbol | string | Constituent |
 | as_of_date | date | Snapshot / rebalance date |
-| weight | float64 | Weight as a fraction, nullable; current EastMoney and CNI adjustment history supply no weights and store null |
+| weight | float64 | Weight ratio, nullable; EastMoney/CNI adjustment history writes null; official file percentages become ratios summing to approximately 1 |
 | source | string | Provenance |
 | data_version | string | Provenance |
 | fetched_at | timestamp | Provenance |

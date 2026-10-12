@@ -210,6 +210,11 @@ from cnequity.orchestrator.engine import JobEngine
     ),
 )
 @click.option(
+    "--turnover-peer-review",
+    is_flag=True,
+    help="与 --turnover-repair 同用：以交易所历史日线、通达信和东财复查价格冲突，一致证据才整行替换；不拼接交易所汇总量额。",
+)
+@click.option(
     "--fill-em-outage",
     is_flag=True,
     help=(
@@ -249,6 +254,7 @@ def backfill(
     tdx_amount_repair: bool,
     tdx_volume_repair: bool,
     turnover_repair: bool,
+    turnover_peer_review: bool,
     fill_em_outage: bool,
 ):
     """回填一个数据集。
@@ -259,6 +265,8 @@ def backfill(
     只想快速验证而不是跑全市场时，用 `--symbols` 缩小范围。
     """
     dataset = _require_known_dataset(dataset)
+    if turnover_peer_review and not turnover_repair:
+        raise click.ClickException("--turnover-peer-review 需要 --turnover-repair")
     if profile == "delisted":
         if dataset != "daily_bars":
             raise click.ClickException("--profile delisted 只适用于 daily_bars")
@@ -541,6 +549,7 @@ def backfill(
         if start_d is None or end_d is None:
             raise click.ClickException("--turnover-repair 需要同时给 --start 和 --end")
         cfg._turnover_repair = True
+        cfg._turnover_peer_review = turnover_peer_review
     if fill_em_outage:
         if dataset != "valuation_metrics":
             raise click.ClickException("--fill-em-outage 只适用于 valuation_metrics")

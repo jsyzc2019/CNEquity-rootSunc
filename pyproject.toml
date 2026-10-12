@@ -61,7 +61,8 @@ dependencies = [
   # CNINFO issuer notices are the primary source for exact historical cash
   # payment dates.  pypdf extracts the text whose symbol, ex-date, pretax cash
   # amount and payment date are all cross-checked before a repair is accepted.
-  "pypdf>=5.0",
+  # Public issuer reports may use AES even with an empty document password.
+  "pypdf[crypto]>=5.0",
   "PyYAML>=6.0",
   # No AkShare. Its two call sites wrapped endpoints already queried directly —
   # the ST board (push2 clist) and the PMI / 货币供应量 datacenter reports — so it
@@ -138,6 +139,8 @@ where = ["src"]
 cnequity = [
     "py.typed",
     "adapters/calendar/seeds/*.csv",
+    "adapters/cni/seeds/*.json",
+    "adapters/exchange/seeds/*.json",
     # Required by BSE symbol migration and full-lake audits on installed wheels.
     "adapters/eastmoney/seeds/*.json",
     "adapters/ths/seeds/*.json",

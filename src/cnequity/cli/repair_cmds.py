@@ -40,6 +40,91 @@ def financial_announcements(config_path: str, apply: bool):
     _emit(repair_financial_announcements(_cfg(config_path), apply=apply))
 
 
+@repair.command("fund-volume")
+@config_option
+@click.option("--apply", is_flag=True, help="核验后替换整行并发布新版本，保留旧版。")
+@click.option(
+    "--refresh-sources", is_flag=True, help="归档官方历史 K 线及必要的独立金额证据；默认离线回放。"
+)
+@click.option("--max-symbols", type=click.IntRange(min=1), default=16, show_default=True)
+def fund_volume(config_path: str, apply: bool, refresh_sources: bool, max_symbols: int):
+    """修复零成交量、正成交额的沪深场内基金；须与官方日线价格及金额一致。"""
+    from cnequity.storage.repairs.fund_volume import repair_fund_volume
+
+    try:
+        _emit(
+            repair_fund_volume(
+                _cfg(config_path),
+                apply=apply,
+                refresh_sources=refresh_sources,
+                max_symbols=max_symbols,
+            )
+        )
+    except (ValueError, RuntimeError) as exc:
+        raise click.ClickException(str(exc)) from exc
+
+
+@repair.command("financial-originals")
+@config_option
+@click.option("--symbols", help="股票代码，逗号分隔。")
+@click.option("--all-stocks", is_flag=True, help="使用湖中股票目录；与 --symbols 二选一。")
+@click.option("--after", help="接续上一批 next_cursor（YEAR:SYMBOL）；失败项可不带游标重试。")
+@click.option(
+    "--quarter",
+    type=click.Choice(["Q1", "Q2", "Q3", "Q4"]),
+    default="Q4",
+    show_default=True,
+    help="报告期；Q2 为半年报，Q4 为年报，利润和现金流只恢复年初至期末累计数。",
+)
+@click.option("--start-year", type=click.IntRange(min=2001), default=2016, show_default=True)
+@click.option("--end-year", type=click.IntRange(min=2001), default=2024, show_default=True)
+@click.option("--max-reports", type=click.IntRange(min=1), default=16, show_default=True)
+@click.option(
+    "--reparse", is_flag=True, help="重新解析已有原文报告；内容未变的行保留原始观测时间。"
+)
+@click.option(
+    "--refresh-sources",
+    is_flag=True,
+    help="从巨潮取完整公告查询和原始定期报告；默认回放已归档来源。",
+)
+@click.option("--apply", is_flag=True, help="追加可核实的原文当期数，保留既有版本及真实采集时间。")
+def financial_originals(
+    config_path: str,
+    symbols: str | None,
+    all_stocks: bool,
+    after: str | None,
+    quarter: str,
+    start_year: int,
+    end_year: int,
+    max_reports: int,
+    reparse: bool,
+    refresh_sources: bool,
+    apply: bool,
+):
+    """从原始定期报告恢复合并报表科目；不使用比较期数，不把今天采集伪装成历史观测。"""
+    from cnequity.cli._shared import comma_values
+    from cnequity.storage.repairs.financial_originals import repair_financial_originals
+
+    try:
+        _emit(
+            repair_financial_originals(
+                _cfg(config_path),
+                symbols=comma_values(symbols, "--symbols") if symbols else None,
+                all_stocks=all_stocks,
+                after=after,
+                quarter=int(quarter[-1]),
+                start_year=start_year,
+                end_year=end_year,
+                max_reports=max_reports,
+                reparse=reparse,
+                refresh_sources=refresh_sources,
+                apply=apply,
+            )
+        )
+    except (ValueError, RuntimeError) as exc:
+        raise click.ClickException(str(exc)) from exc
+
+
 @repair.command("daily-bar-coverage")
 @config_option
 @click.option(
@@ -50,6 +135,35 @@ def daily_bar_coverage(config_path: str, apply: bool):
     from cnequity.storage.repairs.daily_bar_coverage import repair_daily_bar_coverage
 
     _emit(repair_daily_bar_coverage(_cfg(config_path), apply=apply))
+
+
+@repair.command("fund-no-print")
+@config_option
+@click.option(
+    "--apply", is_flag=True, help="保存基金竞价日线覆盖证据并结清对应欠账；不生成日线或停牌行。"
+)
+@click.option(
+    "--refresh-sources", is_flag=True, help="向沪深交易所取历史基金报表；默认离线回放已留存报表。"
+)
+@click.option(
+    "--max-sessions",
+    type=click.IntRange(min=1),
+    default=32,
+    show_default=True,
+    help="每批最多核对的欠账交易日。",
+)
+def fund_no_print(config_path: str, apply: bool, refresh_sources: bool, max_sessions: int):
+    """用沪深交易所明确的基金竞价日线覆盖证据核对欠账；正常可交易不等于当日有竞价成交。"""
+    from cnequity.storage.repairs.fund_no_print import repair_fund_no_print
+
+    _emit(
+        repair_fund_no_print(
+            _cfg(config_path),
+            apply=apply,
+            refresh_sources=refresh_sources,
+            max_sessions=max_sessions,
+        )
+    )
 
 
 @repair.command("fund-factors")
@@ -109,6 +223,91 @@ def fund_listing_dates(config_path: str, apply: bool):
     from cnequity.storage.repairs.fund_listing_dates import repair_fund_listing_dates
 
     _emit(repair_fund_listing_dates(_cfg(config_path), apply=apply))
+
+
+@repair.command("index-snapshots")
+@config_option
+@click.option(
+    "--indices", default=None, help="指数代码，逗号分隔；默认沪深300、科创50、深证成指、创业板指。"
+)
+@click.option("--apply", is_flag=True, help="按文件实际日期替换完整指数快照，保留旧版本。")
+@click.option("--refresh-sources", is_flag=True, help="取官方成分和权重文件；默认离线回放。")
+def index_snapshots(config_path: str, indices: str | None, apply: bool, refresh_sources: bool):
+    """恢复可取得的官方带日期成分与真实权重；不向过去倒推，也不跨日期填权重。"""
+    from cnequity.cli._shared import comma_values
+    from cnequity.storage.repairs.index_snapshots import repair_index_snapshots
+
+    try:
+        _emit(
+            repair_index_snapshots(
+                _cfg(config_path),
+                indices=comma_values(indices, "--indices"),
+                apply=apply,
+                refresh_sources=refresh_sources,
+            )
+        )
+    except (ValueError, RuntimeError) as exc:
+        raise click.ClickException(str(exc)) from exc
+
+
+@repair.command("index-history")
+@config_option
+@click.option(
+    "--index-symbol",
+    type=click.Choice(["399001.SZ", "000688.SH"]),
+    default="399001.SZ",
+    show_default=True,
+    help="选择已核验的历史成分目录。",
+)
+@click.option(
+    "--apply", is_flag=True, help="替换已核验区间的完整成分历史，保留官方带日期权重及旧版本。"
+)
+@click.option(
+    "--refresh-sources", is_flag=True, help="补采目录中未归档的官方历史附件；默认离线回放。"
+)
+def index_history(config_path: str, index_symbol: str, apply: bool, refresh_sources: bool):
+    """回放已核验的深证成指或科创50历史公告；每次生效日保存完整名单，未知历史权重为空。"""
+    from cnequity.storage.repairs.index_history import repair_index_history
+
+    try:
+        _emit(
+            repair_index_history(
+                _cfg(config_path),
+                index_symbol=index_symbol,
+                apply=apply,
+                refresh_sources=refresh_sources,
+            )
+        )
+    except (ValueError, RuntimeError) as exc:
+        raise click.ClickException(str(exc)) from exc
+
+
+@repair.command("stock-listing-dates")
+@config_option
+@click.option("--apply", is_flag=True, help="发布官方 IPO 日历证实的股票上市日期；保留旧版本。")
+@click.option("--refresh-sources", is_flag=True, help="联网取巨潮 IPO 日历；默认回放已归档来源。")
+@click.option("--max-sessions", type=click.IntRange(min=1), default=32, show_default=True)
+@click.option(
+    "--event-date",
+    multiple=True,
+    type=click.DateTime(formats=["%Y-%m-%d"]),
+    help="额外回放指定日的官方上市事件，可重复；不要求证券已有日线。",
+)
+def stock_listing_dates(
+    config_path: str, apply: bool, refresh_sources: bool, max_sessions: int, event_date: tuple
+):
+    """补官方日历证实的股票上市日期；首根日线或显式日期只定位请求。"""
+    from cnequity.storage.repairs.stock_listing_dates import repair_stock_listing_dates
+
+    _emit(
+        repair_stock_listing_dates(
+            _cfg(config_path),
+            apply=apply,
+            refresh_sources=refresh_sources,
+            max_sessions=max_sessions,
+            event_dates=tuple(day.date() for day in event_date),
+        )
+    )
 
 
 @repair.command("layout")

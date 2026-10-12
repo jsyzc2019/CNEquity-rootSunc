@@ -372,6 +372,30 @@ EFFECTS: dict[str, tuple[str, str]] = {
         "请求交易所当前 ETF/LOF 目录",
         "默认预览；--apply 归档来源响应并补未知上市日期，经修复门禁发布并保留已有日期和旧版本",
     ),
+    "repair stock-listing-dates": (
+        "仅 --refresh-sources 联网",
+        "默认离线回放 IPO 日历；--apply 补官方上市事件证实的股票上市日期，经修复门禁发布并保留旧版本",
+    ),
+    "repair index-snapshots": (
+        "仅 --refresh-sources 联网",
+        "默认离线回放官方文件；--apply 按实际日期替换完整指数成分快照及真实权重，经修复门禁发布并保留旧版本",
+    ),
+    "repair index-history": (
+        "仅 --refresh-sources 联网",
+        "默认离线回放所选深证成指或科创50的已核验官方附件目录；--apply 按生效日替换完整历史名单，保留官方实际日期权重及旧版本；未知历史权重为空",
+    ),
+    "repair financial-originals": (
+        "仅 --refresh-sources 联网",
+        "默认离线回放原始定期报告；--apply 追加能明确识别的合并报表当期数，经修复门禁发布并保留已有版本和真实采集时间",
+    ),
+    "repair fund-no-print": (
+        "仅 --refresh-sources 联网",
+        "默认离线预览；联网采证会归档报表并更新缓存；--apply 保存基金竞价日线覆盖证明、结清对应欠账并刷新水位，不生成日线或停牌行",
+    ),
+    "repair fund-volume": (
+        "仅 --refresh-sources 联网",
+        "默认离线预览；联网归档上交所行情服务的历史 K 线，金额冲突时复用或采集东财证据；--apply 核验后修复沪深场内基金成交量，经修复门禁发布并保留旧版",
+    ),
     "repair missing-values": (
         "无",
         "默认只读预览；--apply 将估值占位零及东财、国证缺失权重改为空值，经修复门禁发布并保留旧版本",

@@ -391,6 +391,7 @@ diff 会把删列、改类型、改主键、单位/PIT/历史语义变化识别�
 | `--bj-amount-repair` | 已由 `--tdx-amount-repair` 取代，保留以兼容旧脚本：从 TDX 补 Sina 从未发布的 BJ 成交额，已存的价格与成交量一律不动。需要 `--start`/`--end` |
 | `--tdx-amount-repair` | 仅 `daily_bars`：新浪补上的沪深北历史行与通达信一起核对，只在开高低收一致且成交量差小于一手时补成交额；通达信没有的代码保留新浪行。需要 `--start`/`--end` |
 | `--turnover-repair` | 仅 `daily_bars`：成交额缺失、为 0 或量额单位错位的沪深股票行，用 Baostock 同日行整行替换；开高低收须在半分钱内一致，不一致或未提供的保留原值并计数。需要 `--start`/`--end` |
+| `--turnover-peer-review` | 与 `--turnover-repair` 同用，先用上交所历史日 K 或深交所实际日期报表核对 Baostock 价格，再用通达信和东财复查其余冲突。整行替换须有一致价格和可用量额；交易所汇总成交量、成交额不能拼接进竞价日线，仍有冲突或来源不可用的保留并计数。 |
 | `--tdx-volume-repair` | 仅 `daily_bars`：重读 TDX，只改写已存 TDX 行的成交量（及 64.5 元以下被放大的成交额），修 2026-09-17 前的解码错误；价格须一致，不新增行，不经内部缺口门禁。需要 `--symbols` 和 `--start`/`--end` |
 | `--bse-tip-repair` | 仅 `daily_bars`，历史迁移用：读取已有 session 的 OHLCV，仅向 BSE 请求成交额并严格核对；必须同时指定相同的 `--start/--end` 与 `--symbols` |
 
@@ -517,8 +518,13 @@ cne derive trading_status --start 2001-01-01 --end 2001-12-31
 | `status-listing-window` | 删除 `trading_status` 中落在证券上市日之前、或没有退市记录支撑的行。旧版合并曾把尚无日线的新证券推断为退市，状态步骤随后在它们上市后的头几个交易日写入 `derived_delisted`；东财也会把尚未上市的代码报成正常交易。`derived_delisted` 行只在当前 `instruments` 仍记有不早于上市日、且不晚于该行的退市日时保留；上市日之前的行一律删除，除非日线在上市日之前就有成交（这时上市日有误）。不补写行。发布新版本，旧版本保留 |
 | `status-traded --start --end` | 默认只读预览：用已提交日线的正成交量补已知上市期间、缺状态行的股票/ETF 键，来源 `derived_traded`，ST 保持 null。已有状态不覆盖；`--apply` 重新核对当前版本后发布并保留旧版本。建议按年或月分段 |
 | `fund-listing-dates` | 从完整的上交所、深交所 ETF/LOF 当前目录补未知上市日期，独立于研究资格。预览也请求来源；`--apply` 归档响应、经修复门禁发布新版本，保留已有日期及旧版本，不把首根日线当上市日 |
+| `stock-listing-dates` | 用有成交但上市日期未知的股票首日定位巨潮 IPO 日历请求，也可用可重复的 `--event-date YYYY-MM-DD` 核验尚无日线的股票；只接受代码、日期匹配的明确上市事件，不能与更早成交矛盾。默认回放归档，`--refresh-sources` 联网采证，`--max-sessions` 分批；`--apply` 发布并保留已有日期和旧版本；若补入的官方上市日期晚于残留退市日期，同一修订清除该矛盾退市日期 |
+| `index-snapshots` | 回放官方带日期的完整成分、权重文件；`--refresh-sources` 更新归档，`--indices` 选择指数。`--apply` 替换整个指数快照，百分数转比例，成分与权重按各自日期保存，不倒推历史 |
+| `financial-originals` | `--symbols` 或 `--all-stocks` 选择股票，`--start-year/--end-year` 选择年份，`--quarter` 选择 Q1/Q2/Q3/Q4（默认年报），`--max-reports` 分批，`--after` 接续输出的 `next_cursor`。默认离线预览，`--refresh-sources` 归档巨潮完整查询和原始 PDF，`--apply` 追加可明确识别的合并报表当期数和累计数；`--reparse` 重放旧报告并保留未变行的首次观测时间；未识别布局或科目保留缺口，不回填采集时间 |
 | `adj-factors` | 统一股票因子与 ETF/LOF 份额折算修复。默认离线预览并保存计划；`--refresh-sources` 显式联网采证，`--apply` 复查输入后发布确定的修正。支持 `--symbols`、事件窗口 `--start/--end`、`--max-symbols` 和 `--plan`；未解决事件保留原值和提示。详见 [历史因子修复](../datasets/sources.md) |
 | `fund-factors` | 离线预览 ETF/LOF 已记录拆分、转增的漏跳；从原始来源序列重建完整历史，保留其他来源台阶和现金分红口径。`--apply` 经修复门禁发布 `derived_fund_actions` 并保留旧版本。条款冲突或缺少原始序列时不猜补 |
+| `fund-volume` | 用上交所完整历史 K 线修复沪深场内基金零成交量、正成交额的行。`--refresh-sources` 归档来源，默认离线回放；`--apply` 仅替换上市窗口内、开高低收及舍入金额一致的行并保留旧版本。若湖中金额冲突，须有已归档的东财未复权日线同时证实价格和金额，才替换整行；东财整手成交量不参与补量。优先复用相符的原始响应归档，避免重复请求。不得用成交额倒算成交量。 后续重抓的零量正额行不会覆盖已恢复的有效成交量。 |
+| `fund-no-print` | 用深交所明确的零成交额，或上交所按证券和日期返回的零竞价开高低及正参考价，核对日线欠账。默认离线预览；`--refresh-sources` 联网归档报表，`--max-sessions` 限制交易日数；`--apply` 保存证明并刷新覆盖水位。缺失响应不构成证明，正常可交易不等于当日有成交；舍入量额为零本身不足以证明无成交；上交所覆盖证明表示未形成竞价日线，不能据此否认汇总口径成交，不生成日线或停牌行。证据失效会重新打开欠账，实际成交记录优先 |
 | `daily-bar-coverage` | 逐证券复查 `bj_session_incomplete` 整日欠账；仅按已提交日线的正成交量或独立停牌证据结清已知上市区间。`--apply` 更新覆盖元数据和水位，保存输入版本及收据，不改日线。同样结清已提交且不与成交历史矛盾的上市日期所证明的上市前欠账；未知上市日期仍由逐证券覆盖报告列为未核实 |
 | `misdated-valuation` | 替换 `valuation_metrics` 中盖错交易日的 push2 快照行。快照不带日期，只描述抓取时最近一个已收盘的交易日；抓取时刻对应的交易日与行上日期不同的行，`--apply` 时删除，并在同一版本中换成东财 datacenter 按该日期发布的估值；datacenter 没有的键不再保留错误的行。计划离线，`--apply` 才请求 datacenter |
 | `valuation-basis` | 统一 `valuation_metrics` 口径：push2 动态市盈率移入 `pe_dynamic`；Baostock 流通市值由成交均价口径换算为收盘价口径，无法核对的保留原值并标为 `vwap_x_turn_implied_shares`；总市值按 `share_structure` 当日有效总股本重建，无记录的标为年末股本估算 |

@@ -24,8 +24,10 @@ def missing_bar_keys(
     bars: pl.DataFrame,
     status: pl.DataFrame,
     sessions: list[date],
+    *,
+    no_print_keys: set[tuple[str, date]] | None = None,
 ) -> pl.DataFrame:
-    """Find absent keys with known listing spans and no explicit suspension.
+    """Find absent keys without suspension or verified fund no-print evidence.
 
     Source-empty negative caches only suppress retries; they do not establish
     that a security did not trade. They deliberately cannot certify coverage.
@@ -45,6 +47,10 @@ def missing_bar_keys(
         .unique()
     )
     covered = bars.select(*KEYS).unique()
+    if no_print_keys:
+        covered = pl.concat(
+            [covered, pl.DataFrame(sorted(no_print_keys), schema=KEYS, orient="row")]
+        ).unique()
     if not status.is_empty():
         suspended = independent_suspension_keys(status)
         covered = pl.concat([covered, suspended]).unique()
@@ -102,7 +108,10 @@ def daily_bar_coverage(config: Config, start: date, end: date) -> dict:
         status = load_curated_trading_status(config, start=chunk[0], end=chunk[-1], symbols=scope)
         if status is None:
             status = pl.DataFrame(schema={**KEYS, "is_trading": pl.Boolean})
-        missing = missing_bar_keys(instruments, bars, status, chunk)
+        from cnequity.storage.fund_no_print import approved_no_print_keys
+
+        no_print = approved_no_print_keys(config, start=chunk[0], end=chunk[-1])
+        missing = missing_bar_keys(instruments, bars, status, chunk, no_print_keys=no_print)
         total += missing.height
         for symbol, day in missing.iter_rows():
             row = summaries.setdefault(

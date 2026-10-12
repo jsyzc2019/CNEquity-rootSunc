@@ -262,6 +262,7 @@ class Config:
     _tdx_amount_repair: bool = False
     _tdx_volume_repair: bool = False
     _turnover_repair: bool = False
+    _turnover_peer_review: bool = False
     _sector_bars_force: bool = False
     _rate_limiters: object | None = field(default=None, repr=False)
     # ``workers`` is the legacy/global scheduler budget.  Source-specific

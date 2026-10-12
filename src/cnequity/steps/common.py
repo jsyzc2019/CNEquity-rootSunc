@@ -858,6 +858,7 @@ def classify_daily_bar_ownership(
     trading_status: pl.DataFrame | None = None,
     trading_sessions: Iterable[date] | None = None,
     negative_evidence: Iterable[dict] | None = None,
+    no_print_keys: set[tuple[str, date]] | None = None,
 ) -> DailyBarOwnership:
     """Route symbols using explicit metadata and evidence, never a ratio.
 
@@ -946,6 +947,14 @@ def classify_daily_bar_ownership(
             except ValueError:
                 is_fund = False
             (out.generic if is_fund else out.delegated_delisted).append(normalized)
+        elif (
+            asset_type in {"etf", "lof"}
+            and list_date is not None
+            and sessions
+            and all((normalized, day) in (no_print_keys or set()) for day in sessions)
+        ):
+            out.expected_no_data.append(normalized)
+            out.no_data_reasons[normalized] = "exchange_fund_no_print"
         elif sessions and normalized in status_by_symbol:
             status = status_by_symbol[normalized]
             # A missing session in the status table is unknown, not a silent
