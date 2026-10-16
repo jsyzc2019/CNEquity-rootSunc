@@ -58,10 +58,8 @@ def test_a_dead_owner_is_reclaimed_and_a_live_one_blocks(tmp_path):
     assert scheduler_lock_holder(root, "daily") is None
 
 
-@pytest.mark.parametrize(
-    "marker", ["99999999", '{"pid":99999999,"host":"other-host","start":"old"}']
-)
-def test_remote_and_legacy_owners_are_not_reclaimed(tmp_path, marker):
+def test_a_remote_owner_is_not_reclaimed(tmp_path):
+    marker = '{"pid":99999999,"host":"other-host","start":"old"}'
     directory = tmp_path / "daily.lock"
     directory.mkdir()
     (directory / "pid").write_text(marker)
@@ -71,6 +69,43 @@ def test_remote_and_legacy_owners_are_not_reclaimed(tmp_path, marker):
             pass
     assert caught.value.code == 1
     assert (directory / "pid").read_text() == marker
+
+
+def test_a_legacy_pid_marker_is_reclaimed_once_its_process_is_gone(tmp_path):
+    directory = tmp_path / "daily.lock"
+    directory.mkdir()
+    (directory / "pid").write_text("99999999\n")
+    assert scheduler_lock_holder(tmp_path, "daily") is None
+    with scheduler_lock(tmp_path, "daily"):
+        assert scheduler_lock_holder(tmp_path, "daily") == os.getpid()
+    assert not directory.exists()
+
+
+def test_a_legacy_pid_marker_of_a_live_process_blocks(tmp_path):
+    directory = tmp_path / "daily.lock"
+    directory.mkdir()
+    (directory / "pid").write_text(f"{os.getpid()}\n")
+    assert scheduler_lock_holder(tmp_path, "daily") == os.getpid()
+    with pytest.raises(SchedulerLockError):
+        with scheduler_lock(tmp_path, "daily"):
+            pass
+    assert directory.exists()
+
+
+def test_an_ownerless_directory_is_reclaimed_only_after_the_grace(tmp_path):
+    directory = tmp_path / "daily.lock"
+    directory.mkdir()
+    (directory / ".pid.abc.tmp").write_text("{")
+    assert scheduler_lock_holder(tmp_path, "daily") == -1
+    with pytest.raises(SchedulerLockError):
+        with scheduler_lock(tmp_path, "daily"):
+            pass
+    old = directory.stat().st_mtime - 3600
+    os.utime(directory, (old, old))
+    assert scheduler_lock_holder(tmp_path, "daily") is None
+    with scheduler_lock(tmp_path, "daily"):
+        assert sorted(p.name for p in directory.iterdir()) == ["pid"]
+    assert not directory.exists()
 
 
 def test_reused_local_pid_does_not_keep_a_dead_owners_lock(tmp_path, monkeypatch):
@@ -141,3 +176,14 @@ scheduler_lock_release
     assert done.returncode == 0, done.stderr
     assert done.stdout.strip() == str((data / "locks" / "daily.lock").resolve())
     assert not (data / "locks" / "daily.lock").exists()
+
+
+def test_a_mac_keeps_its_identity_when_the_hostname_changes(monkeypatch):
+    from cnequity.orchestrator import scheduler_lock as module
+
+    monkeypatch.setattr(module.sys, "platform", "darwin")
+    monkeypatch.setattr(module, "_platform_uuid", lambda: "1228759C-BF6E-562C-9599-26651563D05C")
+    monkeypatch.setattr(module.socket, "gethostname", lambda: "laptop.home")
+    before = host_identity()
+    monkeypatch.setattr(module.socket, "gethostname", lambda: "laptop.office")
+    assert host_identity() == before == "mac:1228759C-BF6E-562C-9599-26651563D05C"

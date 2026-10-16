@@ -15,12 +15,14 @@ and missed every lake whose root was not that default.
 from __future__ import annotations
 
 import argparse
+import functools
 import json
 import os
 import re
 import socket
 import subprocess
 import sys
+import time
 import uuid
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -94,7 +96,30 @@ def pid_alive(pid: int) -> bool:
     return not _zombie(pid)
 
 
+@functools.cache
+def _platform_uuid() -> str | None:
+    """The Mac's hardware UUID, which survives network and hostname changes."""
+    try:
+        result = subprocess.run(
+            ["ioreg", "-rd1", "-c", "IOPlatformExpertDevice"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    found = re.search(r'"IOPlatformUUID"\s*=\s*"([0-9A-Fa-f-]{36})"', result.stdout)
+    return found.group(1).upper() if found else None
+
+
 def host_identity() -> str:
+    # macOS rewrites the hostname when a laptop joins another network. A marker
+    # written under the old name would then read as a remote owner and hold
+    # the lock until a maintainer removed it.
+    if sys.platform == "darwin":
+        hardware = _platform_uuid()
+        if hardware:
+            return f"mac:{hardware}"
     return f"{socket.gethostname()}:{uuid.getnode():012x}"
 
 
@@ -136,15 +161,38 @@ def _read_owner(path: Path) -> dict | None:
     return None
 
 
+#: An ownerless lock directory older than this is a writer that died between
+#: ``mkdir`` and its marker; every current writer does both under the guard.
+OWNERLESS_GRACE_SECONDS = 60
+
+
+def _local_hosts() -> set[str]:
+    # The second spelling is what development builds before the hardware UUID
+    # wrote on a Mac; a marker it left must still be recognised as local.
+    return {host_identity(), f"{socket.gethostname()}:{uuid.getnode():012x}"}
+
+
 def _owner_active(owner: dict) -> bool:
-    # A remote owner's PID is not meaningful on this host. Legacy and malformed
-    # identities also require operator verification, even when that PID is gone.
-    if owner.get("host") != host_identity():
+    host = owner.get("host")
+    if host is None:
+        # A pid-only marker from 0.16 and earlier. Those scripts only ever ran
+        # against a local lock directory, so a dead PID means a dead owner.
+        return pid_alive(owner["pid"])
+    # A remote owner's PID is not meaningful on this host.
+    if host not in _local_hosts():
         return True
     if not pid_alive(owner["pid"]):
         return False
     start = process_start(owner["pid"])
     return not start or not owner.get("start") or start == owner["start"]
+
+
+def _ownerless_is_young(directory: Path) -> bool:
+    try:
+        age = time.time() - directory.stat().st_mtime
+    except OSError:
+        return False
+    return age < OWNERLESS_GRACE_SECONDS
 
 
 def _paths(root: Path, name: str) -> tuple[Path, Path]:
@@ -161,7 +209,9 @@ def scheduler_lock_holder(root: Path, name: str) -> int | None:
     if owner and _owner_active(owner):
         return owner["pid"]
     # An ownerless directory can be a process between mkdir and marker write.
-    return -1 if directory.exists() and owner is None else None
+    if owner is None and directory.exists() and _ownerless_is_young(directory):
+        return -1
+    return None
 
 
 def acquire_scheduler_lock(root: Path, name: str, *, pid: int) -> dict:
@@ -182,11 +232,14 @@ def acquire_scheduler_lock(root: Path, name: str, *, pid: int) -> dict:
         with exclusive_lock(root / f".{name}.guard", blocking=False):
             if directory.exists():
                 previous = _read_owner(marker)
-                if previous is None or _owner_active(previous):
+                if _ownerless_is_young(directory) if previous is None else _owner_active(previous):
                     raise SchedulerLockError(
                         f"调度锁 {name} 正被占用或其主机身份尚未核验。", code=1
                     )
-                marker.unlink()
+                marker.unlink(missing_ok=True)
+                # A marker write interrupted by a crash leaves its temp file.
+                for leftover in directory.glob(".pid.*.tmp"):
+                    leftover.unlink()
                 directory.rmdir()  # Never recursively remove an unexpected file.
             directory.mkdir()
             try:
