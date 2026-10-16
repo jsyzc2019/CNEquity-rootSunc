@@ -20,7 +20,7 @@ from cnequity.serve.ops.catalog import OpsError, command_line, config_file, prep
 from cnequity.serve.ops.environment import command_environment
 from cnequity.serve.ops.job import launch_runs, same_job
 from cnequity.serve.ops.plan import describe_backfill
-from cnequity.serve.ops.preflight import blockers, hints, occupancy
+from cnequity.serve.ops.preflight import blockers, config_drift, drift_blocker, hints, occupancy
 from cnequity.serve.ops.records import (
     atomic_write,
     cancel_path,
@@ -173,6 +173,11 @@ class OpsService:
                 raise OpsError("确认凭据不匹配，请重新预览。")
             if preview.config_path != self._identity():
                 raise OpsError("配置已经变了，请重新预览。")
+            drift = config_drift(self.config)
+            if drift:
+                # Unused, like the maintenance wait: valid again once the file
+                # and the server agree.
+                raise OpsError(drift_blocker(drift))
             if self.storage_busy() and preview.lock_class != "read":
                 # Leave the token unused so the same preview can start once
                 # maintenance finishes.

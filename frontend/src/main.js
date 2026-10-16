@@ -2,6 +2,7 @@
 // dataset (#/dataset/<name>[/state|meta]).
 import { renderStorage, closeStorage } from "./storage.js";
 import { renderOps, closeOps } from "./ops.js";
+import { configDriftBanner } from "./drift.js";
 import { closeRunStream, renderRunDetail, renderRuns } from "./runs.js";
 import { disposeAll, heatmap, provenanceSeries, runGantt, severityTimeline } from "./charts.js";
 import {
@@ -81,6 +82,25 @@ async function paintMode() {
     if (ticket !== modePaint) return;
     const el = document.querySelector(".console-mode");
     if (el) el.textContent = modeLabel(body.mode?.label || "");
+    document.getElementById("config-drift")?.remove();
+    const drift = configDriftBanner(body.mode, esc);
+    if (drift) {
+      document.querySelector(".page-main")?.insertAdjacentHTML("afterbegin", drift);
+      const copy = document.querySelector("#config-drift [data-copy-command]");
+      if (copy) {
+        copy.onclick = async () => {
+          try {
+            await navigator.clipboard.writeText(copy.dataset.copyCommand || "");
+            copy.textContent = tr("已复制", "Copied");
+          } catch {
+            // No clipboard permission: leave the command selected for Ctrl/Cmd+C.
+            const code = document.querySelector("#config-drift .drift-command code");
+            if (code) window.getSelection()?.selectAllChildren(code);
+            copy.textContent = tr("已选中，按 Ctrl/⌘+C 复制", "Selected; press Ctrl/⌘+C");
+          }
+        };
+      }
+    }
     const slot = body.occupancy?.slot;
     const meta = document.querySelector(".topbar-meta");
     if (meta && slot && (slot.state === "running" || slot.state === "starting") && !meta.querySelector(".ops-live")) {

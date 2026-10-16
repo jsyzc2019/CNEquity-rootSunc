@@ -537,6 +537,40 @@ def test_malformed_frame_gets_a_parse_error_and_the_loop_continues(lake):
     assert replies[1]["id"] == 7
 
 
+def test_process_streams_speak_utf8_under_a_gbk_console(lake, monkeypatch):
+    """Chinese Windows hands the process GBK pipes with CRLF line ends; the
+    client still writes and reads UTF-8 with bare LF."""
+    import io
+
+    def call(index, query):
+        return json.dumps(
+            {
+                "jsonrpc": "2.0",
+                "id": index,
+                "method": "tools/call",
+                "params": {"name": "resolve_symbol", "arguments": {"query": query}},
+            },
+            ensure_ascii=False,
+        ).encode("utf-8")
+
+    wire = b"\n".join([call(1, "茅台"), b'{"bad": "\xff"}', call(2, "600519")]) + b"\n"
+    sent = io.BytesIO()
+    monkeypatch.setattr(protocol.sys, "stdin", io.TextIOWrapper(io.BytesIO(wire), encoding="gbk"))
+    monkeypatch.setattr(
+        protocol.sys, "stdout", io.TextIOWrapper(sent, encoding="gbk", newline="\r\n")
+    )
+    protocol.serve_stdio(lake)
+
+    raw = sent.getvalue()
+    assert b"\r" not in raw
+    replies = [json.loads(line) for line in raw.decode("utf-8").splitlines()]
+    assert [reply["id"] for reply in replies] == [1, None, 2]
+    assert replies[1]["error"]["code"] == protocol.PARSE_ERROR
+    for reply in (replies[0], replies[2]):
+        body = json.loads(reply["result"]["content"][0]["text"])
+        assert body["rows"][0][:2] == ["600519.SH", "贵州茅台"]
+
+
 # --- the CLI entry point ---------------------------------------------------
 
 

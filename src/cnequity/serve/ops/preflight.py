@@ -8,6 +8,7 @@ rejection is the one that counts.
 
 from __future__ import annotations
 
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -39,6 +40,51 @@ SCHEDULER_TEXT = {
     "daily": "定时日更或收尾补抓正在运行。",
     "events": "定时事件流正在运行。",
 }
+
+
+_TOML_AT = re.compile(r"\s*\(at line (\d+), column (\d+)\)\s*$")
+
+
+def config_drift(config) -> dict | None:
+    """Whether the config file has moved away from the lake *config* holds.
+
+    A running server keeps the lake it started on; changing ``data.root``
+    takes a restart. A job it launches, though, reads the file afresh, so the
+    file is re-read on each call. ``None`` when the two agree.
+    """
+    from cnequity.config.loader import configured_data_root
+
+    path = getattr(config, "config_path", None) if config is not None else None
+    if path is None:
+        return None
+    try:
+        configured = configured_data_root(path)
+    except FileNotFoundError:
+        return {"kind": "missing"}
+    except OSError as exc:
+        return {"kind": "unreadable", "detail": exc.strerror or type(exc).__name__}
+    except (ValueError, TypeError) as exc:
+        # tomllib.TOMLDecodeError is a ValueError; a non-string root is a TypeError.
+        text = str(exc)
+        at = _TOML_AT.search(text)
+        return {
+            "kind": "invalid",
+            "line": int(at.group(1)) if at else None,
+            "column": int(at.group(2)) if at else None,
+            "detail": _TOML_AT.sub("", text),
+        }
+    if configured == Path(config.data_root):
+        return None
+    return {"kind": "data_root", "configured_data_root": str(configured)}
+
+
+def drift_blocker(drift: dict) -> str:
+    if drift["kind"] == "data_root":
+        return (
+            f"配置文件已指向另一个数据目录 {drift['configured_data_root']}，"
+            "控制台仍在使用启动时的湖。重启 cne serve 后再启动任务。"
+        )
+    return "配置文件现在读不出来，任务启动后会失败。修好配置文件后再启动。"
 
 
 def engine_names(lock_class: str) -> tuple[str, ...]:
@@ -86,6 +132,11 @@ def blockers(config, spec: OpSpec, *, storage_busy: bool, lock_class: str) -> li
     found: list[str] = []
     from cnequity.file_lock import is_locked
 
+    # The job reads the config file itself; started now it would work on a
+    # lake other than the one every check below and the page are looking at.
+    drift = config_drift(config)
+    if drift:
+        found.append(drift_blocker(drift))
     if is_locked(slot_path(config)):
         holder = live_holder(config)
         if holder:

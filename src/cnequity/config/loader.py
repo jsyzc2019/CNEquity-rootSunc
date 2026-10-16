@@ -655,12 +655,26 @@ def push2_paused_by_env() -> bool:
     return os.environ.get("CNE_PUSH2_PAUSED", "").strip().lower() in {"1", "true", "yes", "on"}
 
 
+def _data_root(raw: dict) -> Path:
+    return _absolute(Path(raw.get("data", {}).get("root", "./data/cnequity")).expanduser())
+
+
+def configured_data_root(path: str | Path) -> Path:
+    """The ``data.root`` *path* names now, resolved exactly as ``load_config`` does.
+
+    A long-running process holds the lake it started on; this lets it notice
+    the file has since been pointed somewhere else without loading the rest.
+    """
+    with open(Path(path).expanduser().resolve(), "rb") as f:
+        return _data_root(tomllib.load(f))
+
+
 def load_config(path: str | Path) -> Config:
     config_path = Path(path).expanduser().resolve()
     with open(config_path, "rb") as f:
         raw = tomllib.load(f)
 
-    data_root = _absolute(Path(raw.get("data", {}).get("root", "./data/cnequity")).expanduser())
+    data_root = _data_root(raw)
     lake_profile = raw.get("data", {}).get("profile") or None
     orch = raw.get("orchestrator", {})
     tdx = raw.get("tdx_protocol", {})

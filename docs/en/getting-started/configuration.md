@@ -102,6 +102,8 @@ Main sources and request channels in the template:
 
 The fetch settings in `cne serve` only change `enabled` for TDX, EastMoney, Sina daily bars, Baostock, the BSE website, THS pages and CNINFO, plus EastMoney's `push2_paused`. The minute-bar, trade-tick and futures switches and `[universe] ingest` / `ingest_listed_funds` / `ingest_eligible_etfs` are on that page too. Before confirming, it lists the differences, and it backs up before writing; intervals, budgets, breakers and credentials are left untouched. The environment variable `CNE_PUSH2_PAUSED=1` still takes precedence over the pause switch in the config.
 
+`cne serve` keeps using the lake it started with. If you edit the config file and change `data.root`, restart serve to switch; until then, every console page shows the new directory from the file next to the one still in use, with the restart command. If the config file cannot be read, the notice gives the line and column of the error. In both cases you can keep browsing the original lake, but the console will not start jobs or change fetch settings or schedules, because a job would read the file and work on the other lake.
+
 Template request intervals (conservative client-side settings, not a guarantee of a safe quota on the source side):
 
 | source | `min_interval_seconds` | Notes |

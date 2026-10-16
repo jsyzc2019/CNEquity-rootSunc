@@ -453,6 +453,7 @@ export async function renderOps(ctx) {
     alerts.push(`<li>${tr("正在执行", "Running")} <a href="#/ops/jobs/${encodeURIComponent(slot.job_id)}">${esc(pick(slot, "title") || slot.op)}</a></li>`);
   }
   if (!home.mode.ops_enabled) alerts.push(`<li>${tr("当前模式不能从面板启动命令。", "This mode cannot start commands from the panel.")}</li>`);
+  if (home.mode.config_drift) alerts.push(`<li>${tr("配置文件和这个控制台用的不是同一个数据湖，处理好之前不能从这里启动任务，见页面顶部的提示。", "The config file and this console disagree about the lake. Jobs cannot start from here until that is resolved; see the notice at the top of the page.")}</li>`);
   const attention = alerts.length
     ? `<section class="surface-panel report-panel ops-attention"><ul class="ops-status">${alerts.join("")}</ul></section>`
     : "";
@@ -462,7 +463,8 @@ export async function renderOps(ctx) {
   const deferredClose = emptyLake ? "</details>" : "";
   setPage(
     `<section class="page-heading"><div class="eyebrow">${tr("数据湖控制台 / 操作", "Lake console / Operations")}</div>
-      <div class="heading-row"><div><h1>${tr("操作", "Operations")}</h1><p class="sub">${tr("先预览，再启动。同一时间只跑一个。", "Preview, then start. Only one job runs at a time.")}</p></div>
+      <div class="heading-row"><div><h1>${tr("操作", "Operations")}</h1><p class="sub">${tr("先预览，再启动。同一时间只跑一个。", "Preview, then start. Only one job runs at a time.")}</p>
+        <p class="ops-lake">${tr("数据目录", "Data directory")} <code>${esc(home.mode.data_root || "—")}</code></p></div>
       <span class="status-pill">${esc(modeLabel(home.mode.label))}</span></div></section>
     ${attention}
     <div id="ops-recent" hidden></div>

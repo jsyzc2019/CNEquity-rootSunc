@@ -90,7 +90,18 @@ def mode_payload(request: Request) -> dict:
         "label": label,
         "suggested_data_root": (str(Path("./data/cnequity").resolve()) if app.setup else None),
         "config_path": str(app.config_path) if app.config_path else None,
+        "data_root": str(app.config.data_root) if app.config is not None else None,
+        "config_drift": config_drift(app),
     }
+
+
+def config_drift(state) -> dict | None:
+    """The page's view of :func:`preflight.config_drift`; none before setup."""
+    from cnequity.serve.ops.preflight import config_drift as drift
+
+    if state.setup or state.config is None:
+        return None
+    return drift(state.config)
 
 
 def _service(request: Request) -> OpsService:

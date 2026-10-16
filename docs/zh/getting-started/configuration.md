@@ -102,6 +102,8 @@ cne config validate --config configs/cnequity.toml
 
 `cne serve` 的取数设置只改通达信、东财、新浪日线、Baostock、北交所官网、同花顺页面和巨潮的 `enabled`，以及东财的 `push2_paused`。分钟线、分笔、期货开关和 `[universe] ingest` / `ingest_listed_funds` / `ingest_eligible_etfs` 也在那一页。确认前先列出差异，写入前备份；间隔、预算、熔断和凭据不动。环境变量 `CNE_PUSH2_PAUSED=1` 仍优先于配置里的暂停开关。
 
+`cne serve` 启动后一直使用启动时的数据湖。直接编辑配置文件改了 `data.root`，要重启 serve 才会切换；在那之前，控制台每页顶部会对照显示配置文件里的新目录和当前仍在使用的目录，并给出重启命令。配置文件读不出来时会指出出错的行和列。这两种情况下页面照常浏览原来的湖，但不能从控制台启动任务、修改取数设置或定时任务，因为任务会按配置文件读到另一个湖。
+
 模板请求间隔（客户端保守设置，不是源方安全配额保证）：
 
 | source | `min_interval_seconds` | 备注 |

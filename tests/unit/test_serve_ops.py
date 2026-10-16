@@ -506,6 +506,73 @@ def test_setup_rejects_a_file_in_the_data_directory_ancestors(tmp_path):
     assert client.get("/api/ops").json()["mode"]["setup"] is True
 
 
+def test_mode_reports_a_config_file_that_now_names_another_lake(tmp_path):
+    """The server keeps its lake; the page is told the file moved on."""
+    path = tmp_path / "cnequity.toml"
+    first, second = tmp_path / "lake-a", tmp_path / "lake-b"
+    path.write_text(f"[data]\nroot = '{first.as_posix()}'\n", encoding="utf-8")
+    app = create_app(load_config(path))
+    client = TestClient(app, base_url="http://127.0.0.1")
+
+    def mode():
+        response = client.get("/api/ops")
+        assert response.status_code == 200, response.text
+        return response.json()["mode"]
+
+    assert mode()["data_root"] == str(first)
+    assert mode()["config_drift"] is None
+
+    path.write_text(f"[data]\nroot = '{second.as_posix()}'\n", encoding="utf-8")
+    assert mode()["config_drift"] == {"kind": "data_root", "configured_data_root": str(second)}
+    assert mode()["data_root"] == str(first)
+    assert app.state.view.config.data_root == first
+    assert client.get("/api/health").status_code == 200
+
+    path.write_text("[data\nroot = ", encoding="utf-8")
+    broken = mode()["config_drift"]
+    assert (broken["kind"], broken["line"], broken["column"]) == ("invalid", 1, 6)
+    assert "(at line" not in broken["detail"]
+    assert client.get("/api/health").status_code == 200
+
+    path.unlink()
+    assert mode()["config_drift"] == {"kind": "missing"}
+
+    path.write_text(f"[data]\nroot = '{first.as_posix()}'\n", encoding="utf-8")
+    assert mode()["config_drift"] is None
+
+
+def test_jobs_cannot_start_while_the_config_file_names_another_lake(tmp_path):
+    """A job reads the file itself, so it would work on the lake the page is
+    not showing. Preview refuses; a token taken before the edit does too."""
+    path = tmp_path / "cnequity.toml"
+    first, second = tmp_path / "lake-a", tmp_path / "lake-b"
+    path.write_text(f"[data]\nroot = '{first.as_posix()}'\n", encoding="utf-8")
+    app = create_app(load_config(path))
+    client = TestClient(app, base_url="http://127.0.0.1")
+    headers = _csrf(client)
+    early = _preview(client, headers, "check.verify")
+    assert early["launch_token"]
+
+    path.write_text(f"[data]\nroot = '{second.as_posix()}'\n", encoding="utf-8")
+    held = _preview(client, headers, "check.verify")
+    assert held["launch_token"] is None
+    assert any(str(second) in item and "重启" in item for item in held["blockers"])
+    refused = client.post(
+        "/api/ops/jobs",
+        headers=headers,
+        json={"preview_id": early["preview_id"], "launch_token": early["launch_token"]},
+    )
+    assert refused.status_code == 422
+    assert "重启" in refused.json()["detail"]
+    assert not app.state.ops._previews[early["preview_id"]].used
+
+    path.write_text("[data", encoding="utf-8")
+    assert any("读不出来" in item for item in _preview(client, headers, "check.verify")["blockers"])
+
+    path.write_text(f"[data]\nroot = '{first.as_posix()}'\n", encoding="utf-8")
+    assert _preview(client, headers, "check.verify")["launch_token"]
+
+
 def test_failed_group_retries_inherit_the_process_environment():
     import inspect
 
