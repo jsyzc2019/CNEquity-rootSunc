@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -30,6 +31,8 @@ from cnequity.query.reader import (
 )
 from cnequity.query.state import DatasetState, dataset_state
 from cnequity.storage.revisions import RevisionStore
+
+logger = logging.getLogger(__name__)
 
 
 class ReadReceiptError(RuntimeError):
@@ -248,9 +251,17 @@ def load_with_receipt(
                 )
             except (OSError, ValueError, pl.exceptions.PolarsError):
                 pass  # Optional diagnostics cannot invalidate a successful read.
-        payload["adjustment"] = factor_read_quality(
-            cfg, frame, factor_root=context.roots["adj_factors"], factors=factors
-        )
+        try:
+            payload["adjustment"] = factor_read_quality(
+                cfg, frame, factor_root=context.roots["adj_factors"], factors=factors
+            )
+        except Exception as exc:  # noqa: BLE001 — diagnostics never fail a read
+            logger.warning("factor diagnostics unavailable for this read: %s", exc)
+            payload["adjustment"] = {
+                "gate_impact": "none",
+                "historical_accuracy": "not_certified",
+                "diagnostics_assessed": False,
+            }
     canonical = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     payload["receipt_id"] = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
     return ReadResult(frame=frame, receipt=payload)

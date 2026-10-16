@@ -970,3 +970,45 @@ def test_the_tip_tolerance_runs_on_the_real_tip_path(tmp_path, monkeypatch):
     assert "UnboundLocal" not in message
     assert "no usable rows" in message
     assert "cne backfill daily_bars --symbols" in message, "the remedy still travels with it"
+
+
+def test_unavailable_fund_scope_holds_funds_but_not_stocks(tmp_path, monkeypatch):
+    cfg = _instrument_lake(tmp_path, ingest_eligible_etfs=True)
+    monkeypatch.setattr(
+        "cnequity.query.dataset_attempt",
+        lambda *a, **k: {"status": "failed", "started_at": "2026-07-21T16:00:00+08:00"},
+    )
+    assert _daily_fund_bar_symbols(cfg, D3) is None
+
+    requested = _capture_fetch_scope(monkeypatch)
+    run_id = Manifest(cfg.manifest_path).start_run("daily:core")
+    from cnequity.orchestrator.outcomes import SourceUnavailableError
+
+    # The stub serves no rows, so the stock fetch itself ends the step.
+    with pytest.raises(SourceUnavailableError, match="600519.SH"):
+        step_daily_bars(cfg, D3, run_id, {})
+    assert "600519.SH" in requested
+    assert not {"158030.SZ", "512740.SH"} & set(requested)
+
+
+def test_fund_scope_failure_turns_the_step_into_a_warning(tmp_path, monkeypatch):
+    import cnequity.steps.bars as bars
+
+    cfg = _instrument_lake(tmp_path, ingest_eligible_etfs=True)
+    monkeypatch.setattr(
+        "cnequity.query.dataset_attempt",
+        lambda *a, **k: {"status": "failed", "started_at": "2026-07-21T16:00:00+08:00"},
+    )
+
+    def fake_step(config, trade_date, run_id, context):
+        assert bars._daily_fund_bar_symbols(config, trade_date) is None
+        assert bars._daily_fund_bar_symbols(config, trade_date, retry=False) is None
+        return {"status": "success", "rows_written": 3}
+
+    monkeypatch.setattr(bars, "_step_daily_bars", fake_step)
+    run_id = Manifest(cfg.manifest_path).start_run("daily:core")
+    result = step_daily_bars(cfg, D3, run_id, {})
+    assert result["status"] == "warning"
+    findings = result["context_updates"]["audit_findings"]
+    assert [f["check"] for f in findings] == ["fund_bar_scope_unavailable"]
+    assert bars._FUND_SCOPE_ISSUES.get() is None

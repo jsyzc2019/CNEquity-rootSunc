@@ -397,3 +397,20 @@ def test_partial_rebuild_does_not_retract_a_previously_repaired_pending_event(
     pending = repair_adj_factors(cfg, symbols=["600001.SH"])
     assert any(e.get("reason") for e in pending["events"])
     assert pending["rows"] == 0
+
+
+def test_plain_adjusted_load_skips_diagnostics_and_receipt_survives_them(tmp_path, monkeypatch):
+    from cnequity.query import load, load_with_receipt
+
+    cfg = _lake(tmp_path)
+    RevisionStore(cfg.meta_root, cfg.curated_root, cfg.derived_root).ensure_current("adj_factors")
+
+    def fail(*args, **kwargs):
+        raise ValueError("corrupt diagnostics snapshot")
+
+    monkeypatch.setattr("cnequity.quality.factor_diagnostics.factor_read_quality", fail)
+    frame = load("daily_bars", config=cfg, symbols=["600001.SH"], adjust="hfq")
+    assert frame.height == 10
+    result = load_with_receipt("daily_bars", config=cfg, symbols=["600001.SH"], adjust="hfq")
+    assert result.frame.height == 10
+    assert result.receipt["adjustment"]["diagnostics_assessed"] is False

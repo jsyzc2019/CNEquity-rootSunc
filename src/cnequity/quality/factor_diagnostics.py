@@ -63,8 +63,14 @@ def factor_read_quality(
         if "adjust_type" in factors.columns:
             factors = factors.filter(pl.col("adjust_type") == "hfq")
         keys = bars.select("symbol", "trade_date").unique()
-        observed = factors.join(keys, on=["symbol", "trade_date"], how="semi")
-        result["factor_sources"] = dict(Counter(observed["source"].drop_nulls().to_list()))
+        counts = (
+            factors.join(keys, on=["symbol", "trade_date"], how="semi")
+            .drop_nulls("source")
+            .group_by("source")
+            .len()
+            .sort("source")
+        )
+        result["factor_sources"] = dict(counts.iter_rows())
     path = _path(config, factor_root)
     if not path.exists() or bars.is_empty():
         return result

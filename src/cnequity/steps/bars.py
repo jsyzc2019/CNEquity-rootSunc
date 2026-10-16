@@ -7,6 +7,7 @@ import json
 import logging
 import time
 from collections.abc import Iterable
+from contextvars import ContextVar
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -475,7 +476,13 @@ def _resolve_daily_bar_scope(config: Config, symbols: list[str]) -> list[str]:
 _ETF_PROFILE_MAX_AGE_DAYS = 14
 
 
-def _daily_fund_bar_symbols(config: Config, on: date, *, retry: bool = False) -> list[str]:
+#: Fund-scope failures seen by the current ``step_daily_bars`` call.
+_FUND_SCOPE_ISSUES: ContextVar[list[dict] | None] = ContextVar(
+    "daily_bars_fund_scope_issues", default=None
+)
+
+
+def _fund_bar_scope(config: Config, on: date, *, retry: bool = False) -> list[str]:
     if not config.ingest_listed_funds:
         return _eligible_etf_bar_symbols(config, on, retry=retry)
     from cnequity.storage.instrument_catalog import listed_fund_symbols, load_curated_instruments
@@ -484,6 +491,30 @@ def _daily_fund_bar_symbols(config: Config, on: date, *, retry: bool = False) ->
     if instruments is None:
         raise RuntimeError("fund bar scope unavailable: no committed instruments")
     return listed_fund_symbols(instruments, on)
+
+
+def _daily_fund_bar_symbols(config: Config, on: date, *, retry: bool = False) -> list[str] | None:
+    """Fund codes to fetch on *on*, or None when the fund scope is unavailable.
+
+    A broken fund directory holds the funds back, never the stocks: the step
+    carries on and reports a warning naming the cause.
+    """
+    try:
+        return _fund_bar_scope(config, on, retry=retry)
+    except RuntimeError as exc:
+        logger.warning("daily_bars: fund scope unavailable on %s; stocks continue: %s", on, exc)
+        issues = _FUND_SCOPE_ISSUES.get()
+        if issues is not None and not any(item["message"] == str(exc) for item in issues):
+            issues.append(
+                {
+                    "dataset": "daily_bars",
+                    "severity": "warning",
+                    "check": "fund_bar_scope_unavailable",
+                    "message": str(exc),
+                    "trade_date": on.isoformat(),
+                }
+            )
+        return None
 
 
 def _eligible_etf_bar_symbols(config: Config, on: date, *, retry: bool = False) -> list[str]:
@@ -1664,6 +1695,22 @@ def _yearly_slices(start: date, end: date) -> list[tuple[date, date]]:
     requires_workers=True,
 )
 def step_daily_bars(config: Config, trade_date: date, run_id: str, context: dict) -> dict:
+    issues: list[dict] = []
+    token = _FUND_SCOPE_ISSUES.set(issues)
+    try:
+        result = _step_daily_bars(config, trade_date, run_id, context)
+    finally:
+        _FUND_SCOPE_ISSUES.reset(token)
+    if issues and isinstance(result, dict):
+        updates = result.setdefault("context_updates", {})
+        updates.setdefault("audit_findings", []).extend(issues)
+        persist_step_findings(config, run_id, trade_date, issues)
+        if result.get("status", "success") == "success":
+            result["status"] = "warning"
+    return result
+
+
+def _step_daily_bars(config: Config, trade_date: date, run_id: str, context: dict) -> dict:
     batch_specs = context.get("_retry_batch_specs")
     if batch_specs:
         # Retry windows are encoded on each BatchSpec; tip/multi-day gap-fill
@@ -1679,7 +1726,7 @@ def step_daily_bars(config: Config, trade_date: date, run_id: str, context: dict
         remaining: list[tuple[str, list[str], date, date]] = []
         fallback_specs: list[tuple[str, list[str], date, date]] = []
         ownership = DailyBarOwnership()
-        etf_retry_scopes: dict[date, set[str]] = {}
+        etf_retry_scopes: dict[date, list[str] | None] = {}
         explicit_retry = bool(
             getattr(config, "_backfill", False)
             and getattr(config, "_backfill_symbols", None) is not None
@@ -1689,16 +1736,18 @@ def step_daily_bars(config: Config, trade_date: date, run_id: str, context: dict
                 symbols = _resolve_daily_bar_scope(config, symbols)
             else:
                 if spec_end not in etf_retry_scopes:
-                    # A later directory failure stops new admissions, but it
-                    # must not erase work already planned in this failed run.
-                    etf_retry_scopes[spec_end] = set(
-                        _daily_fund_bar_symbols(config, spec_end, retry=True)
+                    etf_retry_scopes[spec_end] = _daily_fund_bar_symbols(
+                        config, spec_end, retry=True
                     )
                 eligible_etfs = etf_retry_scopes[spec_end]
+                # An unavailable fund scope stops new admissions, but it must
+                # not erase fund work already planned in this failed run.
                 symbols = [
                     symbol
                     for symbol in symbols
-                    if in_ingest_universe_symbol(symbol, config) or symbol in eligible_etfs
+                    if in_ingest_universe_symbol(symbol, config)
+                    or eligible_etfs is None
+                    or symbol in eligible_etfs
                 ]
             if not symbols:
                 # Every symbol in this batch has left the ingest scope. Retrying
@@ -1897,7 +1946,9 @@ def step_daily_bars(config: Config, trade_date: date, run_id: str, context: dict
     explicit_scope = (
         getattr(config, "_backfill_symbols", None) if getattr(config, "_backfill", False) else None
     )
-    catalog_etfs = set(_daily_fund_bar_symbols(config, end)) if explicit_scope is None else set()
+    catalog_etfs = (
+        set(_daily_fund_bar_symbols(config, end) or ()) if explicit_scope is None else set()
+    )
     known_symbols = load_symbols(config)
     symbols = (
         # An explicit repair scope is the operator's own request and is never
