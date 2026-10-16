@@ -889,6 +889,12 @@ def _echo_resample_backlog(cfg, df) -> None:
     help="配合 --datasets：打印数据集清单的全部列，而不只是新鲜度。",
 )
 @click.option(
+    "--hide-empty",
+    "hide_empty",
+    is_flag=True,
+    help="配合 --datasets：只列有数据或已陈旧的数据集，还没有数据的折成一行。",
+)
+@click.option(
     "--groups",
     "gate_groups",
     default=None,
@@ -914,6 +920,7 @@ def status(
     run_selector: str | None,
     show_datasets: bool,
     all_columns: bool,
+    hide_empty: bool,
     gate_groups: str | None,
     scope: bool,
     gate: bool,
@@ -928,6 +935,8 @@ def status(
 
     if all_columns and not show_datasets:
         raise click.UsageError("--all-columns 只能配合 --datasets 使用")
+    if hide_empty and not show_datasets:
+        raise click.UsageError("--hide-empty 只能配合 --datasets 使用")
     if gate_groups and not show_datasets:
         raise click.UsageError("--groups 只能配合 --datasets 使用")
     if not scope and not show_datasets:
@@ -995,8 +1004,21 @@ def status(
             "watermark",
         ]
         view = df if all_columns else df.select([c for c in freshness_columns if c in df.columns])
+        hidden: list[str] = []
+        if hide_empty:
+            # A first lake holds a handful of the registered datasets; forty
+            # rows of "empty" read as a broken install rather than as groups
+            # nobody has run yet. They are not judged here, so fold them.
+            listed = pl_mod.col("has_data") | (pl_mod.col("freshness") == "STALE")
+            hidden = view.filter(~listed)["dataset"].to_list()
+            view = view.filter(listed)
         with pl_mod.Config(tbl_rows=-1, tbl_cols=-1, fmt_str_lengths=32):
             click.echo(view)
+        if hidden:
+            click.echo(
+                f"另有 {len(hidden)} 个数据集还没有数据：所属调度组未启用或还没运行，"
+                "不影响这里的结论。完整清单：cne status --datasets"
+            )
         _echo_resample_backlog(cfg, df)
         if lake_profile == "sample":
             click.echo(
@@ -1556,6 +1578,7 @@ def check(ctx: click.Context, config_path: str, full: bool, pack_names: tuple[st
             run_selector=None,
             show_datasets=True,
             all_columns=False,
+            hide_empty=True,
             gate_groups=None,
             scope=True,
             gate=True,

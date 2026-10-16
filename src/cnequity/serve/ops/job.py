@@ -202,6 +202,12 @@ def classify(result_kind: str, exit_code: int, runs: list[dict], stdout: str) ->
             state = _stdout_state(payload) if payload else None
         if state is None:
             state = "complete" if exit_code == 0 else "failed"
+        if state == "failed" and exit_code == 0:
+            # An init whose bars published but which still owes a non-blocking
+            # step (`lake_usable`) is a partial delivery, not a failed build.
+            payload = last_json(stdout)
+            if payload and payload.get("lake_usable"):
+                state = "partial"
         message = {
             "succeeded": "执行成功。",
             "partial": "已交付一部分，仍有缺口或降级。",

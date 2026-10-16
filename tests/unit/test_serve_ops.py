@@ -126,7 +126,7 @@ def test_command_templates_omit_the_local_config_path():
     assert (
         daily == "cne run daily [--trade-date TRADE_DATE] [--backfill] [--no-events] [--pack PACK]"
     )
-    assert command_template(spec_for("init.start")).startswith("cne init --profile PROFILE")
+    assert command_template(spec_for("init.start")).startswith("cne init --json --profile PROFILE")
     assert command_template(spec_for("backfill.run")).startswith("cne backfill DATASET")
     assert command_template(spec_for("daily.stale")).startswith("cne run daily --stale-only")
     cards = {card["id"]: card["command"] for card in describe(None, setup=True)}
@@ -435,6 +435,13 @@ def test_classify_uses_runs_before_stdout():
     assert classify("run_json", 0, [], '{"status": "nothing_stale"}')[0] == "skipped"
     assert classify("gate", 1, [], "")[0] == "findings"
     assert classify("report", 0, [], "hello")[0] == "complete"
+
+
+def test_a_usable_init_that_still_owes_a_step_is_partial():
+    usable = '{"status": "failed", "lake_usable": true, "owed_steps": ["corporate_actions"]}'
+    assert classify("run_json", 0, [{"status": "failed"}], usable)[0] == "partial"
+    unusable = '{"status": "failed", "lake_usable": false}'
+    assert classify("run_json", 1, [{"status": "failed"}], unusable)[0] == "failed"
     assert aggregate(["success", "skipped_non_trading_day"]) == "succeeded"
     assert last_json('noise {"a": 1} tail {"status": "failed"}')["status"] == "failed"
 

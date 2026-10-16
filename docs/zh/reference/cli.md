@@ -152,7 +152,9 @@ cne init --profile sample
 | `--trade-date YYYY-MM-DD` | init 截至交易日（默认今天） |
 | `--resume` | 续跑最近未完成 init |
 | `--run-id` | 续跑指定 init run（隐含 resume） |
-| `--keep-going` | phase 失败后继续后续 phase |
+| `--keep-going` | 任一 phase 失败后都继续后续 phase（公司行为、指数与交易状态阶段，以及日线入湖后的派生和审计默认就会继续） |
+| `--json` | 结束时输出完整的机器可读结果，而不是摘要 |
+| `--no-preflight` | 跳过开跑前的网络预检；也可设 `CNE_SKIP_PREFLIGHT=1` |
 | `--profile demo\|sample\|quick\|full` | 建多大的湖。`quick`（默认）= 全市场标的、最近 3 年；`full` = 全市场、各 step 自己的起点（`daily_bars` 为 2016-01-01），请求和落盘量更大；`demo` / `sample` 是几只票的小湖，见 [上一节](#cne-init---profile-demo--sample) |
 | `--since YYYY-MM-DD` | 显式指定历史起点，覆盖 `--profile` |
 | `--quiet` | 只留 warning 及以上，不打逐批进度 |
@@ -176,7 +178,11 @@ cne backfill daily_bars --start 2016-01-01 --end COVERAGE_START
 
 上表中 `--config` / `--layout-only` / `--resume` / `--run-id` / `--keep-going` / `--since` 只对 `quick|full` 生效；`--symbols` / `--days` / `--data-root` / `--config-out` / `--intraday` / `--research` 只对 `demo|sample` 生效。传错一侧会被按名字拒绝，不会被忽略。
 
-退出：成功、来源受限（`degraded` / `warning`，包括本次 0 行）返回 0；真实执行错误返回 1。
+**公司行为、指数日线和交易状态阶段失败不阻断建湖。** 这些阶段出错时，init 照常抓日线、入湖并派生复权因子，结束时列出没完成的步骤；重跑同一条 `cne init` 只补这些。证券目录、交易日历或日线失败仍会停在原处，已下载的部分保留，恢复后重跑即续跑。
+
+**结束时打印摘要。** 终端给出湖是否可用、还差哪些步骤、日志位置和下一步命令（`cne check`、`cne serve`、Python 读取、MCP 接入）。完整结果存到 `{data.root}/logs/cne-init-<run_id>.json`；需要在 stdout 上拿到它时加 `--json`。
+
+退出：成功、来源受限（`degraded` / `warning`，包括本次 0 行），以及只差上述不阻断步骤、日线已入湖的情况返回 0；其他执行错误返回 1。
 
 ## cne config create
 

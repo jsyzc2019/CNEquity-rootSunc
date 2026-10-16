@@ -390,15 +390,15 @@ audit step 依赖 `compact`，所以它在**行已经进 curated 之后**才跑�
 ```toml
 names = [
   "phase1_reference",
-  "phase2a_corporate_actions",
   "phase2c_daily_bars_backfill",
+  "phase2a_corporate_actions",
   "phase3_index_and_status",
   "phase4_finalize",
   "phase5_derive_and_publish",
 ]
 ```
 
-阶段 → step 映射见 `orchestrator/init_phases.py`。
+阶段 → step 映射见 `orchestrator/init_phases.py`。0.17.0 起日线阶段排在公司行为之前；原样保留旧默认顺序（公司行为在前）的配置自动按新顺序执行，改过的列表照写的顺序执行，已开始的 init 按它记录的顺序续跑。
 
 ## `[on_demand]`
 

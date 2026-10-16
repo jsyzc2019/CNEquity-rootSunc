@@ -390,15 +390,15 @@ Default:
 ```toml
 names = [
   "phase1_reference",
-  "phase2a_corporate_actions",
   "phase2c_daily_bars_backfill",
+  "phase2a_corporate_actions",
   "phase3_index_and_status",
   "phase4_finalize",
   "phase5_derive_and_publish",
 ]
 ```
 
-For the phase → step mapping, see `orchestrator/init_phases.py`.
+For the phase → step mapping, see `orchestrator/init_phases.py`. Since 0.17.0 the daily-bar phase runs before corporate actions; a config that still carries the old default order verbatim (corporate actions first) runs in the new order, an edited list runs as written, and an init already started resumes in the order it recorded.
 
 ## `[on_demand]`
 

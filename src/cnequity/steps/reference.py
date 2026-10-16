@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from copy import copy
 from datetime import date, timedelta
 
 import polars as pl
 
-from cnequity.adapters.calendar.exchange_calendar import curated_bar_dates
+from cnequity.adapters.calendar.exchange_calendar import calendar_seed_end, curated_bar_dates
 from cnequity.adapters.eastmoney.instruments import enrich_instrument_list_dates
 from cnequity.adapters.tdx_protocol.client import (
     fetch_instruments,
@@ -45,6 +46,7 @@ from cnequity.orchestrator.outcomes import (
     result_is_usable,
 )
 from cnequity.orchestrator.registry import register_step
+from cnequity.progress import stage_progress
 from cnequity.quality.failover import snapshot_trading_status_exchange
 from cnequity.quality.st_coverage import (
     ST_EVIDENCE_UNSUPPORTED_EXCHANGES,
@@ -97,6 +99,9 @@ _TUSHARE_ST_BACKFILL_CHUNK = 500
 @register_step("instruments", group="core", requires_workers=False)
 def step_instruments(config: Config, trade_date: date, run_id: str, context: dict) -> dict:
     rl = config.tdx_rate_limit_spec()
+    backfill = getattr(config, "_backfill", False)
+    stage = stage_progress(logger, "instruments", 6 if backfill else 5)
+    stage("TDX security list")
     df = fetch_instruments(rate_limit=rl, allow_mock=config.tdx_allow_mock, config=config)
     df = normalize_with_source(df, "tdx_protocol")
     # Enrichment last, and deliberately: it fills null list_dates from
@@ -105,20 +110,25 @@ def step_instruments(config: Config, trade_date: date, run_id: str, context: dic
     # a null list_date forever, which is also what marks a symbol as a
     # not-yet-listed placeholder — so the names these merges recover would have
     # been discovered and then never fetched.
+    stage("Beijing board", held=df.height)
     df = _merge_bse_instruments(config, df, trade_date)
     df = _merge_untdxable_instruments(config, df)
     findings = []
     beijing_gap = _require_beijing_instrument_scope(config, df, trade_date)
     if beijing_gap:
         findings.append(beijing_gap)
+    stage("fund listing dates", held=df.height)
     df = _enrich_etf_list_dates_from_profiles(config, df, trade_date)
     if config.ingest_listed_funds and config.sources.get("exchange", True):
         df, listing_findings = _enrich_fund_list_dates_from_exchange(config, df, trade_date, run_id)
         findings.extend(listing_findings)
-    df = enrich_instrument_list_dates(config, df)
-    if getattr(config, "_backfill", False):
+    stage("listing dates (Baostock, EastMoney)", held=df.height)
+    basics_source = _instrument_basics_once(config)
+    df = enrich_instrument_list_dates(config, df, basics_source=basics_source)
+    if backfill:
+        stage("delisted directory (Baostock)", held=df.height)
         try:
-            df = _merge_delisted_instruments(config, df)
+            df = _merge_delisted_instruments(config, df, basics_source=basics_source)
         except Exception as exc:
             if error_kind(exc) not in SOURCE_LIMIT_REASONS:
                 raise
@@ -131,6 +141,7 @@ def step_instruments(config: Config, trade_date: date, run_id: str, context: dic
                     "message": str(exc),
                 }
             )
+    stage("write", held=df.height)
     df = _carry_lake_facts(config, df)
     result = write_simple(config, run_id, "instruments", df)
     new = new_instrument_rows(config, df)
@@ -451,7 +462,31 @@ def _merge_untdxable_instruments(config: Config, df: pl.DataFrame) -> pl.DataFra
     )
 
 
-def _merge_delisted_instruments(config: Config, df: pl.DataFrame) -> pl.DataFrame:
+def _instrument_basics_once(config: Config) -> Callable[[], pl.DataFrame]:
+    """Baostock's instrument basics, queried at most once per step.
+
+    Listing-date enrichment and the delisted merge both read it, and each
+    asked baostock separately: ~90s apiece on a full-market init. A failure
+    is not remembered, so the second reader still gets its own attempt.
+    """
+    held: dict[str, pl.DataFrame] = {}
+
+    def basics() -> pl.DataFrame:
+        if "frame" not in held:
+            from cnequity.adapters.baostock import instruments as baostock_instruments
+
+            held["frame"] = baostock_instruments.fetch_instrument_basics(config=config)
+        return held["frame"]
+
+    return basics
+
+
+def _merge_delisted_instruments(
+    config: Config,
+    df: pl.DataFrame,
+    *,
+    basics_source: Callable[[], pl.DataFrame] | None = None,
+) -> pl.DataFrame:
     """Add baostock's delisted names to a live-snapshot instrument list.
 
     TDX and EastMoney both answer "what is listed today", so on their own they
@@ -476,9 +511,9 @@ def _merge_delisted_instruments(config: Config, df: pl.DataFrame) -> pl.DataFram
         )
         return df
 
-    from cnequity.adapters.baostock.instruments import fetch_instrument_basics
-
-    basics = fetch_instrument_basics(config=config)
+    if basics_source is None:
+        basics_source = _instrument_basics_once(config)
+    basics = basics_source()
     if basics.is_empty():
         raise SourceUnavailableError(
             "baostock query_stock_basic returned no rows; refusing to write a "
@@ -559,7 +594,13 @@ def step_trading_calendar(config: Config, trade_date: date, run_id: str, context
             start = earliest
     else:
         start = trade_date - timedelta(days=30)
-    end = trade_date + timedelta(days=365)
+    # A year ahead, but never past the bundled holiday table. Beyond it no
+    # weekday can be classified, and asking anyway failed this step — and so
+    # phase 1 of every `cne init` and the daily calendar — from the first day
+    # the year ahead crossed the table's end. Shrinking forward coverage is
+    # the audit's `calendar_forward_coverage` warning to report, not a reason
+    # to stop.
+    end = min(trade_date + timedelta(days=365), max(calendar_seed_end(), trade_date))
     rl = config.tdx_rate_limit_spec()
     seed_path = config.meta_root / "seeds" / "trading_calendar.csv"
     df = fetch_trading_calendar(

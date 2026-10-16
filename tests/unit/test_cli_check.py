@@ -168,3 +168,25 @@ def test_full_reruns_the_whole_lake_audit(lake, monkeypatch):
     assert result.exit_code == 0, result.output
     assert len(calls) == 1
     assert "全湖审计（刚刚）：0 error" in result.output
+
+
+def test_hide_empty_folds_datasets_without_data(lake):
+    import polars as pl
+
+    root = load_config(lake).curated_root / "daily_bars" / "trade_date=2026-09-30"
+    root.mkdir(parents=True)
+    pl.DataFrame(
+        {"symbol": ["600519.SH"], "close": [1.0], "volume": [1], "source": ["tdx_protocol"]}
+    ).write_parquet(root / "part-0.parquet")
+
+    full = CliRunner().invoke(cli, ["status", "--datasets", "--no-scope", "--config", lake])
+    folded = CliRunner().invoke(
+        cli, ["status", "--datasets", "--no-scope", "--hide-empty", "--config", lake]
+    )
+
+    assert full.exit_code == 0, full.output
+    assert folded.exit_code == 0, folded.output
+    assert "valuation_metrics" in full.output
+    assert "valuation_metrics" not in folded.output
+    assert "daily_bars" in folded.output
+    assert "个数据集还没有数据" in folded.output

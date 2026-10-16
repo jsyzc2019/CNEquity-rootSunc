@@ -176,6 +176,8 @@
 | `--quiet` | `False` | 只留 warning 及以上，不打逐批进度。 |
 | `--pack` | `—` | 研究包：market 行情、fundamentals 基本面、universe 历史 ST。不改变这次初始化下载的内容。决定结束后要保持更新的调度组，以及 `cne check --pack` 的结论。可重复。不写则沿用已保存的选择，第一次是 market。 |
 | `--schedule` | `False` | 初始化成功结束后，为所选研究包安装定时日更和收尾补抓。不含公告和资讯。 |
+| `--json` | `False` | 结束时输出完整的机器可读结果，而不是摘要；完整结果也总会存到日志目录。 |
+| `--no-preflight` | `False` | 跳过开跑前最多 8 秒的网络预检（通达信、交易所、东财）。也可设环境变量 CNE_SKIP_PREFLIGHT=1。 |
 
 ## `cne mcp`
 
@@ -613,6 +615,7 @@
 | `--run` | `—` | 要看的 run id，或 'latest'（默认）。包含各数据集 stage 的结果。 |
 | `--datasets` | `False` | 逐数据集的新鲜度：覆盖区间、水位，以及相对最后交易日是否陈旧。 |
 | `--all-columns` | `False` | 配合 --datasets：打印数据集清单的全部列，而不只是新鲜度。 |
+| `--hide-empty` | `False` | 配合 --datasets：只列有数据或已陈旧的数据集，还没有数据的折成一行。 |
 | `--groups` | `—` | 配合 --datasets：只对这些调度组拥有的数据集判失败（空格或逗号分隔）。其它组的数据集照常列出、照常报为调度缺口，但不会让门禁失败。截面检查同样受它约束——daily_bars 归哪个组，它的覆盖率就归谁判。未跑完的 init 不属于任何调度组，始终判失败。 |
 | `--scope, --no-scope` | `True` | 配合 --datasets：是否做最新交易日的标的截面校验。它要读 daily_bars 的 tip 分区、instruments 和 trading_status，比单纯看水位贵；--no-scope 让这条命令回到纯元数据。 |
 | `--gate` | `False` | 按所选范围和新鲜度执行门禁；默认只报告。 |

@@ -660,8 +660,8 @@ steps = ["news_headlines", "flash_news_wire", "compact"]
 [job.init.phases]
 names = [
   "phase1_reference",
-  "phase2a_corporate_actions",
   "phase2c_daily_bars_backfill",
+  "phase2a_corporate_actions",
   "phase3_index_and_status",
   "phase4_finalize",
   "phase5_derive_and_publish",

@@ -117,6 +117,8 @@ _LAKE_ONLY = (
     "since_str",
     "pack_names",
     "schedule",
+    "as_json",
+    "no_preflight",
 )
 _FLAG_NAMES = {
     "config_path": "--config",
@@ -126,6 +128,7 @@ _FLAG_NAMES = {
     "since_str": "--since",
     "pack_names": "--pack",
     "schedule": "--schedule",
+    "as_json": "--json",
 }
 
 
@@ -263,6 +266,17 @@ def _reject_foreign_options(profile: str, names: tuple[str, ...]) -> None:
     is_flag=True,
     help="初始化成功结束后，为所选研究包安装定时日更和收尾补抓。不含公告和资讯。",
 )
+@click.option(
+    "--json",
+    "as_json",
+    is_flag=True,
+    help="结束时输出完整的机器可读结果，而不是摘要；完整结果也总会存到日志目录。",
+)
+@click.option(
+    "--no-preflight",
+    is_flag=True,
+    help="跳过开跑前最多 8 秒的网络预检（通达信、交易所、东财）。也可设环境变量 CNE_SKIP_PREFLIGHT=1。",
+)
 def init(
     config_path: str,
     profile: str,
@@ -282,6 +296,8 @@ def init(
     quiet: bool,
     pack_names: tuple[str, ...],
     schedule: bool,
+    as_json: bool,
+    no_preflight: bool,
 ):
     """初始化数据湖，并按配置跑完 init 各阶段。
 
@@ -348,7 +364,7 @@ def init(
 
     # After the layout-only exit: a command that finishes in a second has
     # nothing to leave behind but an empty file.
-    attach_log_file(cfg, "init", quiet=quiet)
+    log_path = attach_log_file(cfg, "init", quiet=quiet)
 
     td = parse_date_option(trade_date, "--trade-date") or shanghai_today()
 
@@ -378,6 +394,14 @@ def init(
             resume = True
             resume_run_id = str(incomplete["run_id"])
 
+    config_arg = (
+        ""
+        if click.get_current_context().get_parameter_source("config_path")
+        is click.core.ParameterSource.DEFAULT
+        else f" --config {config_path}"
+    )
+    _init_preflight(cfg, skip=no_preflight, config_arg=config_arg)
+
     is_resume = resume or bool(resume_run_id)
     # A default `--profile quick` is not an explicit request to shrink the
     # history of an older full/custom run. Let the engine restore that run's
@@ -404,15 +428,43 @@ def init(
 
     chosen_packs = remember_packs(cfg, pack_names, override=bool(pack_names))
 
-    result = engine.run_init_phases(
-        trade_date=td,
-        resume=is_resume,
-        resume_run_id=resume_run_id,
-        keep_going=keep_going,
+    from cnequity.keep_awake import keep_awake
+
+    with keep_awake() as held:
+        if held:
+            click.echo(
+                "初始化期间阻止系统空闲睡眠（合盖或手动睡眠仍会生效）；"
+                "不需要时设 CNE_ALLOW_SLEEP=1。",
+                err=True,
+            )
+        result = engine.run_init_phases(
+            trade_date=td,
+            resume=is_resume,
+            resume_run_id=resume_run_id,
+            keep_going=keep_going,
+        )
+    from cnequity.cli.init_summary import render_init_summary, save_init_result
+
+    result_path = save_init_result(
+        log_path.parent if log_path is not None else cfg.data_root / "logs", result
     )
-    click.echo(json.dumps(result, indent=2, default=str))
-    click.echo(format_readiness(cfg, chosen_packs), err=True)
     exit_code = _run_status_exit_code(str(result.get("status", "failed")))
+    if exit_code and result.get("lake_usable"):
+        # Bars are published; what is owed resumes with the next `cne init`.
+        exit_code = 0
+    click.echo(format_readiness(cfg, chosen_packs), err=True)
+    if as_json:
+        click.echo(json.dumps(result, indent=2, default=str))
+    else:
+        for line in render_init_summary(
+            result,
+            config_arg=config_arg,
+            config_abs=Path(config_path).expanduser().resolve(),
+            data_root=cfg.data_root,
+            log_path=log_path,
+            result_path=result_path,
+        ):
+            click.echo(line)
     if schedule and not exit_code:
         click.echo(_install_pack_schedule(cfg, chosen_packs), err=True)
     elif schedule:
@@ -421,6 +473,40 @@ def init(
         raise SystemExit(exit_code)
     if not quiet:
         star_hint_once(cfg)
+
+
+def _init_preflight(cfg, *, skip: bool, config_arg: str) -> None:
+    """Fail in seconds when TDX is unreachable, rather than minutes into a step."""
+    from cnequity.diagnostics.preflight import (
+        PREFLIGHT_BUDGET_SECONDS,
+        preflight_skip_reason,
+        run_init_preflight,
+    )
+    from cnequity.diagnostics.source_health import STATUS_LABELS, ProbeStatus
+
+    if preflight_skip_reason(cfg, requested_skip=skip):
+        return
+    click.echo(f"网络预检（最多 {PREFLIGHT_BUDGET_SECONDS:g} 秒）：", err=True)
+    outcome = run_init_preflight(cfg)
+    for result in outcome.results:
+        label = STATUS_LABELS[ProbeStatus(result.status)]
+        latency = f"{result.latency_ms}ms" if result.latency_ms is not None else "—"
+        line = f"  {label:<4} {result.label}  {latency}"
+        if result.status != ProbeStatus.OK.value:
+            line += f"  {result.detail}"
+            if result.key not in outcome.required:
+                line += "（相关步骤会降级，不挡住建湖）"
+        click.echo(line, err=True)
+    if outcome.ok:
+        return
+    failed = outcome.failed_required[0]
+    raise click.ClickException(
+        f"{failed.label}连不上（{failed.detail}）。全市场 init 的证券列表和日线都从它取，"
+        "现在开跑只会在几分钟后失败。\n"
+        "  先检查网络或代理；境外网络通常连不上通达信。\n"
+        f"  查看各数据源：cne sources probe{config_arg}\n"
+        "  确认网络没问题、只是这次探测慢：加 --no-preflight 跳过预检。"
+    )
 
 
 def _install_pack_schedule(cfg, packs: tuple[str, ...]) -> str:

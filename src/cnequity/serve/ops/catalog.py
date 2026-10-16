@@ -296,6 +296,8 @@ def _ops() -> tuple[OpSpec, ...]:
             summary="全市场标的。quick 是近 3 年，full 从各数据集的历史起点起，日线从 2016-01-01 起。",
             group="初始化",
             command=("init",),
+            # The page reads the machine result; the terminal summary is for people.
+            fixed=("--json",),
             params=(
                 Param(
                     "profile",
@@ -329,6 +331,8 @@ def _ops() -> tuple[OpSpec, ...]:
             summary="续跑最近一次没跑完的初始化，已成功的批次会保留。",
             group="初始化",
             command=("init",),
+            # The page reads the machine result; the terminal summary is for people.
+            fixed=("--json",),
             params=(
                 Param("run_id", "run_id", "init run", flag="--run-id", required=True),
                 Param("keep_going", "bool", "某阶段失败后继续", flag="--keep-going"),

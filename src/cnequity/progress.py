@@ -92,6 +92,35 @@ def sweep_progress(
     return report
 
 
+def stage_progress(log: logging.Logger, label: str, total: int) -> Callable[..., None]:
+    """Report a step that is a short chain of slow calls, one line per call.
+
+    `instruments` is that shape: the TDX security list, the Beijing board,
+    listing dates from the exchanges, Baostock and EastMoney, the delisted
+    directory. None of them is a per-item sweep, and the step printed nothing
+    for 234s on a full-market init. Naming each call as it starts also says
+    which source a long gap belongs to.
+    """
+    started_at = time.monotonic()
+    done = 0
+
+    def enter(stage: str, *, held: int | None = None) -> None:
+        nonlocal done
+        done += 1
+        tail = f" · {held} so far" if held is not None else ""
+        log.info(
+            "%s %d/%d %s · %s elapsed%s",
+            label,
+            done,
+            total,
+            stage,
+            hms(time.monotonic() - started_at),
+            tail,
+        )
+
+    return enter
+
+
 _lock = threading.Lock()
 # Token-keyed, not name-keyed: a wave can run the same step twice (a retry
 # alongside the original), and a name key would let the second scope's exit

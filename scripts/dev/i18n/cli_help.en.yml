@@ -161,6 +161,7 @@
 "要看的 run id，或 'latest'（默认）。包含各数据集 stage 的结果。": "Run id to show, or 'latest' (default). Includes stage results per dataset."
 "逐数据集的新鲜度：覆盖区间、水位，以及相对最后交易日是否陈旧。": "Per-dataset freshness: coverage range, watermark, and whether it is stale relative to the last trading day."
 "配合 --datasets：打印数据集清单的全部列，而不只是新鲜度。": "With --datasets: print all columns of the dataset inventory, not just freshness."
+"配合 --datasets：只列有数据或已陈旧的数据集，还没有数据的折成一行。": "With --datasets: list only datasets that hold data or are stale, and fold the empty ones into one line."
 ? "配合 --datasets：只对这些调度组拥有的数据集判失败（空格或逗号分隔）。其它组的数据集照常列出、照常报为调度缺口，但不会让门禁失败。截面检查同样受它约束——daily_bars 归哪个组，它的覆盖率就归谁判。未跑完的 init 不属于任何调度组，始终判失败。"
 : "With --datasets: fail only on datasets owned by these schedule groups (space- or comma-separated). Datasets of other groups are still listed and reported as schedule gaps but do not fail the gate. The cross-section check follows it too: daily_bars coverage is judged by whichever group owns it. An unfinished init belongs to no schedule group and always fails."
 "配合 --datasets：是否做最新交易日的标的截面校验。它要读 daily_bars 的 tip 分区、instruments 和 trading_status，比单纯看水位贵；--no-scope 让这条命令回到纯元数据。": "With --datasets: whether to run the cross-sectional symbol check for the latest trading day. It reads the daily_bars tip partition, instruments and trading_status, which costs more than checking watermarks alone; --no-scope returns this command to pure metadata."
@@ -231,3 +232,5 @@
 
 "选择已核验的历史成分目录。": "Select a reviewed historical membership catalog."
 "额外回放指定日的官方上市事件，可重复；不要求证券已有日线。": "Replay official listing events for an additional date; repeatable and usable before a stock has daily bars."
+"结束时输出完整的机器可读结果，而不是摘要；完整结果也总会存到日志目录。": "Print the full machine-readable result at the end instead of the summary; the full result is always saved to the log directory too."
+"跳过开跑前最多 8 秒的网络预检（通达信、交易所、东财）。也可设环境变量 CNE_SKIP_PREFLIGHT=1。": "Skip the network preflight (TDX, exchanges, EastMoney) of up to 8 seconds before the run starts. Setting CNE_SKIP_PREFLIGHT=1 does the same."

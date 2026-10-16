@@ -154,7 +154,9 @@ When the default configuration `configs/cnequity.toml` does not exist, `cne init
 | `--trade-date YYYY-MM-DD` | Trading day init runs up to (default today) |
 | `--resume` | Resume the latest unfinished init |
 | `--run-id` | Resume the given init run (implies resume) |
-| `--keep-going` | Continue with later phases after a phase fails |
+| `--keep-going` | Continue with later phases after any phase fails (the corporate-action, index and trading-status phases, and the derives and audit after the bars publish, already continue by default) |
+| `--json` | Print the full machine-readable result at the end instead of the summary |
+| `--no-preflight` | Skip the network preflight before the run; `CNE_SKIP_PREFLIGHT=1` does the same |
 | `--profile demo\|sample\|quick\|full` | How big a lake to build. `quick` (default) = all market symbols, last 3 years; `full` = all market, each step's own start (`daily_bars` from 2016-01-01), with more requests and more data on disk; `demo` / `sample` are small lakes of a few stocks, see [the previous section](#cne-init---profile-demo--sample) |
 | `--since YYYY-MM-DD` | Explicit history start; overrides `--profile` |
 | `--quiet` | Keep only warnings and above; no per-batch progress |
@@ -178,7 +180,11 @@ cne backfill daily_bars --start 2016-01-01 --end COVERAGE_START
 
 In the table above, `--config` / `--layout-only` / `--resume` / `--run-id` / `--keep-going` / `--since` apply only to `quick|full`; `--symbols` / `--days` / `--data-root` / `--config-out` / `--intraday` / `--research` apply only to `demo|sample`. Passing one to the wrong side is rejected by name, not ignored.
 
-Exit: success and source-limited outcomes (`degraded` / `warning`, including 0 rows this time) return 0; real execution errors return 1.
+**A failed corporate-action, index-bar or trading-status phase does not stop the build.** When one of these phases fails, init still fetches daily bars, publishes them and derives adjustment factors, then lists the steps left undone at the end; rerunning the same `cne init` fills only those. A failure in instruments, the trading calendar or daily bars still stops where it is; what was downloaded is kept, and rerunning resumes once the cause is fixed.
+
+**It ends with a summary.** The terminal shows whether the lake is usable, which steps are still owed, where the log is, and what to run next (`cne check`, `cne serve`, reading from Python, connecting MCP). The full result is saved to `{data.root}/logs/cne-init-<run_id>.json`; add `--json` to get it on stdout.
+
+Exit: success, source-limited outcomes (`degraded` / `warning`, including 0 rows this time), and a build whose daily bars are published but which still owes only the non-blocking steps above return 0; other execution errors return 1.
 
 ## cne config create
 

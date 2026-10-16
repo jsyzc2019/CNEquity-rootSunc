@@ -18,15 +18,19 @@ from cnequity.domain.market_time import shanghai_today
 from cnequity.orchestrator.backfill_scope import capture_backfill_scope, restore_backfill_scope
 from cnequity.orchestrator.deps import step_execution_levels, validate_steps_registered
 from cnequity.orchestrator.init_phases import (
-    DEFAULT_INIT_PHASES,
     INIT_PHASE_STEPS,
+    blocks_init,
+    configured_init_phases,
     current_phase_statuses,
     init_run_complete,
     missing_steps,
     missing_steps_within_phase_order,
     needs_finalize,
+    only_non_blocking_owed,
+    owed_steps,
     pending_phases,
     phase_backfill,
+    scheduled_later,
     step_backfill,
     step_completed,
     step_succeeded,
@@ -110,6 +114,19 @@ def _has_execution_errors(result: dict[str, Any]) -> bool:
             for row in steps
         )
     return result.get("status") == "failed"
+
+
+def _failed_step_names(result: dict[str, Any]) -> set[str]:
+    """The steps a phase's ``run_job`` result reports as not executed."""
+    return {
+        str(row["step"])
+        for row in result.get("results") or []
+        if row.get("step")
+        and (
+            row.get("execution_status") in {"failed", "interrupted"}
+            or (row.get("status") == "failed" and row.get("execution_status") is None)
+        )
+    }
 
 
 def job_family(job_name: str) -> str:
@@ -1092,7 +1109,7 @@ class JobEngine:
             phases = meta.get("phases")
             if phases:
                 return list(phases)
-        return list(self.config.init_phases or DEFAULT_INIT_PHASES)
+        return configured_init_phases(self.config.init_phases)
 
     def _init_execution_batches(self, run_id: str) -> list[Any]:
         batches: list[Any] = list(self.manifest.get_batches_for_run(run_id))
@@ -1203,7 +1220,12 @@ class JobEngine:
         return [step for step in planned if step not in present]
 
     def _split_runnable_missing(
-        self, run_id: str, missing: list[str], *, in_run: set[str]
+        self,
+        run_id: str,
+        missing: list[str],
+        *,
+        in_run: set[str],
+        init_phases: list[str] | None = None,
     ) -> tuple[list[str], list[str]]:
         """Split *missing* into steps whose inputs are ready and steps that are blocked.
 
@@ -1230,7 +1252,11 @@ class JobEngine:
         ready: list[str] = []
         blocked: list[str] = []
         for step in missing:
-            deps = [dep for dep in get_step(step).depends_on if dep in in_run]
+            deps = [
+                dep
+                for dep in get_step(step).depends_on
+                if dep in in_run and not (init_phases and scheduled_later(step, dep, init_phases))
+            ]
             if all(dep in satisfied or dep in ready for dep in deps):
                 ready.append(step)
             else:
@@ -1675,7 +1701,7 @@ class JobEngine:
             if init_phases:
                 in_run |= set(init_expected_steps(init_phases))
             ran_missing, blocked_missing = self._split_runnable_missing(
-                run_id, missing, in_run=in_run
+                run_id, missing, in_run=in_run, init_phases=init_phases
             )
             for step in ran_missing:
                 prev_backfill = self.config._backfill
@@ -1782,6 +1808,20 @@ class JobEngine:
         )
         return status
 
+    def _init_completion(self, run_id: str, status: str) -> dict[str, Any]:
+        """What a first build left owed, and whether its lake is usable anyway.
+
+        A run can be ``failed`` because a non-blocking phase is still owed
+        while its bars are published; ``lake_usable`` tells the CLI not to
+        present that as a failed build.
+        """
+        phases = self._init_phases_list(run_id)
+        batches = self._init_execution_batches(run_id)
+        return {
+            "owed_steps": owed_steps(phases, batches),
+            "lake_usable": status != "failed" or only_non_blocking_owed(phases, batches),
+        }
+
     def _execute_init_phases(
         self,
         run_id: str,
@@ -1812,6 +1852,15 @@ class JobEngine:
             total_read += result.get("rows_read", 0)
             total_written += result.get("rows_written", 0)
             if _has_execution_errors(result) and not keep_going:
+                failed = _failed_step_names(result)
+                if not blocks_init(phase, failed):
+                    logger.warning(
+                        "Init phase %s did not complete (%s); continuing so the lake still "
+                        "publishes. Run `cne init` again to resume it.",
+                        phase,
+                        ", ".join(sorted(failed)) or phase,
+                    )
+                    continue
                 logger.error("Init phase %s failed; stopping remaining phases", phase)
                 break
 
@@ -1826,6 +1875,7 @@ class JobEngine:
             "status": status,
             "phases": phase_results,
             **self._public_outcome(run_id),
+            **self._init_completion(run_id, status),
         }
 
     def resume_init(
@@ -1928,13 +1978,19 @@ class JobEngine:
                 )
             }
             if unresolved_started:
-                logger.error(
-                    "Init phase %s is still incomplete after retry (%s); not starting later phases",
+                if not keep_going and blocks_init(phase, unresolved_started):
+                    logger.error(
+                        "Init phase %s is still incomplete after retry (%s); "
+                        "not starting later phases",
+                        phase,
+                        ", ".join(sorted(unresolved_started)),
+                    )
+                    break
+                logger.warning(
+                    "Init phase %s is still incomplete after retry (%s); continuing",
                     phase,
                     ", ".join(sorted(unresolved_started)),
                 )
-                if not keep_going:
-                    break
                 steps = [step for step in steps if step not in unresolved_started]
             if not steps:
                 continue
@@ -1951,13 +2007,17 @@ class JobEngine:
             phase_results.append({"phase": phase, **result})
             total_read += result.get("rows_read", 0)
             total_written += result.get("rows_written", 0)
-            if _has_execution_errors(result) and not keep_going:
+            if keep_going:
+                continue
+            if _has_execution_errors(result) and blocks_init(phase, _failed_step_names(result)):
                 break
             batches = self._init_execution_batches(run_id)
-            if (
-                not all(step_completed(batches, step) for step in INIT_PHASE_STEPS.get(phase, []))
-                and not keep_going
-            ):
+            unfinished = [
+                step
+                for step in INIT_PHASE_STEPS.get(phase, [])
+                if not step_completed(batches, step)
+            ]
+            if unfinished and blocks_init(phase, unfinished):
                 break
 
         batches = self._init_execution_batches(run_id)
@@ -1993,6 +2053,7 @@ class JobEngine:
             "status": status,
             "resumed": True,
             **self._public_outcome(run_id),
+            **self._init_completion(run_id, status),
             "retry": retry_result,
             "phases": phase_results,
         }

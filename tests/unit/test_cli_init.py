@@ -118,3 +118,69 @@ def test_init_exits_nonzero_when_phase_fails(tmp_path, monkeypatch):
     result = runner.invoke(cli, ["init", "--config", cfg_path])
 
     assert result.exit_code == 1
+
+
+def _init_with(tmp_path, monkeypatch, outcome: dict, *extra: str):
+    import json as json_mod
+
+    cfg_path = _write_config(tmp_path)
+    monkeypatch.setattr(
+        JobEngine, "run_init_phases", lambda self, trade_date=None, **kwargs: dict(outcome)
+    )
+    result = CliRunner().invoke(cli, ["init", "--config", cfg_path, *extra])
+    saved = tmp_path / "data" / "logs" / f"cne-init-{outcome['run_id']}.json"
+    return result, cfg_path, json_mod.loads(saved.read_text(encoding="utf-8"))
+
+
+def test_init_ends_with_a_summary_and_saves_the_full_result(tmp_path, monkeypatch):
+    outcome = {"run_id": "r1", "status": "success", "phases": [{"phase": "p", "big": "x" * 50}]}
+    result, cfg_path, saved = _init_with(tmp_path, monkeypatch, outcome)
+
+    assert result.exit_code == 0, result.output
+    assert "✓ 湖已建好，可以使用（run r1）" in result.output
+    assert f"cne check --config {cfg_path}" in result.output
+    assert "claude mcp add cnequity" in result.output
+    assert '"phases"' not in result.output
+    assert saved["phases"] == outcome["phases"]
+
+
+def test_init_json_flag_prints_the_machine_result(tmp_path, monkeypatch):
+    outcome = {"run_id": "r2", "status": "success", "phases": []}
+    result, _, _ = _init_with(tmp_path, monkeypatch, outcome, "--json")
+
+    assert result.exit_code == 0, result.output
+    assert '"run_id": "r2"' in result.output
+    assert "建湖结果" not in result.output
+
+
+def test_a_usable_lake_with_owed_steps_does_not_fail_the_build(tmp_path, monkeypatch):
+    outcome = {
+        "run_id": "r3",
+        "status": "failed",
+        "phases": [],
+        "owed_steps": ["corporate_actions"],
+        "lake_usable": True,
+    }
+    result, cfg_path, _ = _init_with(tmp_path, monkeypatch, outcome)
+
+    assert result.exit_code == 0, result.output
+    assert "可以查询日线" in result.output
+    assert "公司行为（corporate_actions）" in result.output
+    assert f"cne init --config {cfg_path}" in result.output
+
+
+def test_an_unusable_build_says_how_to_resume(tmp_path, monkeypatch):
+    outcome = {
+        "run_id": "r4",
+        "status": "failed",
+        "phases": [],
+        "owed_steps": ["daily_bars", "compact"],
+        "lake_usable": False,
+    }
+    result, _, _ = _init_with(tmp_path, monkeypatch, outcome)
+
+    assert result.exit_code == 1
+    assert "✗ 建湖还没完成" in result.output
+    assert "日线（daily_bars）" in result.output
+    assert "cne sources probe" in result.output
+    assert "cne serve" not in result.output
