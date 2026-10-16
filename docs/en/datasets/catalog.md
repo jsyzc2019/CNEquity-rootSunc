@@ -183,6 +183,8 @@ Registry source code: `domain/datasets.py` (`DatasetSpec`), `domain/schemas.py` 
 
 The daily Beijing instrument catalogue attempts to enrich listing dates from confirmed same-day CNINFO IPO events. Subscription, prospectus and forecast dates do not establish listing dates. If that source is unavailable, the roster and unknown dates remain with a warning; compaction preserves dates already established.
 
+Each day the instrument catalogue asks Baostock, EastMoney and the exchanges only about securities the lake has no listing date for; dates it already holds, including repaired ones, are carried forward. A security no source can date is not asked about again for 7 days, while a new listing is asked about daily until it has a date.
+
 ## L1 Market data
 
 | Dataset | Partition key | Primary key | Semantics | Watermark | Primary source | Notes |

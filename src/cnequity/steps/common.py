@@ -153,6 +153,27 @@ def _reconciliation_depth(config: Config, dataset: str, trade_date: date) -> str
     return "tail"
 
 
+def reconciliation_depth(config: Config, dataset: str, trade_date: date) -> str | None:
+    """Public spelling of the tier this run of *dataset* walks (deep/tail/tip)."""
+    return _reconciliation_depth(config, dataset, trade_date)
+
+
+def mark_reconciled(config: Config, dataset: str, trade_date: date, depth: str | None) -> None:
+    """Record that a run walked its *depth* window, so the next run can go shallower.
+
+    ``fetch_incremental_daily`` records this for the by-date feeds. A feed with
+    its own fetch path must call it, or the weekly deep sweep stays due every
+    day: ``daily_bars`` never did, and from 2026-10-08 re-swept every symbol
+    over a week of sessions on each daily run (~30 min) instead of answering
+    the new session from the whole-board quotes (~8 min).
+    """
+    state = StateStore(config.meta_root)
+    if depth == "deep":
+        state.set_date(dataset, trade_date, field=_DEEP_RECONCILED_FIELD)
+    if depth in {"deep", "tail"}:
+        state.set_date(dataset, trade_date, field=_TAIL_RECONCILED_FIELD)
+
+
 def incremental_window(config: Config, dataset: str, trade_date: date) -> date:
     """Return the start of a dataset's incremental reconciliation window.
 
@@ -696,24 +717,30 @@ def _instrument_identity(config: Config, metadata: pl.DataFrame | None = None) -
         rows = frame.select(columns).sort("symbol").iter_rows(named=True)
     instrument_digest = _row_fingerprint(rows)
 
-    # Keep the content fingerprint even with revision receipts: direct writes
-    # and legacy lakes must invalidate an absence claim when status changes.
-    status_revision = state.get_revision("trading_status")
-    status_frame = load_curated_trading_status(config)
-    status_rows = iter(())
-    if status_frame is not None and not status_frame.is_empty():
-        volatile = {"source", "data_version", "fetched_at", "run_id", "capture_id"}
-        status_columns = [column for column in status_frame.columns if column not in volatile]
-        if status_columns:
-            status_rows = (
-                status_frame.select(status_columns).sort(status_columns).iter_rows(named=True)
-            )
+    # Direct writes and legacy lakes must still invalidate an absence claim
+    # when status changes, so the revision alone is not enough. Hashing every
+    # status row through JSON was: ~85s per call over the whole history,
+    # three calls per daily_bars run. The committed files' paths, sizes and
+    # modification times change whenever any row does, for a few stat calls.
     return {
         "instruments_revision": revision,
         "instruments_fingerprint": instrument_digest,
-        "trading_status_revision": status_revision,
-        "trading_status_fingerprint": _row_fingerprint(status_rows),
+        "trading_status_revision": state.get_revision("trading_status"),
+        "trading_status_files": _status_files_identity(config),
     }
+
+
+def _status_files_identity(config: Config) -> str:
+    """Digest of the committed trading_status files as they sit on disk."""
+    from cnequity.storage.read_context import read_root
+
+    root = read_root(config, "trading_status", None)
+    digest = hashlib.sha256()
+    if root.exists():
+        for path in sorted(root.rglob("*.parquet")):
+            stat = path.stat()
+            digest.update(f"{path.relative_to(root)}|{stat.st_size}|{stat.st_mtime_ns}\n".encode())
+    return digest.hexdigest()
 
 
 def negative_evidence_ttl_days(config: Config, dataset: str) -> int:

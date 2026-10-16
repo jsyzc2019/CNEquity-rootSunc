@@ -342,7 +342,7 @@ Only `error` triggers the gate; `warning` and `info` do not. See [product bounda
 | Key | Default | Description |
 |----|------|------|
 | `negative_evidence_ttl_days` | `7` | Validity period of negative evidence such as "the source is empty here"; set `0` to retry missing keys every time. A revision of the instrument catalog still invalidates evidence within the validity period |
-| `deep_reconciliation_dow` | `6` | Day of the week for the weekly deep reconciliation (0=Monday). Currently only `announcement_index` declares it |
+| `deep_reconciliation_dow` | `6` | Day of the week for the weekly deep reconciliation, 1=Monday … 7=Sunday; `0` turns tiering off so every run reconciles deep. `announcement_index` looks back 7 days on ordinary runs and 30 on the deep day; `daily_bars` fetches only new sessions on ordinary runs (exchange whole-board quotes and TDX batch quotes) and re-checks the last 5 sessions symbol by symbol on the first session on or after that weekday |
 
 Announcements may be indexed late. The weekly deep reconciliation rechecks older windows and reduces routine repeated requests, but it may also delay discovering late announcements. Strict PIT also checks the in-lake observation time; an announcement collected late cannot pass as known at an earlier `as_of`.
 

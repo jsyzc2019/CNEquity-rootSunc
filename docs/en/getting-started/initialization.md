@@ -65,7 +65,7 @@ A failed corporate-action, index-bar or trading-status phase (usually a source t
 
 On macOS and Windows, `cne init` holds off idle system sleep while it runs, so an unattended build does not doze off and lose its connections; closing the lid or choosing Sleep still sleeps, and the hold ends with the process. Set `CNE_ALLOW_SLEEP=1` to turn it off.
 
-Daily bars are fetched before corporate actions. The corporate-action phase asks TDX for every instrument's full ex-rights history whatever the window, which takes tens of minutes across the market; during init only the final adjustment-factor derive reads it, so bars no longer wait for it.
+Daily bars are fetched before corporate actions. The corporate-action phase asks TDX for every instrument's full ex-rights history whatever the window; during init only the final adjustment-factor derive reads it, so bars no longer wait for it. The sweep opens as many TDX connections as `[source_concurrency].tdx_protocol` allows (at most 4), and every request stays under the same TDX pacing, so the whole market takes roughly fifteen minutes.
 
 If you pressed Ctrl-C midway, the process was killed, the result contains a `warning`, or the summary lists steps left undone, do not delete `data/` and do not start over: rerun the same `cne init`; it automatically finds the unfinished run and continues from the failed batches and missing phases. Use `cne check` for acceptance afterwards. Use `cne init --run-id RUN_ID` only when you need to target a specific old run.
 

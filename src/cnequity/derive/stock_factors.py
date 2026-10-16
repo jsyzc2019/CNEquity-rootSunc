@@ -17,6 +17,13 @@ def preserve_pending_steps(series, published, events, source):
     """A partial rebuild must not retract previously published pending steps."""
     if series.is_empty() or published.is_empty() or "source" not in published.columns:
         return series
+    pending = {
+        date.fromisoformat(e["trade_date"]) for e in events if "reason" in e and e.get("trade_date")
+    }
+    if not pending:
+        # Nothing pending, nothing to carry: skip the full-history join that
+        # every symbol used to pay for on every daily derive.
+        return series
     aligned = (
         series.sort("trade_date")
         .join_asof(
@@ -31,9 +38,6 @@ def preserve_pending_steps(series, published, events, source):
             (pl.col("factor") / pl.col("factor").shift(1)).alias("_new_step"),
         )
     )
-    pending = {
-        date.fromisoformat(e["trade_date"]) for e in events if "reason" in e and e.get("trade_date")
-    }
     for row in aligned.filter(
         pl.col("trade_date").is_in(sorted(pending)) & (pl.col("source") == source)
     ).iter_rows(named=True):
@@ -46,6 +50,37 @@ def preserve_pending_steps(series, published, events, source):
                 .alias("factor")
             )
     return series
+
+
+def _zero(value):
+    return 0 if value is None else value
+
+
+def _event_groups(events: pl.DataFrame) -> list[dict]:
+    """Each effective session's actions as plain lists, in first-seen order.
+
+    One aggregation per symbol rather than several tiny Polars operations per
+    event: a full history has dozens of events and the daily derive walks
+    ~5,000 symbols. Values stay unsummed so the caller's arithmetic, and so
+    every finding, is exactly what it was.
+    """
+    if events.is_empty():
+        return []
+    columns = ["ex_date", "_dividend", "_bonus", "_transfer", "_allotment", "_allot_cash", "_split"]
+    aggregations = [pl.col(name) for name in columns] + [pl.len().alias("height")]
+    if "_reference" in events.columns:
+        aggregations.append(pl.col("_reference").drop_nulls().unique().alias("refs"))
+    if "_term_sources" in events.columns:
+        aggregations.append(
+            pl.col("_term_sources").explode(empty_as_null=True).drop_nulls().alias("sources")
+        )
+    groups = events.group_by("effective_session", maintain_order=True).agg(aggregations)
+    out = []
+    for row in groups.iter_rows(named=True):
+        row["refs"] = list(row.get("refs") or [])
+        row["sources"] = set(row.get("sources") or [])
+        out.append(row)
+    return out
 
 
 def stock_event_series(
@@ -84,11 +119,21 @@ def stock_event_series(
     dates = series["trade_date"].to_list()
     previous = dict(zip(dates[1:], dates[:-1], strict=True))
     levels = dict(series.iter_rows())
-    prices = {r["trade_date"]: r for r in bars.iter_rows(named=True)}
     events = effective_session(
         terms.with_columns(pl.lit("_").alias("symbol")),
         series.with_columns(pl.lit("_").alias("symbol")),
     )
+    # Only event sessions and the session before each are ever looked up.
+    # Materialising every bar of a full history as a dict cost ~11ms per
+    # symbol, on every symbol with any action, on every daily derive.
+    wanted = set()
+    for day in events["effective_session"].drop_nulls().to_list():
+        if day in previous:
+            wanted.update((day, previous[day]))
+    prices = {
+        r["trade_date"]: r
+        for r in bars.filter(pl.col("trade_date").is_in(sorted(wanted))).iter_rows(named=True)
+    }
     peer_levels = {}
     if (
         not peer.is_empty()
@@ -104,37 +149,32 @@ def stock_event_series(
     event_days = set(events["effective_session"].drop_nulls().to_list())
     adjustments: dict[date, float] = {}
     findings = []
-    for key, group in events.partition_by("effective_session", as_dict=True).items():
-        day = key[0]
+    for group in _event_groups(events):
+        day = group["effective_session"]
         if day is None or day not in previous:
             continue
         prior = previous[day]
         before = prices[prior]["close"]
-        ex_dates = group["ex_date"].to_list()
+        ex_dates = group["ex_date"]
         detail = {"trade_date": str(day), "ex_dates": [str(d) for d in ex_dates]}
         if any(_SHARE_REFORM[0] <= d <= _SHARE_REFORM[1] for d in [day, *ex_dates]):
             findings.append(
                 {**detail, "reason": "share reform requires exceptional event evidence"}
             )
             continue
-        refs = (
-            group["_reference"].drop_nulls().unique().to_list()
-            if "_reference" in group.columns
-            else []
-        )
-        if refs and (len(refs) != 1 or group.height != 1):
+        refs = group["refs"]
+        if refs and (len(refs) != 1 or group["height"] != 1):
             findings.append({**detail, "reason": "ambiguous event reference"})
             continue
-        cash = sum(group["_dividend"].fill_null(0).to_list())
+        cash = sum(_zero(v) for v in group["_dividend"])
         shares = sum(
-            (
-                group["_bonus"].fill_null(0)
-                + group["_transfer"].fill_null(0)
-                + group["_allotment"].fill_null(0)
-            ).to_list()
+            _zero(b) + _zero(t) + _zero(a)
+            for b, t, a in zip(
+                group["_bonus"], group["_transfer"], group["_allotment"], strict=True
+            )
         )
-        allot_cash = sum(group["_allot_cash"].fill_null(0).to_list())
-        split = math.prod(group["_split"].fill_null(1.0).to_list())
+        allot_cash = sum(_zero(v) for v in group["_allot_cash"])
+        split = math.prod(1.0 if v is None else v for v in group["_split"])
         denominator = (1.0 + shares) * split
         reference = (
             refs[0]
@@ -156,11 +196,7 @@ def stock_event_series(
         quote_source = prices[day].get("source") or ""
         if quote is not None and quote > 0 and not quote_source.startswith("derived"):
             evidence.append(("native_pre_close", before / quote))
-        action_sources = (
-            set(group["_term_sources"].explode(empty_as_null=True).drop_nulls().to_list())
-            if "_term_sources" in group.columns
-            else set()
-        )
+        action_sources = group["sources"]
         if "baostock" not in action_sources and peer_levels.get(prior) and peer_levels.get(day):
             # Across a long halt, the peer can contain several intervening
             # events. Use the exchange reference instead of that aggregate.
@@ -205,6 +241,16 @@ def stock_event_series(
         scale *= adjustments.get(day, 1.0)
         rebuilt.append(factor * scale)
     return series.with_columns(pl.Series("factor", rebuilt)), findings
+
+
+def _by_symbol(frame: pl.DataFrame) -> dict[str, pl.DataFrame]:
+    """Split *frame* by symbol once, keeping each group's row order."""
+    if frame.is_empty() or "symbol" not in frame.columns:
+        return {}
+    return {
+        key[0]: group
+        for key, group in frame.partition_by("symbol", as_dict=True, maintain_order=True).items()
+    }
 
 
 def apply_stock_event_factors(
@@ -277,12 +323,22 @@ def apply_stock_event_factors(
     ).latest("adj_factors")
     proofs = revision.metadata.get("factor_event_proofs", {}) if revision is not None else {}
     replacements, findings = [], []
+    # One pass per frame instead of one full-frame filter per symbol: with
+    # ~5,000 symbols the filters alone rescanned the whole history ~20,000
+    # times a day.
+    scope_by = _by_symbol(scope)
+    stored_by = _by_symbol(stored)
+    bars_by = _by_symbol(bars)
+    terms_by = _by_symbol(terms)
+    peer_by = (
+        _by_symbol(peer.select("symbol", "trade_date", "factor")) if not peer.is_empty() else {}
+    )
     for symbol in symbols:
-        rows = scope.filter(pl.col("symbol") == symbol)
+        rows = scope_by.get(symbol, scope.clear())
         original = (
             config.meta_root / "adj_factors_cache" / f"{symbol.replace('.', '_')}_hfq.parquet"
         )
-        published = stored.filter(pl.col("symbol") == symbol)
+        published = stored_by.get(symbol, stored.clear())
         sources = set(published["source"].drop_nulls()) if "source" in published.columns else set()
         if sources and not sources.issubset({"sina", SOURCE}):
             continue
@@ -297,13 +353,18 @@ def apply_stock_event_factors(
             # Scoped repairs preserve already published corrections outside
             # the event window; daily/full rebuilding still uses raw factors.
             raw = published.select("trade_date", "factor")
+        symbol_peer = peer_by.get(symbol)
         rebuilt, events = stock_event_series(
-            bars.filter(pl.col("symbol") == symbol),
+            bars_by.get(symbol, bars.clear()),
             raw,
-            terms.filter(pl.col("symbol") == symbol),
-            peer.filter(pl.col("symbol") == symbol).select("trade_date", "factor")
-            if not peer.is_empty()
-            else pl.DataFrame(),
+            terms_by.get(symbol, terms.clear()),
+            symbol_peer.select("trade_date", "factor")
+            if symbol_peer is not None
+            else (
+                peer.clear().select("trade_date", "factor")
+                if not peer.is_empty()
+                else pl.DataFrame()
+            ),
             tolerance_bps=config.adj_factors_crosscheck_tolerance_bps,
             proofs={
                 key.split("|", 1)[1]: value

@@ -55,6 +55,8 @@ from cnequity.steps.common import (
     load_curated_trading_status,
     load_negative_evidence,
     load_symbols,
+    mark_reconciled,
+    reconciliation_depth,
     record_negative_evidence,
 )
 from cnequity.storage.fund_no_print import approved_no_print_keys
@@ -1908,10 +1910,12 @@ def _step_daily_bars(config: Config, trade_date: date, run_id: str, context: dic
         )
         return _merge_ownership_result(out, config, ownership, start, end, run_id)
 
+    depth = None
     if getattr(config, "_backfill", False):
         start, end = _backfill_window(config, trade_date)
     else:
         start = incremental_window(config, "daily_bars", trade_date)
+        depth = reconciliation_depth(config, "daily_bars", trade_date)
         end = trade_date
     _reject_unfinished_daily_bar_window(config, end)
 
@@ -2123,7 +2127,13 @@ def _step_daily_bars(config: Config, trade_date: date, run_id: str, context: dic
     out.setdefault("metrics", {})["cache_hits"] = int(
         out.get("metrics", {}).get("cache_hits", 0) or 0
     ) + len(reused_symbols)
-    return _merge_ownership_result(out, config, ownership, start, end, run_id)
+    merged = _merge_ownership_result(out, config, ownership, start, end, run_id)
+    if depth is not None and explicit_scope is None and merged.get("status") != "failed":
+        # The window was walked. Keys it could not settle are already owed in
+        # the outstanding-key ledger and retried on their own; holding the
+        # weekly marker back for them only made every day a deep day.
+        mark_reconciled(config, "daily_bars", trade_date, depth)
+    return merged
 
 
 def _owed_keys_for_symbols(

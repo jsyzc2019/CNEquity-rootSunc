@@ -194,12 +194,15 @@ def _load_daily_bar_dates(
         # rows still need the carried-forward factor for adjusted queries. But
         # a symbol represented only by zero-volume placeholders is not a real
         # factor task and must not trigger a Sina request.
-        traded = collect_parquet_root(
-            bars_path,
-            partition_col="trade_date",
-            start=start,
-            symbols=symbols,
-            traded_only=True,
+        # The same canonicalisation and print filter ``traded_only`` applies
+        # to a scan, applied to the rows already in hand: reading the bar
+        # history a second time cost ~6s per call, three calls per derive.
+        from cnequity.query.canonical import dedupe_lazy_by_primary_key
+
+        traded = (
+            dedupe_lazy_by_primary_key(bars.lazy(), "daily_bars")
+            .filter((pl.col("volume") > 0) | pl.col("volume").is_null())
+            .collect()
         )
         traded_symbols = set(traded.get_column("symbol").unique().to_list())
         bars = bars.filter(pl.col("symbol").is_in(traded_symbols))
@@ -1636,6 +1639,18 @@ def _apply_computed_factors(config: Config, out: pl.DataFrame) -> tuple[pl.DataF
     return replaced, findings
 
 
+def _rows_not_already_stored(incoming: pl.DataFrame, existing: pl.DataFrame) -> pl.DataFrame:
+    """Incoming rows that differ from a stored row in anything but `fetched_at`."""
+    columns = [c for c in incoming.columns if c != "fetched_at"]
+    if not set(columns) <= set(existing.columns):
+        return incoming
+    try:
+        stored = existing.select(columns).cast(incoming.select(columns).schema)
+    except pl.exceptions.PolarsError:
+        return incoming
+    return incoming.join(stored.unique(), on=columns, how="anti", nulls_equal=True)
+
+
 def _write_adj_partitions(
     config: Config,
     out: pl.DataFrame,
@@ -1663,9 +1678,21 @@ def _write_adj_partitions(
                     [pl.read_parquet(path) for path in existing_files],
                     how="diagonal_relaxed",
                 )
-                merged = pl.concat([existing, group], how="diagonal_relaxed")
-            else:
-                merged = group
+                fresh = _rows_not_already_stored(group, existing)
+                total += group.height
+                if fresh.is_empty():
+                    # Every row is already there with the same value and
+                    # source. Rewriting it only to stamp a new `fetched_at`
+                    # made each daily derive republish all ~6,250 partitions
+                    # and keep a new copy of the whole table per revision.
+                    continue
+                merged = pl.concat([existing, fresh], how="diagonal_relaxed")
+                merged = dedupe_by_primary_key(merged, "adj_factors")
+                writer.write_partition(
+                    "adj_factors", "trade_date", td_str, merged, "part-0.parquet"
+                )
+                continue
+            merged = group
         merged = dedupe_by_primary_key(merged, "adj_factors")
         writer.write_partition("adj_factors", "trade_date", td_str, merged, "part-0.parquet")
         total += group.height

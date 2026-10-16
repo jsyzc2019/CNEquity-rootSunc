@@ -1824,3 +1824,53 @@ def test_backfilled_older_bars_are_realigned_from_cache(adj_config, monkeypatch,
     assert calls == fetched
     older = adj_config.derived_root / "adj_factors" / "trade_date=2024-06-27"
     assert list(older.glob("*.parquet")), "the older bar date now has a factor row"
+
+
+def _factor_row(symbol: str, factor: float, *, source: str = "sina", fetched: int = 1):
+    return {
+        "symbol": symbol,
+        "trade_date": date(2024, 6, 28),
+        "adjust_type": "hfq",
+        "factor": factor,
+        "source": source,
+        "data_version": "v1",
+        "fetched_at": datetime(2024, 6, 28, fetched, tzinfo=timezone.utc),
+    }
+
+
+def test_an_unchanged_factor_partition_is_not_rewritten(tmp_path):
+    """Restamping `fetched_at` republished every partition on every derive."""
+    cfg = Config(data_root=tmp_path / "data")
+    part = cfg.derived_root / "adj_factors" / "trade_date=2024-06-28"
+    _write_adj_partitions(
+        cfg,
+        pl.DataFrame([_factor_row("600519.SH", 0.8), _factor_row("000001.SZ", 0.9)]),
+        replace=False,
+    )
+    stored = part / "part-0.parquet"
+    before = stored.read_bytes()
+
+    _write_adj_partitions(
+        cfg, pl.DataFrame([_factor_row("600519.SH", 0.8, fetched=9)]), replace=False
+    )
+    assert stored.read_bytes() == before
+
+    # A changed value or a changed source still lands.
+    _write_adj_partitions(
+        cfg,
+        pl.DataFrame(
+            [
+                _factor_row("600519.SH", 0.81, fetched=9),
+                _factor_row("000001.SZ", 0.9, source="derived_stock_actions", fetched=9),
+            ]
+        ),
+        replace=False,
+    )
+    written = pl.read_parquet(stored)
+    assert dict(zip(written["symbol"], written["factor"], strict=True)) == {
+        "600519.SH": 0.81,
+        "000001.SZ": 0.9,
+    }
+    assert dict(zip(written["symbol"], written["source"], strict=True))["000001.SZ"] == (
+        "derived_stock_actions"
+    )

@@ -69,6 +69,7 @@ from cnequity.steps.common import (
     write_simple,
 )
 from cnequity.steps.http_common import write_fetched
+from cnequity.storage.state import StateStore
 
 logger = logging.getLogger(__name__)
 
@@ -117,14 +118,22 @@ def step_instruments(config: Config, trade_date: date, run_id: str, context: dic
     beijing_gap = _require_beijing_instrument_scope(config, df, trade_date)
     if beijing_gap:
         findings.append(beijing_gap)
+    # A listing date is a fact the lake keeps; vendors are asked only about
+    # names it cannot date yet. Re-deriving every date daily cost ~100s of
+    # Baostock paging (2,000 rows per ~14s page) for answers already held.
+    df = _carry_known_list_dates(config, df)
+    ask_vendors = _undated_need_vendors(config, df, trade_date)
     stage("fund listing dates", held=df.height)
     df = _enrich_etf_list_dates_from_profiles(config, df, trade_date)
-    if config.ingest_listed_funds and config.sources.get("exchange", True):
+    if ask_vendors and config.ingest_listed_funds and config.sources.get("exchange", True):
         df, listing_findings = _enrich_fund_list_dates_from_exchange(config, df, trade_date, run_id)
         findings.extend(listing_findings)
     stage("listing dates (Baostock, EastMoney)", held=df.height)
     basics_source = _instrument_basics_once(config)
-    df = enrich_instrument_list_dates(config, df, basics_source=basics_source)
+    if ask_vendors:
+        df = enrich_instrument_list_dates(config, df, basics_source=basics_source)
+        if basics_source.fetched or not config.sources.get("baostock", False):
+            _remember_undated(config, df, trade_date)
     if backfill:
         stage("delisted directory (Baostock)", held=df.height)
         try:
@@ -476,9 +485,70 @@ def _instrument_basics_once(config: Config) -> Callable[[], pl.DataFrame]:
             from cnequity.adapters.baostock import instruments as baostock_instruments
 
             held["frame"] = baostock_instruments.fetch_instrument_basics(config=config)
+            basics.fetched = True
         return held["frame"]
 
+    basics.fetched = False
     return basics
+
+
+#: How long a "no vendor can date this" answer stands before vendors are
+#: asked again. A new listing is never covered by it: it is asked daily until
+#: some vendor dates it.
+_UNDATED_RECHECK_DAYS = 7
+_UNDATED_CHECKED_ON = "undated_checked_on"
+_UNDATED_SYMBOLS = "undated_symbols"
+
+
+def _carry_known_list_dates(config: Config, df: pl.DataFrame) -> pl.DataFrame:
+    """Fill null list_dates from the lake's own catalogue.
+
+    The live snapshots carry no listing date, so each run used to re-derive
+    every date from vendors. A date the lake holds, including one an operator
+    repaired, now stands; vendors fill only what is still unknown.
+    """
+    if "list_date" not in df.columns or "symbol" not in df.columns:
+        return df
+    existing = load_curated_instruments(config)
+    if existing is None or "list_date" not in existing.columns:
+        return df
+    known = (
+        existing.select("symbol", pl.col("list_date").alias("_known_list_date"))
+        .filter(pl.col("_known_list_date").is_not_null())
+        .unique(subset=["symbol"], keep="last")
+    )
+    if known.is_empty():
+        return df
+    return (
+        df.join(known, on="symbol", how="left")
+        .with_columns(pl.coalesce("list_date", "_known_list_date").alias("list_date"))
+        .drop("_known_list_date")
+    )
+
+
+def _undated_symbols(df: pl.DataFrame) -> set[str]:
+    if "list_date" not in df.columns:
+        return set()
+    return set(df.filter(pl.col("list_date").is_null())["symbol"].to_list())
+
+
+def _undated_need_vendors(config: Config, df: pl.DataFrame, on: date) -> bool:
+    """Whether any undated name is worth a vendor round today."""
+    undated = _undated_symbols(df)
+    if not undated:
+        return False
+    state = StateStore(config.meta_root)
+    checked_on = state.get_date("instruments", _UNDATED_CHECKED_ON)
+    if checked_on is None or not 0 <= (on - checked_on).days < _UNDATED_RECHECK_DAYS:
+        return True
+    return not undated <= state.get_string_set("instruments", _UNDATED_SYMBOLS)
+
+
+def _remember_undated(config: Config, df: pl.DataFrame, on: date) -> None:
+    """Record the names a full vendor round could not date."""
+    state = StateStore(config.meta_root)
+    state.set_string_set("instruments", _UNDATED_SYMBOLS, _undated_symbols(df))
+    state.set_date("instruments", on, field=_UNDATED_CHECKED_ON)
 
 
 def _merge_delisted_instruments(
