@@ -21,6 +21,13 @@ INIT_PHASE_STEPS: dict[str, list[str]] = {
     "phase5_derive_and_publish": ["trading_status_derive", "compact"],
 }
 
+#: The Sina factor prefetch runs in the background from the first of these
+#: phases until the finalize phase, where the derive takes over. It is not a
+#: step, so it is never part of what an init owes.
+FACTOR_PREFETCH_PHASES = frozenset({"phase2c_daily_bars_backfill", "phase2a_corporate_actions"})
+FACTOR_PREFETCH_STOP_PHASE = "phase4_finalize"
+
+
 INIT_BACKFILL_PHASES = frozenset(
     {
         # trading_calendar must span the full bar history (2016+) or historical

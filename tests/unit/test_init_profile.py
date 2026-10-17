@@ -139,7 +139,11 @@ def test_default_init_is_the_shallow_window(tmp_path, monkeypatch):
     # midnight for reasons that have nothing to do with the behaviour under test.
     # The CLI anchors market windows on the exchange-local date, not the host
     # machine's date. Around UTC/local midnight those can differ by one day.
-    today = shanghai_today()
+    # On a weekend or holiday it anchors on the last finished session instead.
+    from cnequity.cli.demo import _last_trading_day
+    from cnequity.config import Config
+
+    today = _last_trading_day(Config(data_root=tmp_path / "anchor"), shanghai_today())
     try:
         expected = today.replace(year=today.year - QUICK_PROFILE_YEARS)
     except ValueError:  # Feb 29 — same fallback the CLI uses

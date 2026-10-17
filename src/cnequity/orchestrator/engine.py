@@ -7,6 +7,7 @@ import threading
 import time
 import uuid
 from collections import defaultdict
+from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from copy import copy
 from datetime import date
@@ -19,6 +20,8 @@ from cnequity.i18n import N_, NP_, Message
 from cnequity.orchestrator.backfill_scope import capture_backfill_scope, restore_backfill_scope
 from cnequity.orchestrator.deps import step_execution_levels, validate_steps_registered
 from cnequity.orchestrator.init_phases import (
+    FACTOR_PREFETCH_PHASES,
+    FACTOR_PREFETCH_STOP_PHASE,
     INIT_PHASE_STEPS,
     blocks_init,
     configured_init_phases,
@@ -1819,6 +1822,28 @@ class JobEngine:
         )
         return status
 
+    def _with_factor_prefetch(self, phases: list[str], trade_date: date) -> Iterator[str]:
+        """Yield *phases*, warming the factor cache in the background meanwhile.
+
+        Starts at the first bars or corporate-action phase and stops before the
+        finalize phase, where the derive fetches whatever is still uncached.
+        Stopped too when the loop ends early, breaks or raises.
+        """
+        from cnequity.derive.adj_factors import BackgroundFactorPrefetch
+
+        prefetch = None
+        try:
+            for phase in phases:
+                if phase == FACTOR_PREFETCH_STOP_PHASE and prefetch is not None:
+                    prefetch.stop()
+                    prefetch = None
+                elif phase in FACTOR_PREFETCH_PHASES and prefetch is None:
+                    prefetch = BackgroundFactorPrefetch(self.config, trade_date).start()
+                yield phase
+        finally:
+            if prefetch is not None:
+                prefetch.stop()
+
     def _init_completion(self, run_id: str, status: str) -> dict[str, Any]:
         """What a first build left owed, and whether its lake is usable anyway.
 
@@ -1845,7 +1870,7 @@ class JobEngine:
         total_read = 0
         total_written = 0
 
-        for phase in phases:
+        for phase in self._with_factor_prefetch(phases, trade_date):
             steps = INIT_PHASE_STEPS.get(phase, [])
             if not steps:
                 continue
@@ -1973,7 +1998,7 @@ class JobEngine:
         total_read = retry_result.get("rows_read", 0)
         total_written = retry_result.get("rows_written", 0)
 
-        for phase in to_run:
+        for phase in self._with_factor_prefetch(to_run, trade_date):
             batches = self._init_execution_batches(run_id)
             steps = [
                 step

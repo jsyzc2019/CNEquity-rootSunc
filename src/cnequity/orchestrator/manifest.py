@@ -846,6 +846,15 @@ class Manifest:
             )
             return {row["dataset"]: row["cnt"] for row in cur.fetchall()}
 
+    def successful_batches_for_task(self, task_id: str) -> list[sqlite3.Row]:
+        """Successful batches of *task_id* across every run, oldest first."""
+        with self._connect() as conn:
+            return conn.execute(
+                "SELECT run_id, batch_id, symbols_json FROM ingestion_batches "
+                "WHERE task_id = ? AND status = 'success' ORDER BY started_at",
+                (task_id,),
+            ).fetchall()
+
     def incomplete_batch_count(self, run_id: str) -> int:
         with self._connect() as conn:
             cur = conn.execute(

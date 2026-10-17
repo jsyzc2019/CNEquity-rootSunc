@@ -401,7 +401,13 @@ def init(
     # nothing to leave behind but an empty file.
     log_path = attach_log_file(cfg, "init", quiet=quiet)
 
-    td = parse_date_option(trade_date, "--trade-date") or shanghai_today()
+    # On a weekend or holiday "today" has no session: the Beijing board and the
+    # exchange status pages answer nothing for it, which left a lake built on a
+    # Saturday without BJ and without trading status. Use the newest finished
+    # session, as the demo does.
+    from cnequity.cli.demo import _last_trading_day
+
+    td = parse_date_option(trade_date, "--trade-date") or _last_trading_day(cfg, shanghai_today())
 
     history_start = _init_history_start(profile, since_str, td)
 

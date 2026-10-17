@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import itertools
 import logging
+import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date, timedelta
 from pathlib import Path
@@ -662,6 +663,129 @@ def _resolve_factors(
         raise AdjFactorsFetchError(
             f"No cached adj factors for {symbol} ({adjust_type}): {exc}"
         ) from exc
+
+
+#: Lanes for the init prefetch. Sina's pacing (``min_interval_seconds``) is
+#: what bounds the rate; two lanes keep it saturated while leaving the family's
+#: other slots to the daily-bar fallback that runs beside it.
+PREFETCH_WORKERS = 2
+
+
+def prefetch_factor_caches(
+    config: Config, symbols: list[str], *, stop: threading.Event | None = None
+) -> dict:
+    """Warm the Sina factor cache for *symbols* without touching the lake.
+
+    A first build used to make one paced Sina request per security only at
+    the end, after every bar was in: ~5,600 stocks at 0.3 s each is a 30-minute
+    tail. Fetched while the daily bars download, the derive later reads the
+    cache instead (measured: 1839 s down to 24 s on the same lake). Anything
+    that fails here is simply fetched again by the derive, so this never raises
+    for a source problem.
+    """
+    stats = {"requested": 0, "cached": 0, "skipped": 0, "failed": 0, "left": 0}
+    if config.adj_factors_source != "sina" or not config.sources.get("sina", True):
+        stats["skipped"] = len(symbols)
+        return stats
+    overridden = _overridden_symbols(config)
+    todo = []
+    for symbol in dict.fromkeys(symbols):
+        cached = _load_cache(config, symbol, STORED_ADJUST_TYPE)
+        if _is_cdr(symbol) or symbol in overridden or not _needs_refresh(cached, False):
+            stats["skipped"] += 1
+        else:
+            todo.append(symbol)
+    if not todo:
+        return stats
+    report = sweep_progress(logger, "adj_factors prefetch", len(todo))
+    done = itertools.count(1)
+    report_lock = threading.Lock()
+
+    def fetch(symbol: str, client: httpx.Client) -> bool:
+        try:
+            with source_request(config, config.adj_factors_source):
+                factors = fetch_adj_factor_series(symbol, STORED_ADJUST_TYPE, client=client)
+        except Exception as exc:  # noqa: BLE001 — the derive retries this symbol
+            logger.debug("adj_factors prefetch: %s not cached: %s", symbol, exc)
+            return False
+        _save_cache(config, symbol, STORED_ADJUST_TYPE, factors)
+        return not factors.is_empty()
+
+    def lane(names: list[str]) -> list[bool]:
+        outcomes = []
+        with httpx.Client(timeout=20.0) as client:
+            for name in names:
+                if stop is not None and stop.is_set():
+                    break
+                outcomes.append(fetch(name, client))
+                with report_lock:
+                    report(next(done))
+        return outcomes
+
+    workers = max(1, min(PREFETCH_WORKERS, config.adj_factor_worker_count()))
+    with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="factor-prefetch") as pool:
+        for outcomes in pool.map(lane, [todo[i::workers] for i in range(workers)]):
+            for ok in outcomes:
+                stats["cached" if ok else "failed"] += 1
+    stats["requested"] = stats["cached"] + stats["failed"]
+    # Stopped before the end: these are what the derive asks Sina for itself.
+    stats["left"] = len(todo) - stats["requested"]
+    return stats
+
+
+def init_prefetch_symbols(config: Config, trade_date: date) -> list[str]:
+    """What a first build's derive will ask Sina about: ingested stocks and funds."""
+    from cnequity.domain.symbols import filter_ingest_universe
+    from cnequity.steps.common import load_symbols
+
+    symbols = filter_ingest_universe(load_symbols(config), config.ingest_universe)
+    if config.ingest_listed_funds or config.ingest_eligible_etfs:
+        from cnequity.steps.bars import _daily_fund_bar_symbols
+
+        symbols += _daily_fund_bar_symbols(config, trade_date) or []
+    return symbols
+
+
+class BackgroundFactorPrefetch:
+    """Warm the factor cache on a thread that outlives single init phases.
+
+    Started when the bars and corporate-action phases begin and stopped when
+    the finalize phase starts: Sina's pacing makes the prefetch longer than
+    the bars alone (measured 1960 s against 974 s), so tying it to one phase
+    held that phase back. Whatever is left when it stops, the derive fetches
+    itself at the same pace, so stopping early never costs a second request.
+    """
+
+    def __init__(self, config: Config, trade_date: date):
+        self._config = config
+        self._trade_date = trade_date
+        self._stop = threading.Event()
+        self.stats: dict | None = None
+        self._thread = threading.Thread(target=self._run, name="factor-prefetch", daemon=True)
+
+    def start(self) -> BackgroundFactorPrefetch:
+        self._thread.start()
+        return self
+
+    def _run(self) -> None:
+        try:
+            symbols = init_prefetch_symbols(self._config, self._trade_date)
+            self.stats = prefetch_factor_caches(self._config, symbols, stop=self._stop)
+        except Exception as exc:  # noqa: BLE001 — an optimisation, never a gate
+            logger.warning("adj_factors prefetch skipped: %s", exc)
+            return
+        logger.info(
+            "adj_factors prefetch: %d cached, %d failed, %d already cached, %d left to the derive",
+            self.stats["cached"],
+            self.stats["failed"],
+            self.stats["skipped"],
+            self.stats.get("left", 0),
+        )
+
+    def stop(self, timeout: float = 60.0) -> None:
+        """Ask the lanes to finish their current request, then wait for them."""
+        self._stop.set()
+        self._thread.join(timeout)
 
 
 def _resolve_factors_via_backup(

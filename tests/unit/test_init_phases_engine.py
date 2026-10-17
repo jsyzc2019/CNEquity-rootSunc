@@ -745,3 +745,60 @@ def test_resume_redoes_an_owed_derive_and_finishes(cfg, monkeypatch):
     assert "derive_adj_factors" in calls
     assert resumed["owed_steps"] == []
     assert resumed["status"] == "success"
+
+
+def test_the_factor_prefetch_spans_bars_and_actions_and_stops_before_finalize(cfg, monkeypatch):
+    from cnequity.derive import adj_factors
+    from cnequity.orchestrator.init_phases import DEFAULT_INIT_PHASES
+
+    init_data_layout(cfg)
+    cfg.init_phases = list(DEFAULT_INIT_PHASES)
+    calls = _steps_failing(monkeypatch, "nothing")
+
+    class Recorder:
+        def __init__(self, config, trade_date):
+            pass
+
+        def start(self):
+            calls.append("prefetch:start")
+            return self
+
+        def stop(self, timeout=60.0):
+            calls.append("prefetch:stop")
+
+    monkeypatch.setattr(adj_factors, "BackgroundFactorPrefetch", Recorder)
+    engine = JobEngine(cfg)
+    result = engine.run_init_phases(date(2024, 6, 28))
+
+    start, stop = calls.index("prefetch:start"), calls.index("prefetch:stop")
+    assert calls.count("prefetch:start") == calls.count("prefetch:stop") == 1
+    assert start < calls.index("daily_bars") < calls.index("corporate_actions") < stop
+    assert stop < calls.index("derive_adj_factors")
+    assert result["status"] != "failed"
+    assert engine.manifest.latest_incomplete_init_run() is None
+
+
+def test_an_init_that_stops_early_also_stops_the_prefetch(cfg, monkeypatch):
+    from cnequity.derive import adj_factors
+    from cnequity.orchestrator.init_phases import DEFAULT_INIT_PHASES
+
+    init_data_layout(cfg)
+    cfg.init_phases = list(DEFAULT_INIT_PHASES)
+    calls = _steps_failing(monkeypatch, "daily_bars")
+    stopped = []
+
+    class Recorder:
+        def __init__(self, config, trade_date):
+            pass
+
+        def start(self):
+            return self
+
+        def stop(self, timeout=60.0):
+            stopped.append(True)
+
+    monkeypatch.setattr(adj_factors, "BackgroundFactorPrefetch", Recorder)
+    result = JobEngine(cfg).run_init_phases(date(2024, 6, 28))
+    assert result["status"] == "failed"
+    assert "compact" not in calls
+    assert stopped == [True]

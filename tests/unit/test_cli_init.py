@@ -189,3 +189,19 @@ def test_an_unusable_build_says_how_to_resume(tmp_path, monkeypatch):
     assert "日线（daily_bars）" in result.output
     assert "cne sources probe" in result.output
     assert "cne serve" not in result.output
+
+
+def test_init_on_a_weekend_builds_as_of_the_last_session(tmp_path, monkeypatch):
+    cfg_path = _write_config(tmp_path)
+    seen = {}
+
+    def fake_run_init_phases(self, trade_date=None, **kwargs):
+        seen["trade_date"] = trade_date
+        return {"run_id": "w1", "status": "success", "phases": []}
+
+    monkeypatch.setattr(JobEngine, "run_init_phases", fake_run_init_phases)
+    monkeypatch.setattr("cnequity.cli.setup_cmds.shanghai_today", lambda: date(2026, 10, 17))
+    result = CliRunner().invoke(cli, ["init", "--config", cfg_path])
+
+    assert result.exit_code == 0, result.output
+    assert seen["trade_date"] == date(2026, 10, 16)  # Saturday -> Friday's session
