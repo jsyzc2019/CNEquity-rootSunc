@@ -52,7 +52,16 @@ scheduler_lock_acquire() {
   local lock_name="${2:-daily}"
   local lock_root py token rc
   lock_root="$(_scheduler_lock_root "$repo_root")"
-  py="${CNE_PYTHON:-$repo_root/.venv/bin/python}"
+  # The checkout's venv when there is one; otherwise the python3 on PATH that
+  # has cnequity installed (a CI runner or a pip install without a venv).
+  py="${CNE_PYTHON:-}"
+  if [[ -z "$py" ]]; then
+    if [[ -x "$repo_root/.venv/bin/python" ]]; then
+      py="$repo_root/.venv/bin/python"
+    else
+      py="python3"
+    fi
+  fi
   export SCHEDULER_LOCK_DIR="$lock_root/$lock_name.lock"
   SCHEDULER_LOCK_ROOT="$lock_root"
   SCHEDULER_LOCK_NAME="$lock_name"

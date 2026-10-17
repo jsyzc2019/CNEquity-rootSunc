@@ -58,7 +58,7 @@ class StagingRetirement:
         signature = _tree_signature(path)
         info = path.stat()
         files = {
-            str(p.relative_to(path)): {"size": p.stat().st_size, "sha256": sha256_file(p)}
+            p.relative_to(path).as_posix(): {"size": p.stat().st_size, "sha256": sha256_file(p)}
             for p in sorted(path.rglob("*"))
             if p.is_file()
         }
@@ -83,7 +83,9 @@ class StagingRetirement:
                 paths = staging_run_paths(self.staging, oid.split("/", 1)[1])
                 if not paths:
                     raise LifecycleError("Staging disappeared during review")
-                obj["paths"] = {str(p.relative_to(self.staging)): self._capture(p) for p in paths}
+                obj["paths"] = {
+                    p.relative_to(self.staging).as_posix(): self._capture(p) for p in paths
+                }
                 obj["logical_bytes"] = sum(
                     f["size"] for item in obj["paths"].values() for f in item["files"].values()
                 )
@@ -138,7 +140,7 @@ class StagingRetirement:
         if [info.st_dev, info.st_ino] != item["identity"]:
             raise LifecycleError("Staging directory identity changed")
         actual = {
-            str(p.relative_to(path)): {"size": p.stat().st_size, "sha256": sha256_file(p)}
+            p.relative_to(path).as_posix(): {"size": p.stat().st_size, "sha256": sha256_file(p)}
             for p in path.rglob("*")
             if p.is_file()
         }
@@ -205,7 +207,7 @@ class StagingRetirement:
                     ):
                         raise LifecycleError("Staging is held or no longer compacted")
                     current = {
-                        str(p.relative_to(self.staging))
+                        p.relative_to(self.staging).as_posix()
                         for p in staging_run_paths(self.staging, run_id)
                     }
                     if not current.issubset(obj["paths"]):
