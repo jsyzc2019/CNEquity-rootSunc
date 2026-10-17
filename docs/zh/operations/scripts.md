@@ -257,7 +257,19 @@ scripts/migrations/migrate_daily_bars_volume_v2.py --config configs/cnequity.tom
 
 ### dev/sync_docs.py
 
-从代码重新生成文档里由代码决定的部分，中英文两套都包括：字段表、衍生品能力表、CLI 参数表、命令副作用清单，以及 PyPI 用的 README。`--check` 只检查不写入，CI 会跑。CLI 帮助和副作用说明的英文在 `scripts/dev/i18n/cli_help.en.yml` 和 `cli_surface.en.yml`；新增或改动帮助文字而没有对应英文时，检查失败。
+从代码重新生成文档里由代码决定的部分，中英文两套都包括：字段表、衍生品能力表、CLI 参数表、命令副作用清单，以及 PyPI 用的 README。`--check` 只检查不写入，CI 会跑。CLI 帮助的中英文来自包内翻译目录（英文写在代码里，中文在 `src/cnequity/locale/zh_CN/LC_MESSAGES/cnequity.po`），缺中文时 `python scripts/dev/i18n_catalog.py` 检查失败；副作用说明的英文在 `scripts/dev/i18n/cli_surface.en.yml`，新增命令而没有对应英文时，检查失败。
+
+### dev/i18n_catalog.py
+
+维护 CLI、终端进度和控制台服务端文案的翻译目录。文案在代码里写英文，用 `cnequity.i18n` 的 `_()`（运行时翻译）或 `N_()`（只登记，显示时再翻译，如 Click 帮助和日志模板）标记；命令的 docstring 就是帮助，自动登记。中文在 `src/cnequity/locale/zh_CN/LC_MESSAGES/cnequity.po`，编译出的 `.mo` 一并提交，安装包不需要构建步骤：
+
+```bash
+python scripts/dev/i18n_catalog.py update    # 补新文案、删掉代码里已没有的
+python scripts/dev/i18n_catalog.py compile   # 由 .po 重新生成 .mo
+python scripts/dev/i18n_catalog.py           # 检查；有问题退出 1
+```
+
+检查覆盖：标记过的文案缺条目或缺中文、条目已不在代码里、模糊条目、占位符与英文不一致、首尾换行不一致、`.mo` 与 `.po` 不符。`tests/unit/test_i18n_catalog.py` 会跑它；`tests/unit/test_cli_untranslated.py` 另外拦下没走目录的中文字面量。Babel 只是开发依赖，安装后用标准库读取 `.mo`。
 
 ### dev/doc_translations.py
 

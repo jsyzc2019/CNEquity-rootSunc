@@ -15,6 +15,7 @@ from typing import Any
 from cnequity.config import Config, WaveConfig
 from cnequity.domain.datasets import DATASETS, history_mode_for
 from cnequity.domain.market_time import shanghai_today
+from cnequity.i18n import N_, NP_, Message
 from cnequity.orchestrator.backfill_scope import capture_backfill_scope, restore_backfill_scope
 from cnequity.orchestrator.deps import step_execution_levels, validate_steps_registered
 from cnequity.orchestrator.init_phases import (
@@ -57,6 +58,14 @@ from cnequity.progress import step_scope
 from cnequity.steps.common import is_trading_day
 
 logger = logging.getLogger(__name__)
+
+# Step outcomes as the terminal names them; the log file keeps these words.
+STEP_STATUS_WORDS = (
+    NP_("step status", "success"),
+    NP_("step status", "warning"),
+    NP_("step status", "failed"),
+    NP_("step status", "skipped"),
+)
 
 _TRANSIENT_RETRY_MARKERS = (
     "connection",
@@ -195,7 +204,7 @@ class JobEngine:
             and not is_trading_day(self.config, trade_date)
         ):
             logger.info(
-                "Skipping job %s: %s is not a trading day",
+                N_("Skipping job %s: %s is not a trading day"),
                 job_name,
                 trade_date.isoformat(),
             )
@@ -265,7 +274,9 @@ class JobEngine:
 
             try:
                 for wave in wave_list:
-                    logger.info("Wave %s: %s (parallel=%s)", wave.name, wave.steps, wave.parallel)
+                    logger.info(
+                        N_("Wave %s: %s (parallel=%s)"), wave.name, wave.steps, wave.parallel
+                    )
                     wave_results, wave_read, wave_written, wave_error, wave_warning = (
                         self._run_wave(wave, wave.steps, trade_date, run_id, context)
                     )
@@ -707,7 +718,7 @@ class JobEngine:
             # done, so a twenty-minute fetch and a hang read identically until
             # one of them ended. Name it on the way in as well, and register it
             # so the heartbeat can say which step the silence belongs to.
-            logger.info("Step %s starting", name)
+            logger.info(N_("Step %s starting"), name)
             from cnequity.orchestrator.source_gaps import source_gap_scope
 
             with step_scope(name), source_gap_scope(step_config) as source_gaps:
@@ -821,9 +832,9 @@ class JobEngine:
                 step_metrics,
             )
             logger.info(
-                "Step %s %s in %.1fs (%s rows)",
+                N_("Step %s %s in %.1fs (%s rows)"),
                 name,
-                step_status,
+                Message.word("step status", step_status),
                 elapsed,
                 out.get("rows_written", 0),
             )
@@ -851,7 +862,7 @@ class JobEngine:
                 error=exc,
             )
             self.manifest.record_stage_metrics(run_id, name, elapsed)
-            logger.warning("Step %s interrupted after %.1fs", name, elapsed)
+            logger.warning(N_("Step %s interrupted after %.1fs"), name, elapsed)
             raise
         except Exception as exc:
             elapsed = time.perf_counter() - t0
@@ -875,11 +886,11 @@ class JobEngine:
             )
             self.manifest.record_stage_metrics(run_id, name, elapsed)
             if outcome.reason_code in SOURCE_LIMIT_REASONS:
-                logger.warning("Step %s source unavailable after %.1fs: %s", name, elapsed, exc)
+                logger.warning(N_("Step %s source unavailable after %.1fs: %s"), name, elapsed, exc)
             elif outcome.execution_status == "skipped":
-                logger.warning("Step %s skipped: %s", name, exc)
+                logger.warning(N_("Step %s skipped: %s"), name, exc)
             else:
-                logger.exception("Step %s failed after %.1fs", name, elapsed)
+                logger.exception(N_("Step %s failed after %.1fs"), name, elapsed)
             if outcome.execution_status == "skipped":
                 status = "skipped"
             elif outcome.reason_code in SOURCE_LIMIT_REASONS:
@@ -1046,7 +1057,7 @@ class JobEngine:
             "delisted_backfill",
             {"parent_init_run_id": run_id, "start": start.isoformat(), "end": end.isoformat()},
         )
-        logger.info("Init: recovering %d delisted symbols before daily bars", len(symbols))
+        logger.info(N_("Init: recovering %d delisted symbols before daily bars"), len(symbols))
         with self._run_lock(child_id):
             try:
                 result = backfill_delisted_bars(
@@ -1839,7 +1850,7 @@ class JobEngine:
             if not steps:
                 continue
             backfill = phase_backfill(phase)
-            logger.info("Init phase %s: %s", phase, steps)
+            logger.info(N_("Init phase %s: %s"), phase, ", ".join(steps))
             result = self.run_job(
                 "init",
                 trade_date,
@@ -1855,13 +1866,15 @@ class JobEngine:
                 failed = _failed_step_names(result)
                 if not blocks_init(phase, failed):
                     logger.warning(
-                        "Init phase %s did not complete (%s); continuing so the lake still "
-                        "publishes. Run `cne init` again to resume it.",
+                        N_(
+                            "Init phase %s did not complete (%s); continuing so the lake still "
+                            "publishes. Run `cne init` again to resume it."
+                        ),
                         phase,
                         ", ".join(sorted(failed)) or phase,
                     )
                     continue
-                logger.error("Init phase %s failed; stopping remaining phases", phase)
+                logger.error(N_("Init phase %s failed; stopping remaining phases"), phase)
                 break
 
         status = self._finalize_init_run(
@@ -1950,7 +1963,7 @@ class JobEngine:
             _mark_resumed,
         )
 
-        logger.info("Resuming init run %s", run_id)
+        logger.info(N_("Resuming init run %s"), run_id)
         self.manifest.resume_run(run_id)
         retry_result = self._retry_run(run_id, trade_date, auto_finalize=False)
 
@@ -1980,14 +1993,16 @@ class JobEngine:
             if unresolved_started:
                 if not keep_going and blocks_init(phase, unresolved_started):
                     logger.error(
-                        "Init phase %s is still incomplete after retry (%s); "
-                        "not starting later phases",
+                        N_(
+                            "Init phase %s is still incomplete after retry (%s); "
+                            "not starting later phases"
+                        ),
                         phase,
                         ", ".join(sorted(unresolved_started)),
                     )
                     break
                 logger.warning(
-                    "Init phase %s is still incomplete after retry (%s); continuing",
+                    N_("Init phase %s is still incomplete after retry (%s); continuing"),
                     phase,
                     ", ".join(sorted(unresolved_started)),
                 )
@@ -1995,7 +2010,7 @@ class JobEngine:
             if not steps:
                 continue
             backfill = phase_backfill(phase)
-            logger.info("Init resume phase %s: %s", phase, steps)
+            logger.info(N_("Init resume phase %s: %s"), phase, ", ".join(steps))
             result = self.run_job(
                 "init",
                 trade_date,

@@ -109,6 +109,9 @@ dev = [
   # `pre-commit install` once per clone; see .pre-commit-config.yaml.
   "pre-commit>=3.5",
   "pytest-randomly>=5.0.0",
+  # Extracts and compiles the translation catalog (scripts/dev/i18n_catalog.py);
+  # the installed package reads the compiled .mo with the standard library.
+  "babel>=2.14",
 ]
 
 [project.urls]
@@ -152,6 +155,10 @@ cnequity = [
     # install — see adapters/sw/industry_history.py.
     "adapters/sw/*.pem",
     "config/templates/*.toml",
+    # Compiled translations, read with the standard library's gettext. The
+    # .po source travels too so an installed copy can be inspected or fixed.
+    "locale/*/LC_MESSAGES/*.mo",
+    "locale/*/LC_MESSAGES/*.po",
     # The dashboard page. Self-contained on purpose (no CDN, no build step): a
     # lake often runs on an offline box or behind a proxy that would turn an
     # external asset into a page that does not load.

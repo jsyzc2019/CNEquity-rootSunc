@@ -168,10 +168,12 @@ def _replay(config, *, refresh_sources, run_id, index_symbol):
                 unchanged.add(day)
         else:
             opening = pd.read_excel(BytesIO(read(catalog["opening"])), dtype=str)
-            declaration = f"公告时间：2015-3-20 正式实施时间：{opening_day.year}-{opening_day.month}-{opening_day.day}"
-            if "证券代码" not in opening.columns or declaration not in opening.columns:
+            # The CNI workbook names its columns in Chinese.
+            code = "证券代码"  # i18n-ignore
+            declaration = f"公告时间：2015-3-20 正式实施时间：{opening_day.year}-{opening_day.month}-{opening_day.day}"  # i18n-ignore
+            if code not in opening.columns or declaration not in opening.columns:
                 raise ValueError("opening workbook does not identify its declared effective date")
-            members = opening["证券代码"].tolist()
+            members = opening[code].tolist()
             if len(members) != len(set(members)):
                 raise ValueError("opening workbook duplicates members")
             opening_members = frozenset(member + ".SZ" for member in members)

@@ -439,6 +439,7 @@ def test_reference_and_index_phases_backfill_history():
     assert step_backfill("index_bars", ["phase1_reference"]) is False
 
 
+@pytest.mark.usefixtures("chinese_output")
 def test_a_killed_init_is_resumed_not_refused(tmp_path, monkeypatch):
     """Looked hung, got killed, started again — the one command the operator
     had left used to answer "no" to the one thing they were trying to do."""
@@ -475,6 +476,7 @@ def test_a_killed_init_is_resumed_not_refused(tmp_path, monkeypatch):
     assert seen == {"resume": True, "resume_run_id": run_id, "backfill_start": None}
 
 
+@pytest.mark.usefixtures("chinese_output")
 def test_a_live_init_is_still_refused(tmp_path, monkeypatch):
     """The refusal is right for a peer that is actually running."""
     import subprocess

@@ -257,7 +257,19 @@ End-to-end smoke test: runs a miniature daily path with mocks or a lightweight c
 
 ### dev/sync_docs.py
 
-Regenerates the parts of the docs that code decides, in both languages: the field tables, the derivatives capability table, the CLI options table, the command side-effect inventory, and the README used on PyPI. `--check` only checks and writes nothing; CI runs it. The English for CLI help and side-effect notes lives in `scripts/dev/i18n/cli_help.en.yml` and `cli_surface.en.yml`; adding or changing a help text without its English fails the check.
+Regenerates the parts of the docs that code decides, in both languages: the field tables, the derivatives capability table, the CLI options table, the command side-effect inventory, and the README used on PyPI. `--check` only checks and writes nothing; CI runs it. CLI help in both languages comes from the package catalog (English in the code, Chinese in `src/cnequity/locale/zh_CN/LC_MESSAGES/cnequity.po`), and `python scripts/dev/i18n_catalog.py` fails on help with no Chinese; the English for side-effect notes lives in `scripts/dev/i18n/cli_surface.en.yml`, and adding a command without its English fails the check.
+
+### dev/i18n_catalog.py
+
+Maintains the translation catalog for the CLI, terminal progress and the console's server-side text. Text is written in English in the code and marked with `_()` (translated at run time) or `N_()` (only registered, translated when shown, as for Click help and log templates) from `cnequity.i18n`; a command's docstring is its help and is registered automatically. The Chinese lives in `src/cnequity/locale/zh_CN/LC_MESSAGES/cnequity.po`, and the compiled `.mo` is committed with it, so installing needs no build step:
+
+```bash
+python scripts/dev/i18n_catalog.py update    # add new text, drop text no longer in the code
+python scripts/dev/i18n_catalog.py compile   # rebuild the .mo from the .po
+python scripts/dev/i18n_catalog.py           # check; exits 1 on any problem
+```
+
+The check covers: marked text with no entry or no Chinese, entries no longer in the code, fuzzy entries, placeholders that differ from the English, leading or trailing newlines that differ, and a `.mo` that does not match its `.po`. `tests/unit/test_i18n_catalog.py` runs it, and `tests/unit/test_cli_untranslated.py` also catches Chinese literals that bypass the catalog. Babel is a development dependency only; the installed package reads the `.mo` with the standard library.
 
 ### dev/doc_translations.py
 

@@ -21,10 +21,12 @@ Targets:
   made absolute, since PyPI resolves none of them.
 
 The English site (``docs/en``) has its own copy of each generated page:
-``schema-en``, ``derivatives-en``, ``cli-options-en`` and ``cli-surface-en``. Text
-that comes from code in Chinese — Click help, the side-effect inventory — is
-translated through ``scripts/dev/i18n/*.en.yml``; a help text without an entry
-there fails the check instead of reaching the English page in Chinese.
+``schema-en``, ``derivatives-en``, ``cli-options-en`` and ``cli-surface-en``. Click
+help is English in the code and Chinese in the package catalog, so each page
+renders its own language from there (``scripts/dev/i18n_catalog.py`` fails on a
+help text with no Chinese). The side-effect inventory is written below in
+Chinese and translated through ``scripts/dev/i18n/cli_surface.en.yml``; a
+command without an entry there fails the check.
 
 Schema page notes:
 
@@ -56,6 +58,7 @@ sys.path.insert(0, str(REPO_ROOT / "src"))
 
 from cnequity.adapters.futures_exchange.registry import capabilities  # noqa: E402
 from cnequity.cli.main import cli  # noqa: E402
+from cnequity.i18n import translate_to  # noqa: E402
 
 DOC_PATH = REPO_ROOT / "docs" / "zh" / "datasets" / "schema.md"
 DOC_PATH_EN = REPO_ROOT / "docs" / "en" / "datasets" / "schema.md"
@@ -256,33 +259,17 @@ def _load_catalog(name: str) -> dict:
     return yaml.safe_load((I18N / name).read_text(encoding="utf-8")) or {}
 
 
-def _help_texts() -> list[str]:
-    seen: list[str] = []
-    for _, command in _option_leaves(cli):
-        for param in command.params:
-            if isinstance(param, click.Option) and param.help and param.help not in seen:
-                seen.append(param.help)
-    return seen
+def _help_in(lang: str, param: click.Parameter) -> str:
+    """An option's help in a docs language, from the package catalog.
 
-
-def _help_translations() -> dict[str, str]:
-    """English for every option help text; refuses gaps and leftovers."""
-    catalog = _load_catalog("cli_help.en.yml")
-    texts = _help_texts()
-    missing = [text for text in texts if not catalog.get(text)]
-    unused = sorted(set(catalog) - set(texts))
-    if missing or unused:
-        raise SystemExit(
-            "scripts/dev/i18n/cli_help.en.yml is out of date:\n"
-            + "".join(f"  missing: {text}\n" for text in missing)
-            + "".join(f"  unused:  {text}\n" for text in unused)
-        )
-    return catalog
+    The written help is the English msgid; `docs/zh` renders its Chinese.
+    """
+    written = param.__dict__.get("help") or ""
+    return translate_to("zh_CN" if lang == "zh" else "en", written) if written else ""
 
 
 def render_cli_options(lang: str = "zh") -> str:
     words = _OPTION_WORDS[lang]
-    translate = _help_translations() if lang == "en" else {}
     lines = [words["title"], "", words["intro"], ""]
     for path, command in _option_leaves(cli):
         ctx = click.Context(command)
@@ -290,7 +277,7 @@ def render_cli_options(lang: str = "zh") -> str:
         for param in command.params:
             if isinstance(param, click.Option):
                 label = ", ".join([*param.opts, *param.secondary_opts])
-                description = translate.get(param.help, param.help) if param.help else ""
+                description = _help_in(lang, param)
             else:
                 label = param.name or ""
                 description = words["positional"]

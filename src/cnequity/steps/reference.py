@@ -37,6 +37,7 @@ from cnequity.domain.trading_status import (
     last_first_hand_status,
     split_before_listing,
 )
+from cnequity.i18n import N_
 from cnequity.orchestrator.manifest import Manifest
 from cnequity.orchestrator.outcomes import (
     SOURCE_LIMIT_REASONS,
@@ -102,7 +103,7 @@ def step_instruments(config: Config, trade_date: date, run_id: str, context: dic
     rl = config.tdx_rate_limit_spec()
     backfill = getattr(config, "_backfill", False)
     stage = stage_progress(logger, "instruments", 6 if backfill else 5)
-    stage("TDX security list")
+    stage(N_("TDX security list"))
     df = fetch_instruments(rate_limit=rl, allow_mock=config.tdx_allow_mock, config=config)
     df = normalize_with_source(df, "tdx_protocol")
     # Enrichment last, and deliberately: it fills null list_dates from
@@ -111,7 +112,7 @@ def step_instruments(config: Config, trade_date: date, run_id: str, context: dic
     # a null list_date forever, which is also what marks a symbol as a
     # not-yet-listed placeholder — so the names these merges recover would have
     # been discovered and then never fetched.
-    stage("Beijing board", held=df.height)
+    stage(N_("Beijing board"), held=df.height)
     df = _merge_bse_instruments(config, df, trade_date)
     df = _merge_untdxable_instruments(config, df)
     findings = []
@@ -123,19 +124,19 @@ def step_instruments(config: Config, trade_date: date, run_id: str, context: dic
     # Baostock paging (2,000 rows per ~14s page) for answers already held.
     df = _carry_known_list_dates(config, df)
     ask_vendors = _undated_need_vendors(config, df, trade_date)
-    stage("fund listing dates", held=df.height)
+    stage(N_("fund listing dates"), held=df.height)
     df = _enrich_etf_list_dates_from_profiles(config, df, trade_date)
     if ask_vendors and config.ingest_listed_funds and config.sources.get("exchange", True):
         df, listing_findings = _enrich_fund_list_dates_from_exchange(config, df, trade_date, run_id)
         findings.extend(listing_findings)
-    stage("listing dates (Baostock, EastMoney)", held=df.height)
+    stage(N_("listing dates (Baostock, EastMoney)"), held=df.height)
     basics_source = _instrument_basics_once(config)
     if ask_vendors:
         df = enrich_instrument_list_dates(config, df, basics_source=basics_source)
         if basics_source.fetched or not config.sources.get("baostock", False):
             _remember_undated(config, df, trade_date)
     if backfill:
-        stage("delisted directory (Baostock)", held=df.height)
+        stage(N_("delisted directory (Baostock)"), held=df.height)
         try:
             df = _merge_delisted_instruments(config, df, basics_source=basics_source)
         except Exception as exc:
@@ -150,7 +151,7 @@ def step_instruments(config: Config, trade_date: date, run_id: str, context: dic
                     "message": str(exc),
                 }
             )
-    stage("write", held=df.height)
+    stage(N_("write"), held=df.height)
     df = _carry_lake_facts(config, df)
     result = write_simple(config, run_id, "instruments", df)
     new = new_instrument_rows(config, df)

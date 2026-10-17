@@ -59,7 +59,9 @@ MISSING_EVENT_MIN_DIVERGENCE = 0.11
 # buybacks, and debt conversion do not make an ex-price adjustment by
 # themselves.  Without this reconciliation, a verified ``缩股`` on 000887.SZ
 # was incorrectly reported as an unrecorded corporate action.
-_STRUCTURAL_ADJUSTMENT_RE = "缩股|减资|合股|并股|拆股"
+_STRUCTURAL_ADJUSTMENT_RE = (
+    "缩股|减资|合股|并股|拆股"  # i18n-ignore: data: corporate-action wording
+)
 
 _MAX_RECON_FINDINGS = 50
 ADJ_RECON_LOOKBACK_DAYS = 30
@@ -1774,8 +1776,8 @@ def corporate_action_classification_findings(config: Config, start: date, end: d
                 "severity": "warning",
                 "check": "corporate_action_duplicate_classification",
                 "message": (
-                    f"{duplicated_events} ex-date(s) carry the same ratio as 送 from one "
-                    "source and 转 from another — one event stored twice. Anything that "
+                    f"{duplicated_events} ex-date(s) carry the same ratio as 送 from one "  # i18n-ignore: Chinese term in an English message
+                    "source and 转 from another — one event stored twice. Anything that "  # i18n-ignore: Chinese term in an English message
                     "adds bonus_ratio and transfer_ratio double-counts the dilution"
                 ),
                 "rows": duplicated_events,
@@ -1789,7 +1791,7 @@ def corporate_action_classification_findings(config: Config, start: date, end: d
                 "check": "corporate_action_ratio_scale",
                 "message": (
                     f"{scaled_events} ex-date(s) carry a transfer_ratio exactly 10x the "
-                    "bonus_ratio another source reports — a 每10股/每股 unit confusion"
+                    "bonus_ratio another source reports — a 每10股/每股 unit confusion"  # i18n-ignore: Chinese term in an English message
                 ),
                 "rows": scaled_events,
                 "sample": [
@@ -2461,7 +2463,7 @@ def unrecorded_ex_event_findings(
             "message": (
                 f"{row['symbol']}: the hfq factor stepped x{row['factor_ratio']:.4f} on "
                 f"{_iso(row['ex_date'])} with no corporate action on record; the daily "
-                "dividend report carries no unit splits, so a 份额折算 arrives only from "
+                "dividend report carries no unit splits, so a 份额折算 arrives only from "  # i18n-ignore: Chinese term in an English message
                 "`cne backfill corporate_actions --symbols "
                 f"{row['symbol']}`"
             ),

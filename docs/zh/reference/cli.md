@@ -8,7 +8,9 @@
 
 **命令名不区分大小写**：`cne STATUS`、`cne run DAILY`、`cne config CREATE` 与小写等价（Click 的 `token_normalize_func`）。`-h` 是 `--help` 的短写法。**不做前缀匹配**——`cne stat` 会被拒绝并提示 `stats` / `status`，而不是猜一个执行。
 
-**每个命令都有过程日志。** 管线自己的 INFO 记录统一在命令树根部接到 stderr，所以 stdout 上的 JSON 契约不受影响。耗时的采集和维护命令另外把日志 tee 进 `{data.root}/logs/cne-<命令>-<时间戳>.log`（`cne run clean --log-retention-days` 可预览过期日志）。`cne mcp` 与 `cne serve` 自管日志——前者 stdout 是 JSON-RPC 线路，stderr 必须压在 WARNING；后者交给 uvicorn。
+**每个命令都有过程日志。** 管线自己的 INFO 记录统一在命令树根部接到 stderr，所以 stdout 上的 JSON 契约不受影响。耗时的采集和维护命令另外把日志 tee 进 `{data.root}/logs/cne-<命令>-<时间戳>.log`（`cne run clean --log-retention-days` 可预览过期日志）。`cne mcp` 与 `cne serve` 自管日志——前者 stdout 是 JSON-RPC 线路，stderr 必须压在 WARNING；后者交给 uvicorn。交互终端上显示的是简短视图：只留时分秒，警告和错误前加标记，不带日志器名，步骤、心跳和进度按显示语言输出；输出被重定向（管道、调度器捕获、CI）时仍是完整格式，日志文件始终是完整的英文格式，方便检索和贴进 issue。
+
+**显示语言。** 帮助、提示、报错和结束摘要支持中文和英文，依次取环境变量 `CNE_LANG`（`en` 或 `zh_CN`，也接受 `zh-CN` 等写法）、系统语言（`LC_ALL` / `LC_MESSAGES` / `LANG`，Windows 读界面语言），都没有时用英文；繁体中文系统落到英文。系统是英文、想看中文时：`export CNE_LANG=zh_CN`（PowerShell：`$env:CNE_LANG = "zh_CN"`）。不随语言变化的：`--json` 等 JSON 输出（其中的说明文字一律英文）、`HEALTHY` / `STALE` 等标记词、退出码、数据文件和日志文件。`cne serve` 控制台按页面所选语言显示，没选过时跟随浏览器；定时任务沿用安装时的语言。
 
 **任何失败都会留下一条日志记录。** Click 只往 stderr 打一行 `Error:` 就结束，定时任务读的是日志文件而不是终端——失败若没成为日志记录，留下的就是一个最后一行停在半路的文件。记录写在命令树的唯一入口，所有已注册命令共用该入口，且每次失败只有一条：用法错误（参数写错、名字不认识）记 `WARNING`，其余记 `ERROR`，未预期的异常还带 traceback。退出码与 Click 的渲染都不变。
 

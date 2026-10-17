@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from cnequity.file_lock import lake_mutation_lock
+from cnequity.i18n import _
 from cnequity.storage.atomic import write_json_atomic
 from cnequity.storage.revisions import RevisionStore, _reject_symlink_path, sha256_file
 
@@ -510,7 +511,7 @@ class LifecycleStore:
         if phase not in ("mark", "purge"):
             raise LifecycleError("Invalid lifecycle plan phase")
         if selected_ids is not None and phase != "purge":
-            raise LifecycleError("手动选择只能用于删除。")
+            raise LifecycleError(_("A manual selection can only be used for deletion."))
         with lake_mutation_lock(self.meta):
             if unfinished(self):
                 raise LifecycleError("Resume unfinished purge before creating another plan")

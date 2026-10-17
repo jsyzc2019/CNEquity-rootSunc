@@ -42,6 +42,12 @@ def _arm_subprocess_network_guard() -> None:
 
 _arm_subprocess_network_guard()
 
+# Output a test asserts on must not depend on the machine's locale: a zh_CN
+# developer box would otherwise render `用法：` where CI renders `Usage:`. Set
+# for the whole process, so CLI subprocesses inherit it too; a test about
+# language selection sets its own and calls `cnequity.i18n.reset()`.
+os.environ["CNE_LANG"] = "en"
+
 
 def pytest_configure(config):
     """Keep Windows ProcessPoolExecutor teardown from aborting the suite.
@@ -245,3 +251,18 @@ def _restore_logging_state():
     root.setLevel(saved[1])
     package.setLevel(saved[2])
     logging.disable(saved[3])
+
+
+@pytest.fixture
+def chinese_output(monkeypatch):
+    """Render CLI output in Chinese, for tests that assert on Chinese wording.
+
+    Messages are English in the code and Chinese in the catalog, so these tests
+    also prove the catalog still says what the CLI used to say.
+    """
+    from cnequity import i18n
+
+    monkeypatch.setenv(i18n.ENV_VAR, "zh_CN")
+    i18n.reset()
+    yield
+    i18n.reset()

@@ -13,6 +13,8 @@ from typing import Any
 
 import polars as pl
 
+from cnequity.i18n import N_, Message
+
 # Windows refuses ``os.replace`` while another handle (DuckDB, Explorer preview,
 # AV) holds the destination. A short backoff covers the common "query just
 # closed" race; persistent locks surface as FileInUseError with a hint.
@@ -84,9 +86,16 @@ def replace_with_retry(tmp: Path | str, path: Path | str) -> None:
                 raise
             raise FileInUseError(
                 exc.errno,
-                f"{path} 正被其他程序占用，重试 {_REPLACE_ATTEMPTS} 次后仍无法替换。"
-                "常见原因：Jupyter/DuckDB/polars 正在读取这份数据、资源管理器打开了该目录，"
-                "或杀毒/同步软件正在扫描。关闭占用的程序后重跑即可",
+                Message(
+                    N_(
+                        "%s is in use by another program and still cannot be replaced after %d "
+                        "attempts. Common causes: Jupyter/DuckDB/polars is reading this data, "
+                        "File Explorer has the folder open, or antivirus/sync software is "
+                        "scanning it. Close the program holding it and run again"
+                    ),
+                    path,
+                    _REPLACE_ATTEMPTS,
+                ),
                 str(tmp),
                 None,
                 str(path),
@@ -111,8 +120,16 @@ def swap_with_backup(staged: Path, target: Path, backup: Path) -> None:
             replace_with_retry(backup, target)
         except OSError as restore_exc:
             raise RollbackIncompleteError(
-                f"替换 {target} 失败，且未能还原原数据；原数据完整保存在 {backup}。"
-                f"关闭占用的程序后，把它改名回 {target.name} 即可恢复"
+                Message(
+                    N_(
+                        "Replacing %s failed and the original could not be restored; it is kept "
+                        "intact at %s. Close the program holding it, then rename it back to %s "
+                        "to recover"
+                    ),
+                    target,
+                    backup,
+                    target.name,
+                )
             ) from restore_exc
         raise
 

@@ -241,6 +241,7 @@ def test_a_changed_file_and_unknown_values_are_refused(config):
     assert path.read_bytes().endswith(b"# edited outside\n")
 
 
+@pytest.mark.usefixtures("chinese_output")
 def test_inline_and_shorthand_tables_are_not_rewritten(tmp_path):
     path = tmp_path / "inline.toml"
     text = f"""
@@ -316,6 +317,7 @@ def test_read_only_and_remote_follow_the_operations_page(config):
     assert preview.json()["token"] is None
 
 
+@pytest.mark.usefixtures("chinese_output")
 def test_normalize_rejects_a_partial_body():
     with pytest.raises(OpsError, match="不完整"):
         normalize({"push2_paused": True})

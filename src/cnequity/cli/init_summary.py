@@ -13,19 +13,20 @@ import json
 from pathlib import Path
 
 from cnequity.cli.demo import MCP_GUIDE_URL
+from cnequity.i18n import N_, _
 
 STEP_LABELS = {
-    "instruments": "证券目录",
-    "trading_calendar": "交易日历",
-    "corporate_actions": "公司行为",
-    "daily_bars": "日线",
-    "index_bars": "指数日线",
-    "trading_status": "交易状态",
-    "compact": "入湖发布",
-    "derive_adj_factors": "复权因子",
-    "derive_industry_index": "行业指数",
-    "audit": "质量审计",
-    "trading_status_derive": "停牌派生",
+    "instruments": N_("security master"),
+    "trading_calendar": N_("trading calendar"),
+    "corporate_actions": N_("corporate actions"),
+    "daily_bars": N_("daily bars"),
+    "index_bars": N_("index daily bars"),
+    "trading_status": N_("trading status"),
+    "compact": N_("publish to the lake"),
+    "derive_adj_factors": N_("adjustment factors"),
+    "derive_industry_index": N_("industry indices"),
+    "audit": N_("quality audit"),
+    "trading_status_derive": N_("suspension derivation"),
 }
 
 
@@ -44,7 +45,7 @@ def save_init_result(log_dir: Path, result: dict) -> Path | None:
 
 def _label(step: str) -> str:
     name = STEP_LABELS.get(step)
-    return f"{name}（{step}）" if name else step
+    return _("{name} ({step})").format(name=_(name), step=step) if name else step
 
 
 def render_init_summary(
@@ -62,39 +63,67 @@ def render_init_summary(
     usable = status != "failed" or bool(result.get("lake_usable"))
     resume = f"cne init{config_arg}"
 
-    lines = ["", "== 建湖结果 =="]
+    lines = ["", _("== Lake build result ==")]
     if status != "failed" and not owed:
-        lines.append(f"✓ 湖已建好，可以使用（run {run_id}）。")
+        lines.append(
+            _("✓ The lake is built and ready to use (run {run_id}).").format(run_id=run_id)
+        )
     elif usable:
-        lines.append(f"✓ 湖已建好，可以查询日线（run {run_id}）。")
-        lines.append("  以下部分这次没有完成，多为数据源暂时不可用：")
+        lines.append(
+            _("✓ The lake is built and daily bars can be queried (run {run_id}).").format(
+                run_id=run_id
+            )
+        )
+        lines.append(
+            _(
+                "  These parts did not finish this time, mostly because a data source was temporarily unavailable:"
+            )
+        )
         lines.extend(f"  - {_label(step)}" for step in owed)
-        lines.append(f"  稍后重跑 `{resume}` 只补这些，已完成的部分不会重来。")
+        lines.append(
+            _(
+                "  Re-run `{resume}` later to fill in only these; finished parts are not redone."
+            ).format(resume=resume)
+        )
     else:
-        lines.append(f"✗ 建湖还没完成（run {run_id}）。已下载的部分都已保存。")
+        lines.append(
+            _(
+                "✗ The lake build has not finished yet (run {run_id}). Everything already downloaded is saved."
+            ).format(run_id=run_id)
+        )
         if owed:
-            lines.append("  还差：" + "、".join(_label(step) for step in owed))
-        lines.append(f"  网络或数据源恢复后重跑 `{resume}`，会从断点续跑。")
-        lines.append("  看哪个数据源不通：cne sources probe" + config_arg)
+            lines.append(_("  Still missing: ") + _(", ").join(_label(step) for step in owed))
+        lines.append(
+            _(
+                "  Once the network or data source is back, re-run `{resume}` to resume where it stopped."
+            ).format(resume=resume)
+        )
+        lines.append(_("  See which data source is unreachable: cne sources probe") + config_arg)
     if log_path is not None:
-        lines.append(f"  日志：{log_path}")
+        lines.append(_("  Log: {log_path}").format(log_path=log_path))
     if result_path is not None:
-        lines.append(f"  完整结果（JSON）：{result_path}")
+        lines.append(_("  Full result (JSON): {result_path}").format(result_path=result_path))
 
     if usable:
         lines += [
             "",
-            "下一步：",
-            f"  cne check{config_arg}          检查数据是否完整、可用",
-            f"  cne serve{config_arg}          在浏览器里看湖",
-            f"  cne run daily{config_arg}      每天运行一次保持更新",
+            _("Next steps:"),
+            _("  cne check{config_arg}          check that the data is complete and usable").format(
+                config_arg=config_arg
+            ),
+            _("  cne serve{config_arg}          browse the lake in a web page").format(
+                config_arg=config_arg
+            ),
+            _("  cne run daily{config_arg}      run once a day to stay up to date").format(
+                config_arg=config_arg
+            ),
             "",
-            "Python：",
+            _("Python:"),
             "  from cnequity.query import load",
             f'  bars = load("daily_bars", symbols=["600519.SH"], data_root="{data_root}")',
             "",
-            "接给 AI（只读 MCP，以 Claude Code 为例）：",
+            _("Connect an AI (read-only MCP, Claude Code as the example):"),
             f"  claude mcp add cnequity -- cne mcp --config {config_abs}",
-            f"其他客户端的写法：{MCP_GUIDE_URL}",
+            _("Other clients: {MCP_GUIDE_URL}").format(MCP_GUIDE_URL=MCP_GUIDE_URL),
         ]
     return lines

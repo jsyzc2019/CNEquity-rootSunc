@@ -27,6 +27,7 @@ from cnequity.diagnostics.source_health import (
     SourceProbe,
     run_probe,
 )
+from cnequity.i18n import N_, Message
 
 #: TDX first: the only probe whose failure stops the init.
 REQUIRED_PROBES = ("tdx_protocol",)
@@ -82,7 +83,7 @@ def _timed_out(probe: SourceProbe, budget: float) -> ProbeResult:
         powers=list(probe.powers),
         status=ProbeStatus.DOWN.value,
         latency_ms=None,
-        detail=f"{budget:g} 秒内没有响应",
+        detail=Message(N_("no response within %g seconds"), budget),
         note=probe.note,
         blast_radius=probe.blast_radius,
     )

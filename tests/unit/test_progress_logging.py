@@ -306,6 +306,7 @@ def test_eta_waits_for_a_full_round_of_lanes(caplog, config, monkeypatch):
     assert all("left" in line for line in lines[4:])
 
 
+@pytest.mark.usefixtures("chinese_output")
 def test_a_run_leaves_a_log_file_behind(tmp_path, capsys):
     """Terminal progress only helps someone watching it; a run that failed
     after three hours has to leave something to read."""
@@ -591,6 +592,7 @@ def test_a_job_log_keeps_info_under_a_host_root_at_warning(tmp_path, monkeypatch
         package.setLevel(prior[2])
 
 
+@pytest.mark.usefixtures("chinese_output")
 def test_the_log_notice_never_contaminates_the_json_on_stdout(tmp_path, monkeypatch):
     """`cne ... | jq` has to keep working after a command learns to log.
 
@@ -689,6 +691,7 @@ def _lake_config(tmp_path):
     return str(cfg)
 
 
+@pytest.mark.usefixtures("chinese_output")
 @pytest.mark.parametrize(
     ("argv", "level", "needle"),
     [

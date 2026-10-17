@@ -52,6 +52,7 @@ def _findings(lake: str, findings: list[dict]):
     )
 
 
+@pytest.mark.usefixtures("chinese_output")
 def test_a_healthy_lake_passes_in_one_command(lake, monkeypatch):
     _status_exits(monkeypatch, 0)
     _findings(lake, [{"severity": "warning", "dataset": "daily_bars", "message": "w"}])
@@ -66,6 +67,7 @@ def test_a_healthy_lake_passes_in_one_command(lake, monkeypatch):
     assert "✓ 湖可用" in result.output
 
 
+@pytest.mark.usefixtures("chinese_output")
 def test_audit_errors_fail_the_check(lake, monkeypatch):
     _status_exits(monkeypatch, 0)
     _findings(lake, [{"severity": "error", "dataset": "adj_factors", "message": "step"}])
@@ -85,6 +87,7 @@ def _health(lake: str, payload: dict):
     )
 
 
+@pytest.mark.usefixtures("chinese_output")
 def test_errors_in_the_whole_lake_snapshot_fail_the_check(lake, monkeypatch):
     """A clean latest run does not vouch for history the snapshot found broken."""
     _status_exits(monkeypatch, 0)
@@ -106,6 +109,7 @@ def test_errors_in_the_whole_lake_snapshot_fail_the_check(lake, monkeypatch):
     assert "全湖审计快照有 1 条 error" in result.output
 
 
+@pytest.mark.usefixtures("chinese_output")
 def test_a_count_only_snapshot_still_fails_on_errors(lake, monkeypatch):
     _status_exits(monkeypatch, 0)
     _findings(lake, [])
@@ -117,6 +121,7 @@ def test_a_count_only_snapshot_still_fails_on_errors(lake, monkeypatch):
     assert "全湖审计快照有 2 条 error" in result.output
 
 
+@pytest.mark.usefixtures("chinese_output")
 def test_full_audit_errors_fail_the_check(lake, monkeypatch):
     _status_exits(monkeypatch, 0)
     _findings(lake, [])
@@ -134,6 +139,7 @@ def test_full_audit_errors_fail_the_check(lake, monkeypatch):
     assert "全湖审计有 1 条 error" in result.output
 
 
+@pytest.mark.usefixtures("chinese_output")
 def test_stale_data_fails_even_when_quality_is_clean(lake, monkeypatch):
     _status_exits(monkeypatch, 1)
     _findings(lake, [])
@@ -153,6 +159,7 @@ def test_no_audit_evidence_cannot_prove_quality(lake, monkeypatch):
     assert "--full" in result.output
 
 
+@pytest.mark.usefixtures("chinese_output")
 def test_full_reruns_the_whole_lake_audit(lake, monkeypatch):
     _status_exits(monkeypatch, 0)
     calls = []
@@ -170,6 +177,7 @@ def test_full_reruns_the_whole_lake_audit(lake, monkeypatch):
     assert "全湖审计（刚刚）：0 error" in result.output
 
 
+@pytest.mark.usefixtures("chinese_output")
 def test_hide_empty_folds_datasets_without_data(lake):
     import polars as pl
 

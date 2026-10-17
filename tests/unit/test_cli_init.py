@@ -1,6 +1,7 @@
 from datetime import date
 from pathlib import Path
 
+import pytest
 from click.testing import CliRunner
 
 from cnequity.cli.main import cli
@@ -27,6 +28,7 @@ names = ["phase1_reference"]
     return str(cfg_path)
 
 
+@pytest.mark.usefixtures("chinese_output")
 def test_init_layout_only_skips_phases(tmp_path, monkeypatch):
     cfg_path = _write_config(tmp_path)
     called = {"phases": False}
@@ -132,6 +134,7 @@ def _init_with(tmp_path, monkeypatch, outcome: dict, *extra: str):
     return result, cfg_path, json_mod.loads(saved.read_text(encoding="utf-8"))
 
 
+@pytest.mark.usefixtures("chinese_output")
 def test_init_ends_with_a_summary_and_saves_the_full_result(tmp_path, monkeypatch):
     outcome = {"run_id": "r1", "status": "success", "phases": [{"phase": "p", "big": "x" * 50}]}
     result, cfg_path, saved = _init_with(tmp_path, monkeypatch, outcome)
@@ -153,6 +156,7 @@ def test_init_json_flag_prints_the_machine_result(tmp_path, monkeypatch):
     assert "建湖结果" not in result.output
 
 
+@pytest.mark.usefixtures("chinese_output")
 def test_a_usable_lake_with_owed_steps_does_not_fail_the_build(tmp_path, monkeypatch):
     outcome = {
         "run_id": "r3",
@@ -169,6 +173,7 @@ def test_a_usable_lake_with_owed_steps_does_not_fail_the_build(tmp_path, monkeyp
     assert f"cne init --config {cfg_path}" in result.output
 
 
+@pytest.mark.usefixtures("chinese_output")
 def test_an_unusable_build_says_how_to_resume(tmp_path, monkeypatch):
     outcome = {
         "run_id": "r4",

@@ -128,7 +128,9 @@ function opsHref(op, params) {
 async function api(path, options) {
   const sep = path.includes("?") ? "&" : "?";
   const url = TOKEN ? `${path}${sep}token=${encodeURIComponent(TOKEN)}` : path;
-  const res = await fetch(url, options);
+  // Server messages (errors, notes) come back in the page's language.
+  const headers = { ...(options?.headers || {}), "X-CNE-Lang": getLang() === "en" ? "en" : "zh-CN" };
+  const res = await fetch(url, { ...options, headers });
   if (!res.ok) {
     // Surface what the server said. A 422 here is usually a real contract
     // message ("requires as_of= for point-in-time queries"), and showing the

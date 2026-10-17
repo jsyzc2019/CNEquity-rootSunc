@@ -435,6 +435,7 @@ def test_mark_requires_confirmation_and_cannot_delete_before_grace(web):
     assert len(store.inspect()["objects"]) == 8
 
 
+@pytest.mark.usefixtures("chinese_output")
 def test_experiment_web_delete_keeps_archive_and_cli_is_blocked(web, tmp_path, monkeypatch):
     client, cfg, store, _ = web
     source = tmp_path / "cne-old"

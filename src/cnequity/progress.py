@@ -21,6 +21,8 @@ import time
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 
+from cnequity.i18n import N_, NP_, Message
+
 logger = logging.getLogger(__name__)
 
 # One minute is longer than any healthy gap measured in a full-market sweep
@@ -38,6 +40,16 @@ def hms(seconds: float) -> str:
     if total >= 60:
         return f"{total // 60}m{total % 60:02d}s"
     return f"{total}s"
+
+
+# The units sweeps count in, for the terminal's translation of progress lines.
+# A unit not listed here is shown as the caller wrote it.
+PROGRESS_UNITS = (
+    NP_("progress unit", "symbols"),
+    NP_("progress unit", "windows"),
+    NP_("progress unit", "datasets"),
+    NP_("progress unit", "boards"),
+)
 
 
 def sweep_progress(
@@ -78,13 +90,13 @@ def sweep_progress(
         elapsed = time.monotonic() - started_at
         eta = ""
         if not first:
-            eta = f" · ~{hms((elapsed / done) * (total - done))} left"
+            eta = Message(N_(" · ~%s left"), hms((elapsed / done) * (total - done)))
         log.info(
-            "%s %d/%d %s · %s elapsed%s",
+            N_("%s %d/%d %s · %s elapsed%s"),
             label,
             done,
             total,
-            unit,
+            Message.word("progress unit", unit),
             hms(elapsed),
             eta,
         )
@@ -107,13 +119,13 @@ def stage_progress(log: logging.Logger, label: str, total: int) -> Callable[...,
     def enter(stage: str, *, held: int | None = None) -> None:
         nonlocal done
         done += 1
-        tail = f" · {held} so far" if held is not None else ""
+        tail = Message(N_(" · %s so far"), held) if held is not None else ""
         log.info(
-            "%s %d/%d %s · %s elapsed%s",
+            N_("%s %d/%d %s · %s elapsed%s"),
             label,
             done,
             total,
-            stage,
+            Message(stage),
             hms(time.monotonic() - started_at),
             tail,
         )
@@ -225,7 +237,7 @@ def _beat_once(interval_seconds: float) -> bool:
     if not active:
         return False
     logger.info(
-        "still working: %s (no output for %s)",
+        N_("still working: %s (no output for %s)"),
         ", ".join(f"{name} {hms(elapsed)}" for name, elapsed in active),
         hms(silent_for),
     )

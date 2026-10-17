@@ -8,6 +8,7 @@ import time
 from datetime import datetime, timedelta
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 
 from cnequity.config import load_config
@@ -548,6 +549,7 @@ def test_mode_reports_a_config_file_that_now_names_another_lake(tmp_path):
     assert mode()["config_drift"] is None
 
 
+@pytest.mark.usefixtures("chinese_output")
 def test_jobs_cannot_start_while_the_config_file_names_another_lake(tmp_path):
     """A job reads the file itself, so it would work on the lake the page is
     not showing. Preview refuses; a token taken before the edit does too."""
@@ -673,6 +675,7 @@ def test_a_later_success_clears_the_continue_init_prompt(config):
     assert all("没跑完" not in note for note in preview["hints"])
 
 
+@pytest.mark.usefixtures("chinese_output")
 def test_init_resume_only_accepts_the_latest_incomplete_run(config):
     manifest = Manifest(config.manifest_path)
     older = manifest.start_run("init", {"phases": ["phase1_reference"], "trade_date": "2026-07-30"})
@@ -747,6 +750,7 @@ def test_real_checks_on_a_sample_lake(tmp_path, monkeypatch):
     assert {status["state"], verify["state"], audit["state"]} <= {"complete", "findings"}
 
 
+@pytest.mark.usefixtures("chinese_output")
 def test_explicit_missing_config_does_not_start_setup(tmp_path, monkeypatch):
     import uvicorn
     from click.testing import CliRunner
@@ -762,6 +766,7 @@ def test_explicit_missing_config_does_not_start_setup(tmp_path, monkeypatch):
     assert "找不到配置" in result.output
 
 
+@pytest.mark.usefixtures("chinese_output")
 def test_missing_default_config_opens_setup_without_binding(tmp_path, monkeypatch):
     from click.testing import CliRunner
 
@@ -854,6 +859,7 @@ def test_loopback_accepts_ipv4_and_ipv6():
             sock.close()
 
 
+@pytest.mark.usefixtures("chinese_output")
 def test_a_taken_loopback_port_is_released_with_the_error():
     import socket
 

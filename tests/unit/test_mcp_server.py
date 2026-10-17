@@ -574,6 +574,7 @@ def test_process_streams_speak_utf8_under_a_gbk_console(lake, monkeypatch):
 # --- the CLI entry point ---------------------------------------------------
 
 
+@pytest.mark.usefixtures("chinese_output")
 def test_mcp_refuses_a_lake_with_nothing_in_it(tmp_path):
     """An MCP client spawns this from a directory of its own choosing. A
     relative data.root then resolves somewhere else, every tool answers "no
@@ -840,6 +841,7 @@ def test_every_tool_is_marked_read_only():
     assert all(d["annotations"] == {"readOnlyHint": True} for d in DESCRIPTORS)
 
 
+@pytest.mark.usefixtures("chinese_output")
 def test_mcp_http_options_need_http():
     from click.testing import CliRunner
 

@@ -1,5 +1,6 @@
 import time
 
+import pytest
 from click.testing import CliRunner
 
 from cnequity.cli.main import cli
@@ -68,7 +69,7 @@ def test_a_probe_past_the_budget_counts_as_down(tmp_path):
     assert time.monotonic() - started < 0.9, "the check must not wait for a slow probe"
     tdx = outcome.results[0]
     assert tdx.status == ProbeStatus.DOWN.value
-    assert "没有响应" in tdx.detail
+    assert "no response" in tdx.detail
     assert not outcome.ok
 
 
@@ -96,6 +97,7 @@ def _config(tmp_path) -> str:
     return str(path)
 
 
+@pytest.mark.usefixtures("chinese_output")
 def test_init_stops_in_seconds_when_tdx_is_unreachable(tmp_path, monkeypatch):
     started: list[bool] = []
     monkeypatch.setattr(preflight, "preflight_skip_reason", lambda config, requested_skip: None)
@@ -121,6 +123,7 @@ def test_init_stops_in_seconds_when_tdx_is_unreachable(tmp_path, monkeypatch):
     assert started == []
 
 
+@pytest.mark.usefixtures("chinese_output")
 def test_init_goes_on_when_only_informational_sources_fail(tmp_path, monkeypatch):
     monkeypatch.setattr(preflight, "preflight_skip_reason", lambda config, requested_skip: None)
     statuses = {"exchange_sse": ProbeStatus.BLOCKED}

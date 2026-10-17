@@ -145,6 +145,7 @@ def test_suspension_requires_independent_session_evidence(source, observed, expe
     )
 
 
+@pytest.mark.usefixtures("chinese_output")
 def test_verify_bars_exits_nonzero_for_unresolved_coverage(monkeypatch):
     monkeypatch.setattr("cnequity.cli.quality_cmds._cfg", lambda path: object())
     monkeypatch.setattr(
