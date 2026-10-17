@@ -240,5 +240,9 @@ export function choiceLabel(field, choice) {
   // `name` is the derive target, which is a dataset for everything but the
   // mapping tables; dsWithCode leaves those as their bare code.
   if (field === "dataset" || field === "datasets" || field === "name") return dsWithCode(choice);
+  if (field === "pack") {
+    const packs = { market: tr("行情", "Market"), fundamentals: tr("基本面", "Fundamentals"), universe: tr("股票池", "Universe") };
+    if (packs[choice]) return packs[choice];
+  }
   return String(choice ?? "");
 }

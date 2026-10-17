@@ -901,13 +901,15 @@ def confirm_level(spec: OpSpec, params: dict[str, Any]) -> str:
 
 
 def acknowledgements(spec: OpSpec, level: str) -> list[dict[str, str]]:
-    if level == "none":
+    # Clicking Start after a preview is the confirmation for routine work; a
+    # checkbox that only repeats "start this now" adds a click and no
+    # information. Heavy work still names its specific cost.
+    if level != "heavy":
         return []
+    if spec.heavy_text:
+        return [{"id": "heavy", "text": zh(spec.heavy_text), "text_en": en(spec.heavy_text)}]
     text = STANDARD_ACK["text"]
-    items = [{**STANDARD_ACK, "text": zh(text), "text_en": en(text)}]
-    if level == "heavy" and spec.heavy_text:
-        items.append({"id": "heavy", "text": zh(spec.heavy_text), "text_en": en(spec.heavy_text)})
-    return items
+    return [{**STANDARD_ACK, "text": zh(text), "text_en": en(text)}]
 
 
 def lock_class_for(spec: OpSpec, params: dict[str, Any], config) -> str:
