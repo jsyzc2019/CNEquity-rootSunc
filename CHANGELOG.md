@@ -2,6 +2,12 @@
 
 这里记录面向用户的主要功能、修复与兼容性变化。历史版本中的命令名反映当时的接口；当前用法以 [CLI 参考](docs/zh/reference/cli.md)为准。升级前阅读[升级与兼容性](docs/zh/getting-started/installation.md#升级与兼容性)。
 
+## [0.17.1] — 2026-10-18
+
+- **升级步骤：** `pip install -U cnequity` 后重启 `cne serve`。数据集契约没有变化，不需要迁移数据或改配置。
+- `cne serve` 启动任务少点几步，概览页更紧凑；修正面板中英文文案。
+- 文档站切换语言时停留在当前页面；中文站内搜索按词切分，搜索中文词能命中；首页、导航与 CLI、schema 参考重新整理，更易浏览。
+
 ## [0.17.0] — 2026-10-17
 
 - **升级步骤：** `pip install -U cnequity` 后重启 `cne serve` 和已在运行的 `cne mcp`。除 `institutional_holdings` 的单位声明外，数据集契约没有变化，不需要迁移数据或改配置。经历过东财中断的湖，升级后对受影响窗口运行一次 `cne repair status-outages --start <起> --end <止>`（先预览，再加 `--apply`）；补跑过估值的湖运行 `cne repair misdated-valuation`。两条命令都发布新版本，旧版本保留。
