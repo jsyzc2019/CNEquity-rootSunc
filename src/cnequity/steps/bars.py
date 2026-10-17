@@ -4358,7 +4358,14 @@ def _learn_suspensions_from_baostock(
         "trading_status",
         frame,
         source="baostock",
-        batch_id=f"suspension-evidence-{start.isoformat()}-{end.isoformat()}",
+        # One file per symbol set: a run can ask twice about the same window
+        # (the gap-fill and the interior-gap pass), and a shared name let the
+        # second pass replace the first's rows after its bars were already
+        # excused by them — those names then had neither rows nor a debt.
+        batch_id=(
+            f"suspension-evidence-{start.isoformat()}-{end.isoformat()}-"
+            + hashlib.sha256(",".join(symbols).encode()).hexdigest()[:12]
+        ),
     )
     logger.info(
         "learned %d suspended session(s) for %d symbol(s) from baostock; "
