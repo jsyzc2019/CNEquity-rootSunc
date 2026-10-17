@@ -1,4 +1,4 @@
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 import polars as pl
 import pytest
@@ -329,7 +329,7 @@ def _write_status_history(cfg, rows: list[tuple[str, date, str, str]]) -> None:
                 "risk_warning": [False] * len(selected),
                 "source": [source for *_, source in selected],
                 "data_version": ["v1"] * len(selected),
-                "fetched_at": [datetime(2026, 1, 1, tzinfo=UTC)] * len(selected),
+                "fetched_at": [datetime(2026, 1, 1, tzinfo=timezone.utc)] * len(selected),
             }
         ).write_parquet(part / "part-merged.parquet")
 

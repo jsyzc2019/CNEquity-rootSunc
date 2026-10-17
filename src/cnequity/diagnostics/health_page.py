@@ -177,7 +177,7 @@ def render_page(reports: list[HealthReport]) -> str:
 
     head = [
         "<main>",
-        f"<h1>{_e(_('A-share public data source health'))}</h1>",
+        "<h1>" + _e(_("A-share public data source health")) + "</h1>",
         '<p class="sub">'
         + _(
             "These are the dozen or so endpoints that AkShare, data-fetching skills and your own "
@@ -195,10 +195,10 @@ def render_page(reports: list[HealthReport]) -> str:
 
     rows = [
         '<div class="scroll"><table><thead><tr>',
-        f'<th class="src">{_e(_("Data source"))}</th>',
+        '<th class="src">' + _e(_("Data source")) + "</th>",
     ]
     rows += [f"<th>{_e(_vantage_label(v))}</th>" for v in vantages]
-    rows.append(f"<th>{_e(_('Affected datasets'))}</th></tr></thead><tbody>")
+    rows.append("<th>" + _e(_("Affected datasets")) + "</th></tr></thead><tbody>")
 
     shared = Counter(probe.blast_radius for probe in PROBES)
     last_radius = None
@@ -246,13 +246,13 @@ def render_page(reports: list[HealthReport]) -> str:
         rows.append("</tr>")
     rows.append("</tbody></table></div>")
 
-    legend = [f"<h2>{_e(_('What the states mean'))}</h2>", '<ul class="legend">']
+    legend = ["<h2>" + _e(_("What the states mean")) + "</h2>", '<ul class="legend">']
     for status in _STATUS_ORDER:
         legend.append(f"<li>{_chip(status)}<span>{_e(_(STATUS_MEANING[status]))}</span></li>")
     legend.append("</ul>")
 
     caveats = [
-        f"<h2>{_e(_('How to read this table'))}</h2>",
+        "<h2>" + _e(_("How to read this table")) + "</h2>",
         '<div class="caveats">',
         _(
             "<p><b>One probe is not an SLA.</b> Each source gets one request per probe. Green "
@@ -297,7 +297,7 @@ def render_page(reports: list[HealthReport]) -> str:
         "<!doctype html>\n"
         f'<html lang="{"en" if current_language() == "en" else "zh-CN"}"><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width, initial-scale=1">'
-        f"<title>{_e(_('A-share public data source health'))} · cnequity</title>"
+        "<title>" + _e(_("A-share public data source health")) + " · cnequity</title>"
         f'<meta name="description" content="{_e(_(DESCRIPTION))}">'
         f"<style>{_CSS}</style></head><body>\n{body}\n</body></html>\n"
     )
