@@ -9,6 +9,7 @@ CNEquity 将股票行情、期货合约、财报、公司事件和资金面等�
 [![PyPI](https://img.shields.io/pypi/v/cnequity?logo=pypi&logoColor=white)](https://pypi.org/project/cnequity/)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)](docs/zh/getting-started/installation.md)
 [![Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
+[![Glama MCP score](https://glama.ai/mcp/servers/rootSunc/CNEquity/badges/score.svg)](https://glama.ai/mcp/servers/rootSunc/CNEquity)
 
 [English](README.en.md) · [完整文档](https://rootsunc.github.io/CNEquity/) · [数据集目录](docs/zh/datasets/catalog.md) · [更新日志](CHANGELOG.md)
 </div>
