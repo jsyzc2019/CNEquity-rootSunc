@@ -200,6 +200,8 @@ ST, suspended, CDR and delisted names are kept under every value — dropping th
 
 Explicitly enabling `[universe].ingest_listed_funds = true` adds listed ETF/LOF from the security master to daily fetching; research eligibility only filters research selections. Known prelisting and post-delisting sessions are excluded. Unknown listing dates are still requested and listed separately in per-security coverage; they cannot certify completeness. An unreadable catalog fails explicitly, and empty source responses remain gaps. This switch takes precedence over the legacy `ingest_eligible_etfs`. The legacy switch still fetches only research-eligible ETFs, but a failed, missing or more than 14-day-old eligibility catalog now raises an error.
 
+With fund ingestion off, the full corporate-actions sweep skips ETF/LOF. If either switch is turned on later, the daily corporate-actions step sweeps the xdxr history of funds never swept before, at most 500 per run (about 2,200 market-wide, so it takes a few days); newly listed funds are swept once as well. Until the sweep finishes, each run warns `fund_history_unswept` and lists some of the codes; meanwhile those funds' adjustment factors lack their older unit splits.
+
 ## `[job.daily.waves]`
 
 Wave DAG: each wave has `name`, `parallel` (whether steps within the wave run in parallel) and `steps` (a list of step names).

@@ -1,4 +1,4 @@
-# Python API 参考
+# Python API
 
 模块：`cnequity.query`。先看[查询指南](../datasets/query-guide.md)理解口径；本页用于查参数、返回值和版本边界。
 

@@ -38,7 +38,7 @@ The generator handles TOML path escaping. PowerShell 5.1 does not support `&&`, 
 
 ## Install from source
 
-The repository's main branch may be ahead of the stable PyPI release; to use features just added to the development tree, install from source and record the commit.
+The repository's main branch may be ahead of the stable PyPI release; to use features on main that are not yet released, install from source and record the commit.
 
 ```bash
 git clone https://github.com/rootSunc/CNEquity.git

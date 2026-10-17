@@ -1,20 +1,8 @@
-# CLI Reference
+# CLI reference
 
 Options and defaults are generated automatically by Click in the [options reference](cli-options.md); the network/write boundary of every command is in the [full side-effect inventory](cli-surface.md); source selection and request cost are in [Fetching and source protection](../operations/fetch-policy.md).
 
-Command: `cne` (`cnequity.cli.main:cli`)
-
-Leaf commands that support configuration accept `--config PATH`; resolution order is explicit option → `CNE_CONFIG` → `configs/cnequity.toml` in the current working directory. For example, `cne status --config /abs/path/to/cnequity.toml`.
-
-**Command names are case-insensitive**: `cne STATUS`, `cne run DAILY` and `cne config CREATE` are equivalent to their lowercase forms (Click's `token_normalize_func`). `-h` is short for `--help`. **There is no prefix matching**: `cne stat` is rejected with a hint pointing to `stats` / `status`, rather than guessing one and running it.
-
-**Every command has a process log.** The pipeline's own INFO records are attached to stderr once, at the root of the command tree, so the JSON contract on stdout is unaffected. Long-running ingestion and maintenance commands also tee their logs into `{data.root}/logs/cne-<command>-<timestamp>.log` (`cne run clean --log-retention-days` can preview expired logs). `cne mcp` and `cne serve` manage their own logging: the former's stdout is the JSON-RPC wire, so stderr must stay at WARNING; the latter hands logging to uvicorn. An interactive terminal gets a short view: time of day only, warnings and errors tagged, no logger name, with steps, heartbeats and progress in the display language. Redirected output (a pipe, a scheduler capturing stderr, CI) keeps the full format, and the log file is always in the full English format, so it stays searchable and can be pasted into an issue.
-
-**Display language.** Help, prompts, errors and closing summaries are available in English and Chinese. The language comes from the `CNE_LANG` environment variable (`en` or `zh_CN`; spellings like `zh-CN` also work), then the system locale (`LC_ALL` / `LC_MESSAGES` / `LANG`; on Windows, the UI language), and is English when neither says; a Traditional Chinese locale gets English. To read Chinese on an English system: `export CNE_LANG=zh_CN` (PowerShell: `$env:CNE_LANG = "zh_CN"`). What never changes with the language: JSON output such as `--json` (its explanatory text is always English), markers like `HEALTHY` / `STALE`, exit codes, data files and log files. The `cne serve` console shows the language chosen on the page, following the browser until one is chosen; scheduled tasks keep the language they were installed in.
-
-**Every failure leaves a log record.** Click only prints one `Error:` line to stderr and stops, and scheduled jobs read the log file, not the terminal; if a failure never becomes a log record, all that remains is a file whose last line stops halfway. The record is written at the single entry point of the command tree, which all registered commands share, and there is exactly one per failure: usage errors (a mistyped option, an unknown name) are logged at `WARNING`, everything else at `ERROR`, and unexpected exceptions also carry a traceback. Exit codes and Click's rendering are unchanged.
-
-**Six commands do not accept `--config`**: `cne contract show|validate|diff`, `cne profile list|show`, `cne sources policy`. They read the registry shipped with the package rather than a lake, so they give the same answer whichever lake they point at. `cne doctor` is the opposite: it accepts `--config`, but also runs without a configuration (which is exactly the situation it exists for).
+Conventions shared by every command (`--config` resolution, case, logs, display language, failure records) are collected under [Conventions](#conventions).
 
 ## Command index
 
@@ -106,6 +94,22 @@ Error: `cne retry` 已改名，请改用 `cne run retry`。
 | `cne servers test` | `cne sources probe --only tdx_protocol` | Long deprecated, announced for removal in 0.9.0 but kept until 0.10 |
 
 The top-level mapping is defined by `MOVED` in `cnequity/cli/_root.py`; old names inside a group are hinted by `moved_hints`. The hint does not run the old command.
+
+## Conventions
+
+Command: `cne` (`cnequity.cli.main:cli`)
+
+Leaf commands that support configuration accept `--config PATH`; resolution order is explicit option → `CNE_CONFIG` → `configs/cnequity.toml` in the current working directory. For example, `cne status --config /abs/path/to/cnequity.toml`.
+
+**Command names are case-insensitive**: `cne STATUS`, `cne run DAILY` and `cne config CREATE` are equivalent to their lowercase forms (Click's `token_normalize_func`). `-h` is short for `--help`. **There is no prefix matching**: `cne stat` is rejected with a hint pointing to `stats` / `status`, rather than guessing one and running it.
+
+**Every command has a process log.** The pipeline's own INFO records are attached to stderr once, at the root of the command tree, so the JSON contract on stdout is unaffected. Long-running ingestion and maintenance commands also tee their logs into `{data.root}/logs/cne-<command>-<timestamp>.log` (`cne run clean --log-retention-days` can preview expired logs). `cne mcp` and `cne serve` manage their own logging: the former's stdout is the JSON-RPC wire, so stderr must stay at WARNING; the latter hands logging to uvicorn. An interactive terminal gets a short view: time of day only, warnings and errors tagged, no logger name, with steps, heartbeats and progress in the display language. Redirected output (a pipe, a scheduler capturing stderr, CI) keeps the full format, and the log file is always in the full English format, so it stays searchable and can be pasted into an issue.
+
+**Display language.** Help, prompts, errors and closing summaries are available in English and Chinese. The language comes from the `CNE_LANG` environment variable (`en` or `zh_CN`; spellings like `zh-CN` also work), then the system locale (`LC_ALL` / `LC_MESSAGES` / `LANG`; on Windows, the UI language), and is English when neither says; a Traditional Chinese locale gets English. To read Chinese on an English system: `export CNE_LANG=zh_CN` (PowerShell: `$env:CNE_LANG = "zh_CN"`). What never changes with the language: JSON output such as `--json` (its explanatory text is always English), markers like `HEALTHY` / `STALE`, exit codes, data files and log files. The `cne serve` console shows the language chosen on the page, following the browser until one is chosen; scheduled tasks keep the language they were installed in.
+
+**Every failure leaves a log record.** Click only prints one `Error:` line to stderr and stops, and scheduled jobs read the log file, not the terminal; if a failure never becomes a log record, all that remains is a file whose last line stops halfway. The record is written at the single entry point of the command tree, which all registered commands share, and there is exactly one per failure: usage errors (a mistyped option, an unknown name) are logged at `WARNING`, everything else at `ERROR`, and unexpected exceptions also carry a traceback. Exit codes and Click's rendering are unchanged.
+
+**Six commands do not accept `--config`**: `cne contract show|validate|diff`, `cne profile list|show`, `cne sources policy`. They read the registry shipped with the package rather than a lake, so they give the same answer whichever lake they point at. `cne doctor` is the opposite: it accepts `--config`, but also runs without a configuration (which is exactly the situation it exists for).
 
 ## cne init --profile demo | sample
 

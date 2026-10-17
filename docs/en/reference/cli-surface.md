@@ -1,4 +1,4 @@
-# CLI side-effect inventory
+# Network and write inventory
 
 Checked against the Click command registry by `scripts/dev/sync_docs.py`. “When run” means when the command body executes; `--help` executes nothing. For source selection and limits, see [Fetching and source protection](../operations/fetch-policy.md).
 

@@ -1,4 +1,4 @@
-# Python API reference
+# Python API
 
 Module: `cnequity.query`. Read the [query guide](../datasets/query-guide.md) first to understand the semantics; this page is for looking up parameters, return values, and version boundaries.
 

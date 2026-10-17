@@ -1,4 +1,4 @@
-# MCP: connecting the lake to AI agents
+# MCP integration: connecting the lake to AI agents
 
 `cne serve` shows the lake to people, and its operations page can also start allowlisted fetches and daily updates. `cne mcp` gives the lake to models, and it is **read-only**: there is no entry point here that triggers fetching, retries, or cleanup.
 

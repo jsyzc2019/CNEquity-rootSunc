@@ -1,14 +1,18 @@
 # 数据集目录
 
-cnequity 的注册数据集包含 curated 数据和 derived 数据（`adj_factors`、`industry_index`、`futures_continuous`、`option_greeks`、`delisting_events`，以及默认不计算、按需派生的 `minute_bars_15m` / `minute_bars_30m` / `minute_bars_60m`），按选股用途分为 L0–L9 十类。另有 **on-demand** 数据集不进 curated 主路径。其中日内数据集 `minute_bars` / `minute_bars_5m` 默认关闭，需在 `[minute_bars]` 显式开启；分笔 `trade_ticks` 同样默认关闭，开关在**独立的** `[trade_ticks]`。期货/期权主表（`futures_contracts`、`option_contracts`、`futures_bars`、`option_bars`）默认关闭，开关在 `[futures]`，不进 `cne init`（见 [产品边界](../architecture/overview.md)）。
+本页回答两件事：湖里登记了哪些数据集，以及每个数据集从哪来、能补多远。先按下方 L0–L9 分层找到数据集，再看它的采集语义和历史限制；要复制查询代码，去[查询指南](query-guide.md)。
 
-注册表包含可选、兼容和停用源占位入口：`flash_news_wire` 是新闻兼容读取，`economic_calendar` 为停用源占位。注册数不是物理独立表数，也不是默认采集完成数。
+| 想查 | 去哪里 |
+|------|--------|
+| 字段、类型和单位 | [字段与单位](schema.md) |
+| 每个来源的限制和更新频率 | [数据源与历史限制](sources.md) |
+| 程序里查起点和历史模式 | `list_datasets()` 的 `coverage_start` / `coverage_end` / `history_mode` / `backfill_source` |
 
-先按下方 L0–L9 找数据，再核对采集语义和历史限制；需要复制查询示例时转到[查询指南](query-guide.md)。
-
-权威字段定义：[schema.md](schema.md)。逐源限制：[sources.md](sources.md)。
-
-程序化可用起点与历史模式：`list_datasets()` → `coverage_start` / `coverage_end` / `history_mode` / `backfill_source`。
+!!! note "登记不等于默认采集"
+    - 默认关闭、需要显式开启：分钟线 `minute_bars` / `minute_bars_5m`（`[minute_bars]`）、分笔 `trade_ticks`（独立的 `[trade_ticks]`）、期货/期权四张主表 `futures_contracts`、`option_contracts`、`futures_bars`、`option_bars`（`[futures]`，不进 `cne init`，见[产品边界](../architecture/overview.md)）。
+    - derived 数据由已入湖数据派生：`adj_factors`、`industry_index`、`futures_continuous`、`option_greeks`、`delisting_events`；`minute_bars_15m` / `30m` / `60m` 默认不计算，按需派生。
+    - **on-demand** 数据集不进 curated 主路径。`flash_news_wire` 是新闻兼容读取，`economic_calendar` 是停用源占位。
+    - 所以登记数既不是物理表数，也不是默认采集完成数。
 
 **图例**（下表）：语义 `by_date` / `snapshot`；水位 ✓ = 维护 `meta/state` 水位。
 

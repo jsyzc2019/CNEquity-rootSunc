@@ -1,14 +1,18 @@
 # Dataset catalog
 
-cnequity's registered datasets include curated data and derived data (`adj_factors`, `industry_index`, `futures_continuous`, `option_greeks`, `delisting_events`, plus `minute_bars_15m` / `minute_bars_30m` / `minute_bars_60m`, which are not computed by default and are derived on request), grouped by stock-selection use into ten tiers, L0–L9. There are also **on-demand** datasets that stay off the curated main path. Among them, the intraday datasets `minute_bars` / `minute_bars_5m` are off by default and must be enabled explicitly in `[minute_bars]`; trade ticks (`trade_ticks`) are also off by default, with the switch in a **separate** `[trade_ticks]` section. The futures/options main tables (`futures_contracts`, `option_contracts`, `futures_bars`, `option_bars`) are off by default, are switched on in `[futures]`, and are not part of `cne init` (see [Product boundaries](../architecture/overview.md)).
+This page answers two questions: which datasets the lake registers, and where each one comes from and how far back it goes. Find a dataset by the L0–L9 tiers below, then check its collection semantics and history limits; for query code to copy, go to the [Query guide](query-guide.md).
 
-The registry includes optional entries, compatibility entries and placeholders for retired sources: `flash_news_wire` is a compatibility read for news, and `economic_calendar` is a placeholder for a retired source. The registered count is neither the number of physically separate tables nor the number of datasets collected by default.
+| To look up | Go to |
+|------|--------|
+| Columns, types and units | [Fields and units](schema.md) |
+| Each source's limits and update frequency | [Sources and history limits](sources.md) |
+| Start dates and history mode from code | `list_datasets()` → `coverage_start` / `coverage_end` / `history_mode` / `backfill_source` |
 
-Find data by the L0–L9 tiers below first, then check the collection semantics and history limits; for query examples to copy, go to the [Query guide](query-guide.md).
-
-Authoritative field definitions: [schema.md](schema.md). Per-source limits: [sources.md](sources.md).
-
-Programmatic availability start and history mode: `list_datasets()` → `coverage_start` / `coverage_end` / `history_mode` / `backfill_source`.
+!!! note "Registered does not mean collected by default"
+    - Off by default and enabled explicitly: minute bars `minute_bars` / `minute_bars_5m` (`[minute_bars]`), trade ticks `trade_ticks` (a separate `[trade_ticks]` section), and the four futures/options main tables `futures_contracts`, `option_contracts`, `futures_bars`, `option_bars` (`[futures]`, not part of `cne init`; see [Product boundaries](../architecture/overview.md)).
+    - Derived datasets are computed from ingested data: `adj_factors`, `industry_index`, `futures_continuous`, `option_greeks`, `delisting_events`; `minute_bars_15m` / `30m` / `60m` are not computed by default and are derived on request.
+    - **On-demand** datasets stay off the curated main path. `flash_news_wire` is a compatibility read for news, and `economic_calendar` is a placeholder for a retired source.
+    - So the registered count is neither the number of physical tables nor the number collected by default.
 
 **Legend** (tables below): semantics `by_date` / `snapshot`; watermark ✓ = maintains a `meta/state` watermark.
 

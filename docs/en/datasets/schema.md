@@ -1,6 +1,23 @@
-# Schema contract
+# Fields and units
 
 This page is for looking up columns, types and units. For what each dataset is for, see the [catalog](catalog.md); for how to read data, see the [query guide](query-guide.md); for compatibility and versioning, see the [data contract](contract.md). Column names and types are synced by `scripts/dev/sync_docs.py`; the explanatory text is maintained by hand.
+
+### Find by layer
+
+Ordered by [research layer](catalog.md#data-tiers); click a name to jump to its column definitions.
+
+| Layer | Datasets |
+|------|--------|
+| **L0** Reference | [instruments](#instruments), [etf_profiles](#etf_profiles), [trading_calendar](#trading_calendar), [trading_status](#trading_status) |
+| **L1** Prices | [daily_bars](#daily_bars), [index_bars](#index_bars), [minute_bars](#minute_bars--minute_bars_5m), [minute_bars_5m](#minute_bars--minute_bars_5m), [trade_ticks](#trade_ticks), [adj_factors](#adj_factors), [minute_bars_15m](#minute_bars_15m--minute_bars_30m--minute_bars_60m), [minute_bars_30m](#minute_bars_15m--minute_bars_30m--minute_bars_60m), [minute_bars_60m](#minute_bars_15m--minute_bars_30m--minute_bars_60m), [delisting_events](#delisting_events) |
+| **L2** Corporate events | [corporate_actions](#corporate_actions), [announcement_index](#announcement_index), [earnings_disclosure_schedule](#earnings_disclosure_schedule) |
+| **L3** Fundamentals | [financial_statement_items](#financial_statement_items), [share_structure](#share_structure), [shareholder_counts](#shareholder_counts), [top_holders](#top_holders), [valuation_metrics](#valuation_metrics), [analyst_consensus](#analyst_consensus) |
+| **L4** Capital flows | [fund_flow](#fund_flow), [margin_trading](#margin_trading), [northbound_holdings](#northbound_holdings), [northbound_flows](#northbound_flows), [dragon_tiger](#dragon_tiger), [block_trades](#block_trades), [institutional_holdings](#institutional_holdings), [fund_flow_ths](#fund_flow_ths) |
+| **L5** Industry structure | [sector_members](#sector_members), [index_constituents](#index_constituents), [industry_members](#industry_members), [industry_index](#industry_index) |
+| **L6** Macro | [macro_indicators](#macro_indicators), [market_breadth](#market_breadth) |
+| **L7** Sentiment / rotation | [sentiment_scores](#sentiment_scores), [hot_rank](#hot_rank), [sector_bars](#sector_bars), [sector_fund_flow](#sector_fund_flow), [sector_fund_flow_ths](#sector_fund_flow_ths), [news_headlines](#news_headlines), [flash_news_wire](#flash_news_wire), [economic_calendar](#economic_calendar) |
+| **L8** Risk and compliance | [share_unlock_schedule](#share_unlock_schedule), [regulatory_events](#regulatory_events) |
+| **L9** Derivatives | [commodity_bars](#commodity_bars), [futures_contracts](#futures_contracts), [option_contracts](#option_contracts), [futures_bars](#futures_bars), [futures_minute_bars](#futures_minute_bars), [option_bars](#option_bars), [futures_continuous](#futures_continuous), [option_greeks](#option_greeks) |
 
 ### Global conventions
 

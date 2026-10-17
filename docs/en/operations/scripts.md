@@ -1,4 +1,4 @@
-# Scripts
+# Repository scripts
 
 Path: `scripts/`
 
@@ -45,7 +45,8 @@ In a later window, the separate `stale_pipeline.sh` catches up only the snapshot
 `CNE_SOURCE_VANTAGE` (default `local`; set it to a stable, truthful egress label such as `cn` or
 `overseas`),
 `CNE_TRADE_DATE`,
-`CNE_BIN` (overrides the `cne` path; used by tests that exercise the control flow with a stub).
+`CNE_BIN` (overrides the `cne` path; used by tests that exercise the control flow with a stub),
+`CNE_PYTHON` (interpreter for the gate and the scheduler lock; defaults to the repository's `.venv/bin/python`, or the `python3` on PATH when there is no `.venv`; it must be able to import cnequity).
 
 At the end it prints a per-group summary (`group: OK|FAILED [gate|soft]`) plus `stale-retry: OK|FAILED|not needed|skipped`, making it easy to tell "the gate broke" from "EastMoney broke". A catch-up failure counts as soft.
 
@@ -73,7 +74,7 @@ If the previous run is still going, it skips and exits 0: every group rereads it
 
 **Mutually exclusive with the daily update**: it shares the same lock from `scheduler_lock.sh` with `daily_pipeline.sh`. launchd may trigger it while the main pipeline is still running — in that case it **skips** (exit 0) rather than queueing, because the next window can try again, and duplicate runs must never pile up behind ingestion.
 
-Environment variables: `CNE_BIN` / `CNE_CONFIG` / `CNE_LOG_DIR`, optionally `CNE_STALE_GROUPS`, `CNE_TRADE_DATE`.
+Environment variables: `CNE_BIN` / `CNE_CONFIG` / `CNE_LOG_DIR`, optionally `CNE_STALE_GROUPS`, `CNE_TRADE_DATE`, `CNE_PYTHON` (as above).
 
 ### scheduler_lock.sh
 

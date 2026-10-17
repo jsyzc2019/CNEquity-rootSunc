@@ -1,6 +1,23 @@
-# Schema 契约
+# 字段与单位
 
 本页用于查字段、类型和单位。数据集用途见[目录](catalog.md)，读取方式见[查询指南](query-guide.md)，兼容性与版本见[数据契约](contract.md)。列名与类型由 `scripts/dev/sync_docs.py` 同步，解释文字人工维护。
+
+### 按层查找
+
+按[研究分层](catalog.md#数据分层)排列，点名字跳到该数据集的列定义。
+
+| 层次 | 数据集 |
+|------|--------|
+| **L0** 基础参考 | [instruments](#instruments), [etf_profiles](#etf_profiles), [trading_calendar](#trading_calendar), [trading_status](#trading_status) |
+| **L1** 行情 | [daily_bars](#daily_bars), [index_bars](#index_bars), [minute_bars](#minute_bars--minute_bars_5m), [minute_bars_5m](#minute_bars--minute_bars_5m), [trade_ticks](#trade_ticks), [adj_factors](#adj_factors), [minute_bars_15m](#minute_bars_15m--minute_bars_30m--minute_bars_60m), [minute_bars_30m](#minute_bars_15m--minute_bars_30m--minute_bars_60m), [minute_bars_60m](#minute_bars_15m--minute_bars_30m--minute_bars_60m), [delisting_events](#delisting_events) |
+| **L2** 公司事件 | [corporate_actions](#corporate_actions), [announcement_index](#announcement_index), [earnings_disclosure_schedule](#earnings_disclosure_schedule) |
+| **L3** 基本面 | [financial_statement_items](#financial_statement_items), [share_structure](#share_structure), [shareholder_counts](#shareholder_counts), [top_holders](#top_holders), [valuation_metrics](#valuation_metrics), [analyst_consensus](#analyst_consensus) |
+| **L4** 资金面 | [fund_flow](#fund_flow), [margin_trading](#margin_trading), [northbound_holdings](#northbound_holdings), [northbound_flows](#northbound_flows), [dragon_tiger](#dragon_tiger), [block_trades](#block_trades), [institutional_holdings](#institutional_holdings), [fund_flow_ths](#fund_flow_ths) |
+| **L5** 结构行业 | [sector_members](#sector_members), [index_constituents](#index_constituents), [industry_members](#industry_members), [industry_index](#industry_index) |
+| **L6** 宏观 | [macro_indicators](#macro_indicators), [market_breadth](#market_breadth) |
+| **L7** 舆情 / 轮动 | [sentiment_scores](#sentiment_scores), [hot_rank](#hot_rank), [sector_bars](#sector_bars), [sector_fund_flow](#sector_fund_flow), [sector_fund_flow_ths](#sector_fund_flow_ths), [news_headlines](#news_headlines), [flash_news_wire](#flash_news_wire), [economic_calendar](#economic_calendar) |
+| **L8** 风险合规 | [share_unlock_schedule](#share_unlock_schedule), [regulatory_events](#regulatory_events) |
+| **L9** 衍生品 | [commodity_bars](#commodity_bars), [futures_contracts](#futures_contracts), [option_contracts](#option_contracts), [futures_bars](#futures_bars), [futures_minute_bars](#futures_minute_bars), [option_bars](#option_bars), [futures_continuous](#futures_continuous), [option_greeks](#option_greeks) |
 
 ### 全局约定
 

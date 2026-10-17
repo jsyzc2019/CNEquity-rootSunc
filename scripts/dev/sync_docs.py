@@ -455,7 +455,7 @@ def _surface_leaves(group: click.Group, prefix: str = "") -> list[str]:
 
 _SURFACE_HEAD = {
     "zh": [
-        "# CLI 命令副作用清单",
+        "# 联网与写入清单",
         "",
         "由 `scripts/dev/sync_docs.py` 从 Click 命令注册表核对。‘执行时’指运行命令主体；`--help` 不执行。详细源选择与限制见[取数策略](../operations/fetch-policy.md)。",
         "",
@@ -463,7 +463,7 @@ _SURFACE_HEAD = {
         "|---|---|---|",
     ],
     "en": [
-        "# CLI side-effect inventory",
+        "# Network and write inventory",
         "",
         "Checked against the Click command registry by `scripts/dev/sync_docs.py`. \u201cWhen run\u201d means when the command body executes; `--help` executes nothing. For source selection and limits, see [Fetching and source protection](../operations/fetch-policy.md).",
         "",

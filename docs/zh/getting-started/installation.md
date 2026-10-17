@@ -38,7 +38,7 @@ cne init
 
 ## 从源码安装
 
-仓库主分支可能领先于稳定 PyPI 版；若要使用开发树刚加入的功能，使用源码安装，并记录 commit。
+仓库主分支可能领先于稳定 PyPI 版；若要使用 main 上尚未发布的功能，使用源码安装，并记录 commit。
 
 ```bash
 git clone https://github.com/rootSunc/CNEquity.git

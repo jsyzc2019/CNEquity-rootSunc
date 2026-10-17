@@ -1,4 +1,4 @@
-# CLI 命令副作用清单
+# 联网与写入清单
 
 由 `scripts/dev/sync_docs.py` 从 Click 命令注册表核对。‘执行时’指运行命令主体；`--help` 不执行。详细源选择与限制见[取数策略](../operations/fetch-policy.md)。
 

@@ -1,4 +1,4 @@
-# 脚本说明
+# 仓库脚本
 
 路径：`scripts/`
 
@@ -45,7 +45,8 @@ cne run clean
 `CNE_SOURCE_VANTAGE`（默认 `local`；应设为稳定且真实的出口标签，如 `cn` 或
 `overseas`）、
 `CNE_TRADE_DATE`、
-`CNE_BIN`（覆盖 `cne` 路径；供用 stub 跑通控制流的测试用）。
+`CNE_BIN`（覆盖 `cne` 路径；供用 stub 跑通控制流的测试用）、
+`CNE_PYTHON`（门控与调度锁使用的解释器；默认仓库 `.venv/bin/python`，没有 `.venv` 时用 PATH 上的 `python3`，须能导入 cnequity）。
 
 结束时打印分组摘要（`group: OK|FAILED [gate|soft]`）外加 `stale-retry: OK|FAILED|not needed|skipped`，便于区分「门禁挂了」与「东财挂了」。补抓失败算 soft。
 
@@ -73,7 +74,7 @@ cne run clean
 
 **与日更互斥**：和 `daily_pipeline.sh` 共用 `scheduler_lock.sh` 的同一把锁。launchd 可能在主 pipeline 还没跑完时触发它——这时它**直接跳过**（退出 0）而不是排队，因为下一个窗口还能再试，而重复的 run 绝不该堆在采集后面。
 
-环境变量：`CNE_BIN` / `CNE_CONFIG` / `CNE_LOG_DIR`，可选 `CNE_STALE_GROUPS`、`CNE_TRADE_DATE`。
+环境变量：`CNE_BIN` / `CNE_CONFIG` / `CNE_LOG_DIR`，可选 `CNE_STALE_GROUPS`、`CNE_TRADE_DATE`、`CNE_PYTHON`（同上）。
 
 ### scheduler_lock.sh
 

@@ -1,4 +1,4 @@
-# Dataset catalog (per-source limits and update frequency)
+# Sources and history limits
 
 Primary source, update frequency and known limits for each dataset.
 
