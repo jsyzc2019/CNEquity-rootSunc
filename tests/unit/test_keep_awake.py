@@ -58,5 +58,8 @@ def test_real_caffeinate_holds_and_lets_go(monkeypatch):
     monkeypatch.delenv(mod.ALLOW_SLEEP_ENV, raising=False)
     with mod.keep_awake() as held:
         assert held is True
-        out = subprocess.run(["pmset", "-g", "assertions"], capture_output=True, text=True)
+        # Other processes' assertion names are not guaranteed to be UTF-8.
+        out = subprocess.run(
+            ["pmset", "-g", "assertions"], capture_output=True, text=True, errors="replace"
+        )
         assert "caffeinate" in out.stdout

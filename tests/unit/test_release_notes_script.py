@@ -34,7 +34,11 @@ def test_missing_or_empty_section_is_an_error():
 
 
 def test_current_release_has_a_changelog_section():
-    import tomllib
+    try:
+        import tomllib
+    except ModuleNotFoundError:
+        import tomli as tomllib  # type: ignore
 
-    version = tomllib.loads((ROOT / "pyproject.toml").read_text())["project"]["version"]
+    pyproject = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    version = tomllib.loads(pyproject)["project"]["version"]
     assert NOTES["changelog_section"]((ROOT / "CHANGELOG.md").read_text(encoding="utf-8"), version)
