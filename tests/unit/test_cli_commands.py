@@ -1681,7 +1681,9 @@ def test_backfill_explains_a_watermark_it_pulled_back(cfg_path, monkeypatch):
 
 def test_backfill_snapshot_dataset_reports_capability_and_fallback(cfg_path):
     result = CliRunner().invoke(cli, ["backfill", "fund_flow", "--config", cfg_path])
-    assert result.exit_code == 0, result.output
+    # A snapshot-only dataset cannot serve history: nothing usable, so the backfill fails.
+    assert result.exit_code == 1, result.output
+    assert "fetched nothing usable" in result.stderr
     payload = json.loads(result.stdout)
     assert payload["execution_status"] == "completed"
     assert payload["status"] == "degraded"
@@ -1728,7 +1730,8 @@ def test_backfill_trading_status_bj_reports_capability_limit(cfg_path, extra):
         cli,
         ["backfill", "trading_status", "--config", cfg_path, "--symbols", "920201.BJ", *extra],
     )
-    assert result.exit_code == 0, result.output
+    # A plan writes nothing by design; a run the source cannot serve fetched nothing usable.
+    assert result.exit_code == (0 if extra else 1), result.output
     payload = json.loads(result.stdout)
     if extra:
         assert payload["writes"] is False

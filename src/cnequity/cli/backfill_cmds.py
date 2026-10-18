@@ -667,6 +667,9 @@ def backfill(
         attach_log_file(cfg, f"backfill-{dataset}")
         result = _repair_outstanding(cfg, dataset, workers)
         click.echo(json.dumps(result, indent=2, default=str))
+        if _fetched_nothing(result):
+            _explain_fetched_nothing()
+            raise SystemExit(1)
         if code := _run_status_exit_code(result["status"]):
             raise SystemExit(code)
         return
@@ -758,10 +761,7 @@ def backfill(
         result["followup"] = followup
         if followup.get("status") != "success":
             result["status"] = followup.get("status", "degraded")
-    # Sources that all failed end as `degraded` with exit 0 by the documented
-    # contract (coverage, not execution). The lineage summary would then print
-    # "✓ nothing changed", which reads as success; say what happened instead.
-    fetched_nothing = result.get("usable_result") is False and not result.get("rows_written")
+    fetched_nothing = _fetched_nothing(result)
     if actions_before is not None and result.get("status") != "failed" and not fetched_nothing:
         result["adj_factors_sync"] = _follow_lineage(
             result, lambda: _after_corporate_actions(cfg, actions_before, result)
@@ -773,17 +773,37 @@ def backfill(
     _explain_watermark_pullback(cfg, dataset, watermark_before, result)
     click.echo(json.dumps(result, indent=2, default=str))
     if fetched_nothing:
-        click.echo(
-            _(
-                "! This backfill fetched nothing usable: the sources were unavailable, so the range "
-                "stays a gap in the coverage record. `fallback` above lists the sources tried, and "
-                "the log has the reason for each key."
-            ),
-            err=True,
-        )
+        _explain_fetched_nothing()
+        raise SystemExit(1)
     code = _run_status_exit_code(result["status"])
     if code:
         raise SystemExit(code)
+
+
+def _fetched_nothing(result: dict) -> bool:
+    """A backfill that asked for data and got nothing usable, and wrote nothing.
+
+    The step still reports `degraded`, so a daily run can publish what it has;
+    a backfill exists to fill this range, and having filled none of it is a failure.
+    A `success` is left alone: a step that found nothing new may report no coverage
+    evidence, and that is not a source failure.
+    """
+    return (
+        result.get("status") != "success"
+        and result.get("usable_result") is False
+        and not result.get("rows_written")
+    )
+
+
+def _explain_fetched_nothing() -> None:
+    click.echo(
+        _(
+            "✗ This backfill fetched nothing usable, so the range stays a gap in the coverage "
+            "record. `fallback` above gives the reason (sources unavailable, or unable to serve "
+            "this range) and the sources tried; the log has the reason for each key."
+        ),
+        err=True,
+    )
 
 
 def _watermark(cfg, dataset: str) -> date | None:

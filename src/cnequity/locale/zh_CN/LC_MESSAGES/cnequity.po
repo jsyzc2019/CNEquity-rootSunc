@@ -694,10 +694,6 @@ msgstr " · 约剩 %s"
 msgid " … {value} more days"
 msgstr " … 还有 {value} 天"
 
-#: cnequity/cli/backfill_cmds.py
-msgid "! This backfill fetched nothing usable: the sources were unavailable, so the range stays a gap in the coverage record. `fallback` above lists the sources tried, and the log has the reason for each key."
-msgstr "! 本次回填没有取到可用数据：数据源不可用，该范围作为缺口留在覆盖记录中。上方 `fallback` 列出了尝试过的来源，日志里有每个键的原因。"
-
 #: cnequity/diagnostics/source_health.py
 #, python-format
 msgid "%d K-lines"
@@ -6961,4 +6957,8 @@ msgstr "✓ 湖可用：新鲜度、覆盖和质量都通过"
 #, python-brace-format
 msgid "✗ The lake build has not finished yet (run {run_id}). Everything already downloaded is saved."
 msgstr "✗ 建湖还没完成（run {run_id}）。已下载的部分都已保存。"
+
+#: cnequity/cli/backfill_cmds.py
+msgid "✗ This backfill fetched nothing usable, so the range stays a gap in the coverage record. `fallback` above gives the reason (sources unavailable, or unable to serve this range) and the sources tried; the log has the reason for each key."
+msgstr "✗ 本次回填没有取到可用数据，该范围作为缺口留在覆盖记录中。上方 `fallback` 给出了原因（数据源不可用，或无法提供这段范围）和尝试过的来源；日志里有每个键的原因。"
 

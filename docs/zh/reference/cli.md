@@ -647,11 +647,11 @@ cne verify --derivatives --dataset futures_bars --start 2026-09-01 --end 2026-09
 | `publication_status` | `pending` / `published` / `partial` / `unchanged` / `none` / `rejected`，描述当前运行的版本发布 |
 | `fallback` | 来源受限时列出已有可读数据、注册来源角色与开关、请求范围和重试命令；来源列表不代表已尝试或当前可达 |
 | `reason_code` | 数据集回执和批次保留结构化原因，例如 `source_transient`、`source_unavailable`、`input_unavailable`、`storage_failure`、`execution_error` |
-| `usable_result` | 有有效请求结果、已覆盖范围或明确无数据证据；来源受限且本次 0 行可以为 false，不能据此判定执行失败 |
+| `usable_result` | 有有效请求结果、已覆盖范围或明确无数据证据；来源受限且本次 0 行可以为 false。日更等不因此判定执行失败；`cne backfill` 在此时退出 1，见下文 |
 
-`completed + partial` 可以是正常终态。已校验事实可以发布，缺失范围、未扫描证券、冷却与重试证据继续留在台账中。缺输入的派生会解释跳过；派生版本记录输入版本和覆盖证据，输入变化时要求重算。来源全部不可用且本次没有有效请求结果，也正常结束为覆盖不足，保留已有湖；程序、配置、存储、完整性错误仍报告失败。
+`completed + partial` 可以是正常终态。已校验事实可以发布，缺失范围、未扫描证券、冷却与重试证据继续留在台账中。缺输入的派生会解释跳过；派生版本记录输入版本和覆盖证据，输入变化时要求重算。来源全部不可用且本次没有有效请求结果，也正常结束为覆盖不足，保留已有湖（`cne backfill` 的退出码见下文）；程序、配置、存储、完整性错误仍报告失败。
 
-取数 / 写入命令：`success`、来源受限的 `warning` / `degraded`（包括 0 行）返回 0，`failed` 返回 1。显式质量检查（`audit`、`verify`、`status --gate`）继续按各自质量规则返回非零。只读报告成功读取并展示后返回 0，不要求报告中的数据完全健康。
+取数 / 写入命令：`success`、来源受限的 `warning` / `degraded`（包括 0 行）返回 0，`failed` 返回 1。例外是 `cne backfill`（含 `--outstanding`）：状态不是 `success`、`usable_result` 为 false 且本次写入 0 行时返回 1，因为回填就是为了补这段范围，一行都没补上即为失败；数据源不可用和数据源无法提供该范围（`capability_limit`）都属于这种情况，JSON 结果与 `fallback` 不变。显式质量检查（`audit`、`verify`、`status --gate`）继续按各自质量规则返回非零。只读报告成功读取并展示后返回 0，不要求报告中的数据完全健康。
 
 **升级调度脚本：** 若以前依靠 `status --datasets` 的退出码触发告警，改为 `status --datasets --gate`（按组调度时同时加 `--groups`）。依赖日更 / 回填退出码 2 的脚本，应读取 `coverage_status`，或另行运行显式质量门禁。现有数据目录、manifest、检查点和成功批次不需要删除；旧元数据以增量方式迁移。旧部分 staging 没有校验封存时保持保守门禁，通过原范围重试后再发布。
 
