@@ -2,8 +2,9 @@
 
 这里记录面向用户的主要功能、修复与兼容性变化。历史版本中的命令名反映当时的接口；当前用法以 [CLI 参考](docs/zh/reference/cli.md)为准。升级前阅读[升级与兼容性](docs/zh/getting-started/installation.md#升级与兼容性)。
 
-## [0.18.0] — 未发布
+## [0.18.0] — 2026-10-19
 
+- **升级步骤：** `pip install -U cnequity` 后重启 `cne serve` 和已在运行的 `cne mcp`。数据集契约没有变化，不需要迁移数据或改配置。调度或脚本里依赖 `cne backfill` 退出 0 的，按下方「退出码变化」改为读取 `usable_result` / `coverage_status`；调用了已移除的 `cne storage` 试验与归档子命令的，需要删去这些调用；仍需运行已弃用迁移命令的旧湖，请在升级到 0.20.0 之前完成。
 - **弃用：** 11 个一次性迁移命令 `cne repair missing-values`、`financial-announcements`、`fund-factors`、`daily-bar-coverage`、`fund-listing-dates`、`valuation-basis`、`orphan-symbols`、`stale-suspensions`、`status-outages`、`status-listing-window`、`misdated-valuation` 已弃用，将在 0.20.0 移除。它们只修 0.17 及更早版本写入的数据，当前版本采集时已不再产生这些问题，新建的湖不需要运行。旧湖如需迁移（包括 0.17.0 升级步骤里的 `status-outages` 和 `misdated-valuation`），请在升级到 0.20.0 之前用 0.18 或 0.19 运行。`cne repair --help` 中这些命令标有「已弃用」，运行时在 stderr 打印警告，stdout 的 JSON 报告不变。
 - **弃用：** `cne derive bse_code_migration`、`cne derive valuation_orphans`，以及 `cne backfill` 的 `--eastmoney-bj-repair`、`--tdx-volume-repair`、`--bj-amount-repair` 同样将在 0.20.0 移除，规则同上；`--bj-amount-repair` 请改用 `--tdx-amount-repair`，孤立估值行在 `valuation_metrics` 回填时会自动清理。`--ths-repair` 和 `--bse-tip-repair` 对新建的湖仍然有用，继续保留，帮助中去掉了「历史迁移用」的说法。
 - **移除：** `cne storage` 的试验与归档子命令（`experiment-create`、`archive`、`experiment-seal`、`artifact-verify`、`resolve`、`experiment-plan`、`experiment-apply`），以及 serve 存储页的「试验目录」清理。版本保留、标记与网页确认删除不受影响；旧注册表里登记的试验照常读取，其目录不会被删除，不再需要时可自行处理。
