@@ -219,6 +219,17 @@ class _LoggedFailures(click.Group):
             if not self._already_logged(ctx):
                 logger.warning(N_("%s: aborted"), self._failed_command(ctx))
             raise
+        except KeyboardInterrupt:
+            # Click turns this into "Aborted!" once it leaves the command, which
+            # tells someone who pressed Ctrl-C an hour into `cne init` neither
+            # that the finished work survived nor how to pick it up again.
+            if not self._already_logged(ctx):
+                command = self._failed_command(ctx)
+                logger.warning(N_("%s: interrupted"), command, extra=ECHOED_BY_CLICK)
+                hint = _interrupt_hint(command)
+                if hint:
+                    click.echo(hint, err=True)
+            raise
         except click.exceptions.Exit:
             # `--help` and `--version` leave this way, and Click's `Exit`
             # derives from RuntimeError — so the catch-all below logged every
@@ -241,6 +252,17 @@ class _LoggedFailures(click.Group):
             raise
 
 
+def _interrupt_hint(command: str) -> str | None:
+    """What a Ctrl-C left behind, for the commands that write the lake."""
+    if command == "init":
+        return _("Stopped. Run `cne init` again to resume; finished batches are kept.")
+    if command.split(" ", 1)[0] in {"run", "backfill", "derive", "repair"}:
+        return _(
+            "Stopped. Finished batches are kept and the run is recorded as interrupted; run the same command again to continue, and `cne status` shows what it finished."
+        )
+    return None
+
+
 def _expected_failure(exc: Exception) -> str | None:
     """The message of a failure that is the lake's state, not a bug in the CLI.
 
@@ -250,9 +272,12 @@ def _expected_failure(exc: Exception) -> str | None:
     modules pull in the data stack, which `--help` must not pay for.
     """
     from cnequity.orchestrator.outcomes import InputUnavailableError
+    from cnequity.orchestrator.run_lock import RunLockError
     from cnequity.query.reader import ReaderError
 
-    if isinstance(exc, ReaderError | InputUnavailableError):
+    # Another job holding the lake is the lake's state too: `cne backfill`
+    # beside a running init printed the refusal under a traceback.
+    if isinstance(exc, ReaderError | InputUnavailableError | RunLockError):
         return str(exc)
     return None
 

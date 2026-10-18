@@ -106,6 +106,7 @@ RUNTIME_META_PATHS = (
     "quality",
     "rate_limits",
     "raw",
+    "raw_storage.json",
     "repairs",
     "revisions",
     "source_cache",

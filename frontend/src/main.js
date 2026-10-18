@@ -277,27 +277,42 @@ async function renderOverview() {
   try {
     const ops = await api("/api/ops");
     const pending = ops.occupancy?.incomplete_init;
-    if (ops.occupancy?.lake_empty) {
+    if (pending?.running) {
+      // An empty lake during its first init is expected; offering to start
+      // another init sent people into a form that could only refuse.
+      notes.push({
+        tone: "info",
+        title: tr("初始化正在进行", "Initialization is running"),
+        detail: tr("数据会随批次陆续出现，进度在运行记录里。", "Data appears batch by batch; the run shows its progress."),
+        action: { href: "#/runs", label: tr("查看进度", "View progress") },
+      });
+      primaryHref = "#/runs";
+      primaryLabel = tr("查看进度", "View progress");
+    } else if (pending) {
+      const resume = `#/ops?op=init.resume&run_id=${encodeURIComponent(pending.run_id)}`;
+      if (ops.occupancy?.lake_empty) {
+        notes.push({
+          tone: "stale",
+          title: tr("湖里还没有 curated 数据", "The lake has no curated data yet"),
+          detail: tr("初始化会下载全市场行情主干。", "Initialization downloads the full-market price spine."),
+          action: { href: "#/ops?op=init.start", label: tr("初始化数据湖", "Initialize the lake") },
+        });
+      }
+      notes.push({
+        tone: "stale",
+        title: tr("初始化没跑完", "Initialization did not finish"),
+        detail: tr("已成功的批次会保留。", "Batches that succeeded are kept."),
+        action: { href: resume, label: tr("继续初始化", "Resume initialization") },
+      });
+      primaryHref = resume;
+      primaryLabel = tr("继续初始化", "Resume initialization");
+    } else if (ops.occupancy?.lake_empty) {
       notes.push({
         tone: "stale",
         title: tr("湖里还没有 curated 数据", "The lake has no curated data yet"),
         detail: tr("初始化会下载全市场行情主干。", "Initialization downloads the full-market price spine."),
         action: { href: "#/ops?op=init.start", label: tr("初始化数据湖", "Initialize the lake") },
       });
-    }
-    if (pending && !pending.running) {
-      notes.push({
-        tone: "stale",
-        title: tr("初始化没跑完", "Initialization did not finish"),
-        detail: tr("已成功的批次会保留。", "Batches that succeeded are kept."),
-        action: {
-          href: `#/ops?op=init.resume&run_id=${encodeURIComponent(pending.run_id)}`,
-          label: tr("继续初始化", "Resume initialization"),
-        },
-      });
-      primaryHref = `#/ops?op=init.resume&run_id=${encodeURIComponent(pending.run_id)}`;
-      primaryLabel = tr("继续初始化", "Resume initialization");
-    } else if (ops.occupancy?.lake_empty) {
       primaryHref = "#/ops?op=init.start";
       primaryLabel = tr("初始化数据湖", "Initialize the lake");
     } else if (h.stale_datasets.length) {

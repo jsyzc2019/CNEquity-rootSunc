@@ -162,8 +162,8 @@
 | `--profile` | `quick` | 建多大。demo = 用真实数据源抓几只票，sample = 同样的形状但离线且确定 —— 两者都不是一个市场。quick = 全市场标的、最近 3 年；full = 全市场标的、从 2016-01-01 起（通常需要更多分页）。以后可以用 `cne backfill daily_bars` 补深。 |
 | `--symbols` | `600519.SH,000001.SZ,000858.SZ,300750.SZ,601318.SH` | demo/sample：要抓的标的，逗号分隔（有意保持很少）。 |
 | `--days` | `30` | demo/sample：daily_bars 大致抓最近多少个交易日。 |
-| `--data-root` | `data/cnequity-demo` | demo/sample：独立的湖根目录（不要拿去跑全市场 init）。 |
-| `--config-out` | `configs/cnequity.demo.toml` | demo/sample：把那份小配置写到哪，供后续 `cne query` 使用。 |
+| `--data-root` | `data/cnequity-demo; sample: data/cnequity-sample` | demo/sample：独立的湖根目录（不要拿去跑全市场 init）。 |
+| `--config-out` | `configs/cnequity.demo.toml; sample: configs/cnequity.sample.toml` | demo/sample：把那份小配置写到哪，供后续 `cne query` 使用。 |
 | `--force` | `False` | demo/sample：允许覆盖内容不同的已有 --config-out；默认拒绝并保留原文件。 |
 | `--intraday` | `False` | demo/sample：同一批标的额外抓 1 分钟线（最多 5 个交易日）并打印一个交易日，让 bar_time 的口径看得见。 |
 | `--research` | `False` | demo/sample：额外用 Sina 派生 hfq 复权因子，并打印未复权 / 复权收益对照（较慢；需要访问 Sina）。 |
@@ -711,6 +711,16 @@
 | `--config` | `configs/cnequity.toml` | 配置文件路径。 |
 | `--keep` | `5` | — |
 | `--phase` | `mark` | — |
+
+## `cne storage raw-external`
+
+| 参数 | 默认值 | 说明 |
+|---|---|---|
+| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--dataset` | `—` | 必填 |
+| `--source` | `—` | 必填 |
+| `--root` | `—` | 必填 |
+| `--format` | `pdf` | — |
 
 ## `cne storage resolve`
 

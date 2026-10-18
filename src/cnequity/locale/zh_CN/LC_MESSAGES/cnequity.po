@@ -150,10 +150,10 @@ msgstr ""
 #, python-brace-format
 msgid ""
 "\n"
-"Found {DEMO_CONFIG}, written by `cne init --profile demo`. To work on the demo lake, add `--config {DEMO_CONFIG}`."
+"Found {config}, written by `cne init --profile {profile}`. To work on that lake, add `--config {config}`."
 msgstr ""
 "\n"
-"找到 `cne init --profile demo` 写的 {DEMO_CONFIG} —— 要对 demo 湖操作，请加上 `--config {DEMO_CONFIG}`。"
+"找到 `cne init --profile {profile}` 写的 {config} —— 要对那个湖操作，请加上 `--config {config}`。"
 
 #: cnequity/cli/quality_cmds.py
 #, python-brace-format
@@ -674,6 +674,11 @@ msgstr " [仅显式探测]"
 msgid " and others ({total} in all)"
 msgstr " 等 {total} 个"
 
+#: cnequity/cli/_shared.py
+#, python-brace-format
+msgid " at line {line}, column {column}"
+msgstr "，第 {line} 行第 {column} 列"
+
 #: cnequity/progress.py
 #, python-format
 msgid " · %s so far"
@@ -818,6 +823,11 @@ msgstr "%s: 冷却后已有一个恢复探测在进行；本次不发请求。"
 #, python-format
 msgid "%s: aborted"
 msgstr "%s：已中止"
+
+#: cnequity/cli/_root.py
+#, python-format
+msgid "%s: interrupted"
+msgstr "%s：已中断"
 
 #: cnequity/diagnostics/source_health.py
 #, python-format
@@ -1967,8 +1977,8 @@ msgstr "无法生成配置（{name}）。"
 
 #: cnequity/cli/_shared.py
 #, python-brace-format
-msgid "Could not load config {path} ({name}); check the TOML syntax, value types, and that rate limits are finite and non-negative."
-msgstr "无法加载配置 {path}（{name}）；请检查 TOML 语法、数值类型和非负有限限速。"
+msgid "Could not load config {path} ({name}{where}); check the TOML syntax, value types, and that rate limits are finite and non-negative."
+msgstr "无法加载配置 {path}（{name}{where}）；请检查 TOML 语法、数值类型和非负有限限速。"
 
 #: cnequity/serve/ops/job.py
 #, python-brace-format
@@ -3092,6 +3102,11 @@ msgstr "Instruments（demo 标的范围）"
 msgid "Interrupted"
 msgstr "已中断"
 
+#: cnequity/orchestrator/worker_pool.py
+#, python-format
+msgid "Interrupted: letting %d %s batch(es) already in flight finish so nothing is half-written; this can take up to one batch's time."
+msgstr "已中断：正在等 %d 个已发出的 %s 批次完成，避免写入一半；最多需要一个批次的时间。"
+
 #: cnequity/serve/ops/catalog.py
 msgid "Invalid backup directory path."
 msgstr "备份目录路径无效。"
@@ -4120,6 +4135,10 @@ msgstr "只重抓仍然落后于最后交易日的数据集。挂在主 pipeline
 msgid "Refresh the on-demand cache before fetching (requires both --dataset and --symbol)."
 msgstr "抓取前先刷新按需缓存（需要同时给 --dataset 和 --symbol）。"
 
+#: cnequity/cli/storage_cmds.py
+msgid "Register external payload storage; retains local sidecars and moves/deletes no files."
+msgstr "登记外置原文存储；本地保留来源记录，不移动或删除文件。"
+
 #: cnequity/serve/ops/records.py
 msgid "Rejected"
 msgstr "已拒绝"
@@ -4902,6 +4921,14 @@ msgstr "调度组缺少的 step —— 不带参数的 `cne run daily` 不会跑
 msgid "Still missing: {datasets}"
 msgstr "还缺：{datasets}"
 
+#: cnequity/cli/_root.py
+msgid "Stopped. Finished batches are kept and the run is recorded as interrupted; run the same command again to continue, and `cne status` shows what it finished."
+msgstr "已停止。完成的批次会保留，本次运行记为中断；再运行同一条命令即可继续，`cne status` 可查看已完成的部分。"
+
+#: cnequity/cli/_root.py
+msgid "Stopped. Run `cne init` again to resume; finished batches are kept."
+msgstr "已停止。再次运行 `cne init` 即可续跑，完成的批次会保留。"
+
 #: cnequity/serve/ops/scheduler.py
 msgid "Stops future scheduled triggers; tasks already running continue."
 msgstr "停止后续定时触发，已在运行的任务继续执行。"
@@ -5590,6 +5617,11 @@ msgstr "还没到今天的日更时间 {daily_run_at}（北京时间），当天
 #, python-brace-format
 msgid "Today's daily update time {daily_run_at} (Beijing time) has not come yet, and today's data may not be published. This run will not count as the scheduled one, and the scheduled daily update still runs on time."
 msgstr "还没到今天的日更时间 {daily_run_at}（北京时间），当天数据可能还没发布。这次不会记成定时任务已跑，到点后定时日更仍会运行。"
+
+#: cnequity/cli/run_cmds.py
+#, python-brace-format
+msgid "Today's session ({today}) is not final until 15:05 Beijing time; the schedule groups update through {settled}."
+msgstr "今天（{today}）的交易日要到北京时间 15:05 才收盘定稿；本次各调度组只更新到 {settled}。"
 
 #: cnequity/serve/storage.py
 msgid "Too many check requests; try again shortly."
@@ -6743,6 +6775,11 @@ msgstr "{config_path} 里没有 [[job.daily.waves]]：没有调度组时 `cne ru
 #, python-brace-format
 msgid "{config} has no [job.daily.groups]; a config written by `cne config create` has these schedule groups."
 msgstr "{config} 里没有 [job.daily.groups] —— `cne config create` 生成的配置带有这些调度组。"
+
+#: cnequity/cli/demo.py
+#, python-brace-format
+msgid "{data_root} holds the synthetic sample lake (source=mock). Real data is not written over it: pass another --data-root, or delete that directory first."
+msgstr "{data_root} 里是合成的 sample 湖（source=mock），不会把真实数据写进去：请换一个 --data-root，或先删除该目录。"
 
 #: cnequity/cli/quality_cmds.py
 #, python-brace-format

@@ -72,6 +72,7 @@ storage hold: ["none", "Adds object protection and clears pending-deletion marks
 storage import: ["none", "Validates and registers a reference manifest; only adds protection"]
 storage inspect: ["none", "Reads versions, retention reasons and registered experiments"]
 storage plan: ["none", "Validates retention dependencies and saves a version plan; deletes no data"]
+storage raw-external: ["none", "Registers external payload storage; retains local source sidecars and does not move or delete files"]
 ths-official backfill: ["when run", "Calls the credentialed source and fills gaps"]
 ths-official capture: ["when run", "Calls the credentialed source and writes comparison evidence"]
 ths-official repair-bars: ["when run", "Fetches even in a dry run; --apply writes repairs"]

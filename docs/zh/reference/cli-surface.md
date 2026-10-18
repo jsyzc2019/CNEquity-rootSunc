@@ -78,6 +78,7 @@
 | `cne storage import` | 无 | 校验并登记引用清单；只增加保护 |
 | `cne storage inspect` | 无 | 读取版本、保留原因与登记试验 |
 | `cne storage plan` | 无 | 校验保留依赖并保存版本计划；不删除数据 |
+| `cne storage raw-external` | 无 | 登记外置原文目录；本地保留来源记录，不移动或删除文件 |
 | `cne storage resolve` | 无 | 校验旧路径对应的归档位置；不重写报告 |
 | `cne ths-official backfill` | 执行时 | 调用凭证源并补缺 |
 | `cne ths-official capture` | 执行时 | 调用凭证源并写对照证据 |

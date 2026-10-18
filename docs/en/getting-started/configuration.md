@@ -360,6 +360,17 @@ Announcements may be indexed late. The weekly deep reconciliation rechecks older
 
 **Request credentials, proxy settings, cookies and authorization headers are never archived.**
 
+Large payloads such as financial report PDFs can live on a separate drive or in iCloud Drive while source, observation-time and hash sidecars stay local. Create the destination directory, then register it:
+
+```bash
+cne storage raw-external --dataset financial_statement_items --source cninfo \
+  --root "$HOME/Library/Mobile Documents/com~apple~CloudDocs/CNEquity/archives/my-lake"
+```
+
+By default only new PDF payloads go to the external folder; other responses stay local. The lake stores the registration in `meta/raw_storage.json`, which all archive readers recognize automatically. Historical `payload_path` values stay unchanged and no symlinks are used. Registration does not migrate existing files. Copy them under the external root at their original `payload_path`, verify bytes and hashes, and confirm cloud upload before removing local payloads. Keep the local `.json` source sidecars.
+
+Replay requires the external folder to be available; cloud files may need downloading first. An unavailable folder fails explicitly rather than being recreated empty or fetching the provider again. Portable snapshots materialize external payloads without machine-specific locations, which may download cloud files. macOS manages iCloud synchronization and Remove Download; registration alone does not confirm upload.
+
 ## `[exchange_audit]`
 
 | Key | Default | Description |

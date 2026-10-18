@@ -5,6 +5,13 @@
 ## [0.18.0] — 未发布
 
 - **弃用：** 11 个一次性迁移命令 `cne repair missing-values`、`financial-announcements`、`fund-factors`、`daily-bar-coverage`、`fund-listing-dates`、`valuation-basis`、`orphan-symbols`、`stale-suspensions`、`status-outages`、`status-listing-window`、`misdated-valuation` 已弃用，将在 0.20.0 移除。它们只修 0.17 及更早版本写入的数据，当前版本采集时已不再产生这些问题，新建的湖不需要运行。旧湖如需迁移（包括 0.17.0 升级步骤里的 `status-outages` 和 `misdated-valuation`），请在升级到 0.20.0 之前用 0.18 或 0.19 运行。`cne repair --help` 中这些命令标有「已弃用」，运行时在 stderr 打印警告，stdout 的 JSON 报告不变。
+- 新增 `cne storage raw-external`：把财报 PDF 等大原文登记到独立磁盘或 iCloud Drive 等外置目录，本地保留来源、观察时间和哈希记录；只登记，不移动或删除已有文件。
+- `cne init` 与日更、事件任务不再同时运行；Ctrl-C 中断写湖命令时说明已完成的部分会保留，以及如何续跑。`cne serve` 把进程已退出、仍记为运行中的 run 显示为中断。
+- `cne query` 和 MCP 改为在内存中建立 DuckDB 视图，不再依赖磁盘上的视图库；配置文件 TOML 写错时报错指明行号和列号。
+- `cne init --profile sample` 默认写入 `data/cnequity-sample/` 与 `configs/cnequity.sample.toml`，不再与 demo 共用目录和配置。
+- 事件任务的启动时间加入随机偏移，北京时间 01–07 点改为每小时一次；新闻连续 3 次被拒后暂停到本地午夜。
+- 修复新用户和小数据湖上的一批问题：`--profile demo --research` 因新浪未启用而崩溃；空数据集预览修复时报错或登记版本；缺少输入数据集时打印堆栈而不是一行说明；`--only`、`--symbols` 等选项重复给出时只保留最后一个；`backfill --symbols` 在未分标的数据集上崩溃；demo 湖误报事件数据集过期，或对 demo 湖执行 `run daily --stale-only` 时抓取全市场快照。
+- `cne verify` 和 `cne status` 按最近一次完整查询来源的时间判断事件数据是否新鲜，补抓没有新数据时不再一直报过期；`cne run retry` 遇到已成功的 run 时说明无需重试，不再重跑整个任务；指标正确统计步骤发出的东财请求数。
 
 ## [0.17.1] — 2026-10-18
 

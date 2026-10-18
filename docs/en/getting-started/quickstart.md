@@ -75,11 +75,11 @@ Minute bars, trade ticks and per-contract derivatives are off by default. For hi
 
 ## Just want to try a few stocks first
 
-When you do not want to build a full-market lake, `--profile demo` uses real data sources to write 5 stocks and roughly the last 30 trading days into a separate `data/cnequity-demo/`, with config `configs/cnequity.demo.toml`; `--profile sample` generates synthetic data of the same shape offline (`source=mock`), and is only for verifying the installation. Neither affects the production lake, and neither replaces full-market initialization.
+When you do not want to build a full-market lake, `--profile demo` uses real data sources to write 5 stocks and roughly the last 30 trading days into a separate `data/cnequity-demo/`, with config `configs/cnequity.demo.toml`; `--profile sample` generates synthetic data of the same shape offline (`source=mock`) into `data/cnequity-sample/` with config `configs/cnequity.sample.toml`, and is only for verifying the installation. Neither affects the production lake, and neither replaces full-market initialization.
 
 ```bash
 cne init --profile demo
-cne init --profile sample --data-root data/cnequity-sample --config-out configs/cnequity.sample.toml
+cne init --profile sample
 ```
 
 When the demo finishes it prints a `claude mcp add ...` command with the config's absolute path; copy it to hand this small lake to an AI agent, and see [MCP integration](../reference/mcp.md) for other clients. Run `cne serve --config configs/cnequity.demo.toml` to browse it; the dashboard only evaluates the datasets a demo lake actually holds.

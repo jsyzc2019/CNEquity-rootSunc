@@ -243,6 +243,11 @@ _OPTION_WORDS = {
 
 def _default(param: click.Parameter, ctx: click.Context, lang: str = "zh") -> str:
     words = _OPTION_WORDS[lang]
+    # A string `show_default` is what `--help` prints in place of the value,
+    # e.g. a default that depends on another option.
+    shown = getattr(param, "show_default", None)
+    if isinstance(shown, str):
+        return shown
     value = param.get_default(ctx, call=False)
     if value.__class__.__name__ == "Sentinel":
         return "—"
@@ -435,6 +440,7 @@ EFFECTS: dict[str, tuple[str, str]] = {
     "storage import": ("无", "校验并登记引用清单；只增加保护"),
     "storage inspect": ("无", "读取版本、保留原因与登记试验"),
     "storage plan": ("无", "校验保留依赖并保存版本计划；不删除数据"),
+    "storage raw-external": ("无", "登记外置原文目录；本地保留来源记录，不移动或删除文件"),
     "ths-official backfill": ("执行时", "调用凭证源并补缺"),
     "ths-official capture": ("执行时", "调用凭证源并写对照证据"),
     "ths-official repair-bars": ("执行时", "预演也取数；--apply 写修复"),

@@ -54,8 +54,9 @@ from cnequity.orchestrator.registry import get_step
 from cnequity.orchestrator.run_lock import (
     DAILY_INGESTION_LOCK,
     EVENTS_INGESTION_LOCK,
-    INIT_JOB_LOCK,
+    init_job_lock,
     reentrant_run_lock,
+    refuse_overlap_with_init,
     run_lock,
 )
 from cnequity.progress import step_scope
@@ -235,6 +236,11 @@ class JobEngine:
         lock_name = _JOB_LOCKS.get(family)
         with contextlib.ExitStack() as stack:
             stack.enter_context(self._optional_job_lock(lock_name))
+            # Checked after taking this job's own lock, so an init starting at
+            # the same instant sees this job when it checks in turn: at worst
+            # both refuse, never both run.
+            if family != "init":
+                refuse_overlap_with_init(self.config.meta_root)
             if not run_id:
                 # Pin the plan to the run. A retry days later must know what
                 # this run set out to do even if the process died before
@@ -1949,7 +1955,7 @@ class JobEngine:
         if run["job_name"] != "init":
             raise RuntimeError(f"Run {run_id} is not an init job (job_name={run['job_name']})")
 
-        with self._run_lock(run_id):
+        with init_job_lock(self.config.meta_root), self._run_lock(run_id):
             try:
                 return self._resume_init_locked(
                     trade_date,
@@ -2121,7 +2127,7 @@ class JobEngine:
         # One init at a time, and visibly so. `_retry_run` locks by run id, so
         # a resume nesting inside this takes a different lock and cannot
         # deadlock against it.
-        with run_lock(self.config.meta_root, INIT_JOB_LOCK, blocking=False):
+        with init_job_lock(self.config.meta_root):
             return self._run_init_phases_locked(
                 trade_date,
                 resume=resume,

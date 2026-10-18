@@ -12,6 +12,7 @@ from cnequity.cli._shared import _cfg, config_option
 from cnequity.file_lock import LockUnavailable
 from cnequity.i18n import N_, _
 from cnequity.storage.lifecycle import LifecycleError, LifecycleStore
+from cnequity.storage.raw_archive import RawArchiveError, RawPayloadArchive
 from cnequity.storage.revisions import RevisionConsistencyError
 
 
@@ -22,6 +23,7 @@ class _LifecycleGroup(click.Group):
         except (
             LifecycleError,
             RevisionConsistencyError,
+            RawArchiveError,
             LockUnavailable,
             OSError,
             ValueError,
@@ -40,6 +42,22 @@ def _emit(value: dict) -> None:
 @cli.group(cls=_LifecycleGroup)
 def storage():
     """Version retention holds and observation periods; physical deletion must be confirmed on the serve web page."""
+
+
+@storage.command("raw-external")
+@config_option
+@click.option("--dataset", required=True)
+@click.option("--source", required=True)
+@click.option(
+    "--root", type=click.Path(exists=True, file_okay=False, path_type=Path), required=True
+)
+@click.option("--format", "formats", multiple=True, default=("pdf",), show_default=True)
+def raw_external(config_path: str, dataset: str, source: str, root: Path, formats: tuple[str, ...]):
+    """Register external payload storage; retains local sidecars and moves/deletes no files."""
+    cfg = _cfg(config_path)
+    _emit(
+        RawPayloadArchive(cfg.meta_root).register_external(dataset, source, root, formats=formats)
+    )
 
 
 @storage.command("inspect")

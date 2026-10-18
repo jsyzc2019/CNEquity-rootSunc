@@ -297,6 +297,41 @@ def test_run_daily_run_lock_error(cfg_path, monkeypatch):
     assert "daily lock held" in result.output
 
 
+@pytest.mark.parametrize(
+    ("args", "hint"),
+    [
+        (["init", "--since", "2026-10-09"], "Run `cne init` again to resume"),
+        (["run", "daily", "--group", "core"], "run the same command again to continue"),
+        (["backfill", "daily_bars", "--start", "2026-10-01"], "run the same command again"),
+    ],
+)
+def test_ctrl_c_says_what_survived_and_how_to_continue(tmp_path, monkeypatch, args, hint):
+    """Click's bare "Aborted!" told nobody that finished batches are kept."""
+    cfg = _write_config(
+        tmp_path, extra='\n[job.daily.groups.core]\nat = "16:00"\nsteps = ["compact"]\n'
+    )
+
+    def interrupted(*_a, **_k):
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(JobEngine, "run_job", interrupted)
+    monkeypatch.setattr(JobEngine, "run_init_phases", interrupted)
+    result = CliRunner().invoke(cli, [*args, "--config", cfg])
+    assert result.exit_code == 1
+    assert hint in result.output
+    assert "Aborted!" in result.output
+
+
+def test_ctrl_c_on_a_read_only_command_adds_no_resume_hint(cfg_path, monkeypatch):
+    def interrupted(*_a, **_k):
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr("cnequity.cli.quality_cmds.Manifest.latest_run", interrupted)
+    result = CliRunner().invoke(cli, ["status", "--config", cfg_path])
+    assert result.exit_code == 1
+    assert "Stopped." not in result.output
+
+
 @pytest.mark.usefixtures("chinese_output")
 def test_run_daily_unknown_group(cfg_path):
     result = CliRunner().invoke(cli, ["run", "daily", "--config", cfg_path, "--group", "nope"])
@@ -1189,10 +1224,7 @@ def test_query_rejects_partial_on_demand_options(cfg_path, args):
     assert "必须一起给" in result.output or "需要同时给" in result.output
 
 
-def test_query_sql(cfg_path, monkeypatch, tmp_path):
-    db = tmp_path / "lake.duckdb"
-    db.touch()
-
+def test_query_sql(cfg_path, monkeypatch):
     class FakeCon:
         def execute(self, sql):
             return SimpleNamespace(pl=lambda: pl.DataFrame({"n": [1]}))
@@ -1200,8 +1232,7 @@ def test_query_sql(cfg_path, monkeypatch, tmp_path):
         def close(self):
             pass
 
-    monkeypatch.setattr("cnequity.cli.consume_cmds.ensure_duckdb_views", lambda cfg: db)
-    monkeypatch.setattr("duckdb.connect", lambda *a, **k: FakeCon())
+    monkeypatch.setattr("cnequity.cli.consume_cmds.views_connection", lambda cfg: FakeCon())
     result = CliRunner().invoke(cli, ["query", "--config", cfg_path, "--sql", "SELECT 1 AS n"])
     assert result.exit_code == 0, result.output
     assert "1" in result.output
@@ -2211,6 +2242,79 @@ def test_bare_run_daily_runs_every_group_then_the_event_stream(tmp_path, monkeyp
     assert payload["events"]["status"] == "success"
 
 
+def _pin_monday(monkeypatch, *, final: bool) -> date:
+    """Monday 2026-10-19 in Beijing, before or after the 15:05 settlement."""
+    monday = date(2026, 10, 19)
+    settled = (lambda _day: True) if final else (lambda day: day != monday)
+    monkeypatch.setattr("cnequity.cli.run_cmds.shanghai_today", lambda: monday)
+    monkeypatch.setattr("cnequity.cli.run_cmds.is_session_final", settled)
+    monkeypatch.setattr("cnequity.cli.quality_cmds.is_session_final", settled)
+    return monday
+
+
+def _record_trade_dates(monkeypatch) -> dict[str, object]:
+    seen: dict[str, object] = {}
+
+    def fake_run_job(self, job_name, *a, trade_date=None, **k):
+        seen[job_name] = trade_date
+        return {"run_id": f"r-{job_name}", "status": "success", "results": []}
+
+    monkeypatch.setattr(JobEngine, "run_job", fake_run_job)
+    return seen
+
+
+def test_run_daily_before_the_close_updates_through_the_last_settled_session(tmp_path, monkeypatch):
+    """At 01:00 on a Monday the groups catch up to Friday, not to Monday.
+
+    Targeting Monday made `daily_bars` refuse the unfinished session with a
+    traceback, and stamped snapshot feeds read before the open with Monday's
+    date. The event stream follows the calendar and keeps today.
+    """
+    cfg = _write_config(tmp_path, extra=_DAY_GROUPS)
+    _pin_monday(monkeypatch, final=False)
+    seen = _record_trade_dates(monkeypatch)
+    result = CliRunner().invoke(cli, ["run", "daily", "--config", cfg])
+    assert result.exit_code == 0, result.output
+    friday = date(2026, 10, 16)
+    assert seen["daily:core"] == friday
+    assert seen["daily:capital"] == friday
+    assert seen["daily:audit"] == friday
+    assert seen["events"] is None
+    assert "not final until 15:05" in result.output
+
+
+@pytest.mark.parametrize("flags", [["--group", "core"], ["--core-only"]])
+def test_single_group_runs_also_wait_for_the_settled_session(tmp_path, monkeypatch, flags):
+    cfg = _write_config(
+        tmp_path,
+        extra=_DAY_GROUPS + '\n[[job.daily.waves]]\nname = "w"\nsteps = ["compact"]\n',
+    )
+    _pin_monday(monkeypatch, final=False)
+    seen = _record_trade_dates(monkeypatch)
+    result = CliRunner().invoke(cli, ["run", "daily", "--config", cfg, *flags])
+    assert result.exit_code == 0, result.output
+    assert list(seen.values()) == [date(2026, 10, 16)]
+
+
+@pytest.mark.parametrize(
+    ("final", "flags", "expected"),
+    [
+        (True, [], None),
+        (False, ["--trade-date", "2026-10-19"], date(2026, 10, 19)),
+    ],
+)
+def test_settled_session_leaves_final_and_explicit_dates_alone(
+    tmp_path, monkeypatch, final, flags, expected
+):
+    cfg = _write_config(tmp_path, extra=_DAY_GROUPS)
+    _pin_monday(monkeypatch, final=final)
+    seen = _record_trade_dates(monkeypatch)
+    result = CliRunner().invoke(cli, ["run", "daily", "--no-events", "--config", cfg, *flags])
+    assert result.exit_code == 0, result.output
+    assert seen["daily:core"] == expected
+    assert "not final until 15:05" not in result.output
+
+
 @pytest.mark.parametrize(
     ("flags", "expected"),
     [
@@ -2728,3 +2832,13 @@ def test_retry_of_a_succeeded_run_says_there_is_nothing_to_retry(cfg_path, monke
     result = CliRunner().invoke(cli, ["run", "retry", "--config", cfg_path, "--run-id", "d1"])
     assert result.exit_code == 0, result.output
     assert "already succeeded" in result.output
+
+
+def test_a_broken_config_names_the_line_but_not_its_text(tmp_path):
+    """The position is what a person needs; the text may hold a token."""
+    path = tmp_path / "broken.toml"
+    path.write_text('[sources.tushare]\ntoken = "s3cret\n', encoding="utf-8")
+    result = CliRunner().invoke(cli, ["status", "--config", str(path)])
+    assert result.exit_code == 1
+    assert "TOMLDecodeError at line 2, column" in result.output
+    assert "s3cret" not in result.output

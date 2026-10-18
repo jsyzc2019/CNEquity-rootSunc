@@ -609,7 +609,7 @@ def _configure_sql_connection(con: Any, config: Config) -> None:
 
     ``read_only=True`` protects the DuckDB catalog, not the host filesystem:
     DuckDB SELECT table functions can still read local files or fetch remote
-    resources.  The views created by :func:`ensure_duckdb_views` only need the
+    resources.  The views created by :func:`views_connection` only need the
     curated and derived roots, so make those the sole allowed directories and
     disable all other external access before locking the settings. A dataset
     with a published generation reads from ``meta/revisions/data`` instead, so
@@ -643,7 +643,7 @@ def run_sql(config: Config, *, sql: str, limit: int | None = None) -> dict:
     and open-lake qfq_* columns already computed; for a bounded historical qfq
     window use the ``daily_bars_qfq(start_date, end_date)`` table macro.
     """
-    from cnequity.query.views import ensure_duckdb_views
+    from cnequity.query.views import views_connection
 
     text = _guard_sql(sql)
     limit = _clamp_limit(limit)
@@ -654,10 +654,7 @@ def run_sql(config: Config, *, sql: str, limit: int | None = None) -> dict:
             "it queries the parquet on disk, and in live mode nothing is written there.",
         )
 
-    import duckdb
-
-    db_path = ensure_duckdb_views(config)
-    con = duckdb.connect(str(db_path), read_only=True)
+    con = views_connection(config)
     try:
         _configure_sql_connection(con, config)
         df = con.execute(text).pl()

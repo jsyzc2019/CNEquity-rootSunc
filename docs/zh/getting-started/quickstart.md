@@ -77,11 +77,11 @@ cne run daily
 
 ## 只想先试几只股票
 
-不建全市场湖时，`--profile demo` 用真实数据源把 5 只股票、最近约 30 个交易日写入独立的 `data/cnequity-demo/`，配置为 `configs/cnequity.demo.toml`；`--profile sample` 离线生成同样形状的合成数据（`source=mock`），只用于验证安装。两者都不影响正式湖，也不能代替全市场初始化。
+不建全市场湖时，`--profile demo` 用真实数据源把 5 只股票、最近约 30 个交易日写入独立的 `data/cnequity-demo/`，配置为 `configs/cnequity.demo.toml`；`--profile sample` 离线生成同样形状的合成数据（`source=mock`），写入 `data/cnequity-sample/`，配置为 `configs/cnequity.sample.toml`，只用于验证安装。两者都不影响正式湖，也不能代替全市场初始化。
 
 ```bash
 cne init --profile demo
-cne init --profile sample --data-root data/cnequity-sample --config-out configs/cnequity.sample.toml
+cne init --profile sample
 ```
 
 demo 结束时会打印一条带配置绝对路径的 `claude mcp add ...` 命令，复制即可把这个小湖接给 AI agent，其他客户端见 [MCP 接入](../reference/mcp.md)。用 `cne serve --config configs/cnequity.demo.toml` 可以在浏览器里查看它；面板只评估 demo 湖实际持有的数据集。

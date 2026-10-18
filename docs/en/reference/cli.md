@@ -123,10 +123,10 @@ The options below apply only to these two profiles; `--config` / `--resume` / `-
 | `--days` | About how many trading days of `daily_bars` (default 30) |
 | `--intraday` | Also fetch 1m bars for the same symbols (at most about 5 trading days) and print one full session |
 | `--research` | Also derive hfq factors from Sina and print a raw / hfq return comparison; extends the window to about 3 years |
-| `--data-root` | Separate lake root directory (default `data/cnequity-demo`) |
+| `--data-root` | Separate lake root directory (default `data/cnequity-demo`; sample: `data/cnequity-sample`) |
 | `--profile sample` | No network access; generates a synthetic sample for verifying the installation, queries and DuckDB views; cannot be combined with `--research` / `--intraday` |
 | `--trade-date` | As-of date YYYY-MM-DD (default today / the latest trading day) |
-| `--config-out` | Write a small configuration for later `cne query` use (default `configs/cnequity.demo.toml`) |
+| `--config-out` | Write a small configuration for later `cne query` use (default `configs/cnequity.demo.toml`; sample: `configs/cnequity.sample.toml`) |
 | `--force` | Allow overwriting an existing `--config-out` with different content; by default the original file is kept and an error is raised; identical content can simply be rerun |
 
 Flow: create directories → probe TDX → pull instruments and trim to the demo universe → trading calendar → `daily_bars` + compact → print sample tables; with `--research` it also derives Sina hfq and checks exact coverage, and with `--intraday` it also runs `minute_bars`. The terminal shows staged progress and INFO logs. TDX must be reachable; `allow_mock` is not turned on.

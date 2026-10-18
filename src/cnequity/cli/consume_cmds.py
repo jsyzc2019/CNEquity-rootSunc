@@ -23,7 +23,7 @@ from cnequity.cli._shared import (
 )
 from cnequity.i18n import N_, _
 from cnequity.query.on_demand import OnDemandService
-from cnequity.query.views import ensure_duckdb_views
+from cnequity.query.views import views_connection
 
 _LOOPBACK = {"127.0.0.1", "::1", "localhost"}
 # macOS resolves localhost to ::1 before 127.0.0.1, and a browser does not
@@ -286,10 +286,9 @@ def query(
         if data.get("error"):
             raise SystemExit(1)
         return
-    db_path = ensure_duckdb_views(cfg)
     import duckdb
 
-    con = duckdb.connect(str(db_path), read_only=True)
+    con = views_connection(cfg)
     try:
         # A typo in the SQL is the most ordinary thing that happens here, and
         # DuckDB's own message already names the line, the column and the near

@@ -188,6 +188,63 @@ def test_demo_help_lists_command():
     assert "demo|sample|quick|full" in result.output
 
 
+def test_sample_then_demo_with_defaults_do_not_collide(tmp_path, monkeypatch):
+    """The sample's closing hint, `cne init --profile demo`, must just work.
+
+    Both profiles used to default to configs/cnequity.demo.toml and
+    data/cnequity-demo, so the demo refused the config the sample had written,
+    and with --force would have mixed real bars into a source=mock lake.
+    """
+    monkeypatch.chdir(tmp_path)
+    sample = CliRunner().invoke(cli, ["init", "--profile", "sample", "--days", "3"])
+    assert sample.exit_code == 0, sample.output
+    assert (tmp_path / "configs" / "cnequity.sample.toml").exists()
+    assert any((tmp_path / "data" / "cnequity-sample").rglob("*.parquet"))
+    assert not (tmp_path / "configs" / "cnequity.demo.toml").exists()
+
+    seen = {}
+
+    def fake_run_demo(**kwargs):
+        seen.update(kwargs)
+        return {}
+
+    monkeypatch.setattr("cnequity.cli.demo.run_demo", fake_run_demo)
+    demo = CliRunner().invoke(cli, ["init", "--profile", "demo"])
+    assert demo.exit_code == 0, demo.output
+    assert seen["data_root"] == Path("data/cnequity-demo")
+    assert seen["config_out"] == Path("configs/cnequity.demo.toml")
+
+
+def test_demo_refuses_a_data_root_holding_the_sample(tmp_path, monkeypatch):
+    from cnequity.cli.demo import run_demo, run_sample_demo
+
+    monkeypatch.setattr(
+        "cnequity.cli.demo._probe_tdx",
+        lambda *_a, **_k: pytest.fail("the refusal must come before any network"),
+    )
+    root = tmp_path / "lake"
+    run_sample_demo(
+        symbols=["600519.SH"], days=3, data_root=root, config_out=tmp_path / "sample.toml"
+    )
+    with pytest.raises(click.ClickException, match="synthetic sample"):
+        run_demo(
+            symbols=["600519.SH"],
+            days=3,
+            data_root=root,
+            config_out=tmp_path / "demo.toml",
+            force=True,
+        )
+
+
+def test_missing_user_config_points_at_the_sample_config(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "configs").mkdir()
+    (tmp_path / "configs" / "cnequity.sample.toml").write_text("", encoding="utf-8")
+    result = CliRunner().invoke(cli, ["status"])
+    assert result.exit_code != 0
+    assert "--config configs/cnequity.sample.toml" in result.output
+
+
 @pytest.mark.usefixtures("chinese_output")
 def test_cne_demo_sample_needs_no_network(tmp_path, monkeypatch):
     def fail_on_network(*args, **kwargs):

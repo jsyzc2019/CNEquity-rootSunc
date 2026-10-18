@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from datetime import date, datetime
 from pathlib import Path
 
@@ -19,6 +20,9 @@ from cnequity.i18n import N_, _
 USER_CONFIG = "configs/cnequity.toml"
 EXAMPLE_CONFIG = "configs/cnequity.example.toml"
 DEMO_CONFIG = "configs/cnequity.demo.toml"
+DEMO_DATA_ROOT = "data/cnequity-demo"
+SAMPLE_CONFIG = "configs/cnequity.sample.toml"
+SAMPLE_DATA_ROOT = "data/cnequity-sample"
 DEFAULT_CONFIG = USER_CONFIG
 
 
@@ -64,10 +68,12 @@ def resolve_config_path(config_path: str):
         # `cne init` against a demo data_root is destructive enough that the
         # choice has to stay the user's.
         hint = ""
-        if Path(DEMO_CONFIG).exists():
-            hint = _(
-                "\nFound {DEMO_CONFIG}, written by `cne init --profile demo`. To work on the demo lake, add `--config {DEMO_CONFIG}`."
-            ).format(DEMO_CONFIG=DEMO_CONFIG)
+        for small, profile in ((DEMO_CONFIG, "demo"), (SAMPLE_CONFIG, "sample")):
+            if Path(small).exists():
+                hint = _(
+                    "\nFound {config}, written by `cne init --profile {profile}`. To work on that lake, add `--config {config}`."
+                ).format(config=small, profile=profile)
+                break
         raise click.ClickException(
             _(
                 "No config found at {USER_CONFIG}. On first use, just run `cne init`: it writes this config and starts initializing. To only write the config, use `cne config create` (with a repository checkout you can also copy {EXAMPLE_CONFIG}).{hint}"
@@ -78,17 +84,29 @@ def resolve_config_path(config_path: str):
     return path
 
 
+# tomllib ends every decode error with "(at line N, column M)".
+_TOML_POSITION = re.compile(r"\(at line (\d+), column (\d+)\)")
+
+
 def _cfg(config: str):
     path = resolve_config_path(config)
     try:
         cfg = load_config(path)
     except (ValueError, TypeError, OSError) as exc:
         # Parser messages may contain a literal token/proxy from the TOML.
-        # Keep the path and error type, never echo the configuration text.
+        # Keep the path and error type, never echo the configuration text —
+        # but do say where: "TOMLDecodeError" alone sent people reading the
+        # whole file for one missing quote.
+        at = _TOML_POSITION.search(str(exc))
+        where = (
+            _(" at line {line}, column {column}").format(line=at.group(1), column=at.group(2))
+            if at
+            else ""
+        )
         raise click.ClickException(
             _(
-                "Could not load config {path} ({name}); check the TOML syntax, value types, and that rate limits are finite and non-negative."
-            ).format(path=path, name=type(exc).__name__)
+                "Could not load config {path} ({name}{where}); check the TOML syntax, value types, and that rate limits are finite and non-negative."
+            ).format(path=path, name=type(exc).__name__, where=where)
         ) from None
     try:
         cfg._validate_source_limits()
