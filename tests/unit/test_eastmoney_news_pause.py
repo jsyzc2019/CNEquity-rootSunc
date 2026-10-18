@@ -19,6 +19,16 @@ from cnequity.steps import news_feed as step
 _COOLING = SourceCoolingDown("eastmoney: HTTP 403; shared cooldown")
 
 
+@pytest.fixture(autouse=True)
+def _fresh_fetch_cache():
+    """`shared_fetch` caches by run id for the process; tests reuse ids like `run-2`."""
+    step._CACHE.clear()
+    step._STAGED.clear()
+    yield
+    step._CACHE.clear()
+    step._STAGED.clear()
+
+
 def _cfg(tmp_path, **kwargs) -> Config:
     return Config(data_root=tmp_path / "data", **kwargs)
 
