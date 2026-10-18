@@ -719,25 +719,18 @@ init 不属于任何调度组，因此不受 `--groups` 豁免；截面校验则
 
 ## cne storage
 
-版本生命周期包括引用登记、不可变计划、原地观察期和维护窗口下的物理回收。满 7 天不会自动删除。试验目录可先归档再退出原位置；外部读取须由操作者停止。
+版本生命周期包括引用登记、不可变计划、原地观察期和维护窗口下的物理回收。满 7 天不会自动删除。外部读取须由操作者停止。
 
 | 命令 | 行为 |
 |---|---|
-| `inspect --keep 5` | 只读列出仍存在的版本、保留原因和登记试验；未导入引用时仅为初筛 |
+| `inspect --keep 5` | 只读列出仍存在的版本和保留原因；未导入引用时仅为初筛 |
 | `explain OBJECT_ID` | 显示版本的 current/recent/hold 等依据 |
 | `import --manifest FILE` | 校验并合并已审核的本地引用清单；不会自动解除已有保护 |
-| `hold OBJECT_ID --reason TEXT` | 新增版本、试验、工件或清理资源的保留理由，取消相应待删除标记 |
+| `hold OBJECT_ID --reason TEXT` | 新增版本或清理资源的保留理由，取消相应待删除标记 |
 | `plan --keep 5 --phase mark` | 校验引用源后保存内容寻址的标记计划，返回 `plan_id` |
 | `plan --keep 5 --phase purge` | 只选择观察期已满且内容未变的候选，逐文件核对 SHA-256；输出 `purge_ids` 和 `logical_bytes_to_purge` |
 | `apply PLAN_ID --phase mark` | 再次校验指针、引用、登记和文件身份，开始至少 7 天的原地观察期 |
 | `apply PLAN_ID --phase purge` | 已禁用；必须转到 serve 存储运维页重新检查并确认 |
-| `experiment-create --parent DIR --case-id ID` | 新建独立实例身份的空试验目录，登记为 active |
-| `archive OBJECT_ID --destination DIR` | 独立复制已登记试验，逐文件校验后封存工件；保留原目录 |
-| `experiment-seal OBJECT_ID --artifact-id ID` | 显式声明试验结束，校验源身份与归档一致后登记 sealed |
-| `artifact-verify OBJECT_ID` | 校验工件文件集合、大小和 SHA-256 |
-| `resolve OLD_PATH [--artifact-id ID]` | 校验并返回旧路径对应的归档位置；多版本时必须明确选择 |
-| `experiment-plan --phase mark\|purge` | 为非 active、无引用/hold 且原内容与归档一致的试验原目录生成计划 |
-| `experiment-apply PLAN_ID` | 仅执行 mark；purge 必须转到 serve 网页确认 |
 
 每个子命令接受 `--config`。版本 `OBJECT_ID` 为当前湖内的 `revision/<dataset>/<revision_id>`；计划另外绑定湖身份及 metadata 根，不能直接在另一个湖使用。被引用但暂时缺失的版本也可通过清单登记保护，以便恢复后继续受到保护。
 
@@ -754,10 +747,6 @@ init 不属于任何调度组，因此不受 `--groups` 豁免；截面校验则
 `logical_bytes_deleted` 仅累计已完整删除的版本；部分失败的字节不计入，并报告 `partial_deletion_possible`。文件系统可用空间另记录前后值，可能受到其他系统活动影响。待删除标记和删除收据都不能替代备份。
 
 `logical_bytes_selected` 来自版本文件清单，不是实际磁盘释放量；APFS 克隆和系统快照可使两者相差很大。标记阶段所有字节保持原位。
-
-试验使用 `experiment/<id>`，归档使用 `artifact/<manifest-digest>`。归档采用独立 inode 的复制，支持时使用文件系统克隆；中断副本保留为 `.incomplete-*`，不会登记为 sealed。归档不会自动停止源写入或解除旧 hold，也不证明完整重放可用。托管试验需显式 `experiment-seal` 才退出 active；归档本身不改变此状态。后续源内容改变会阻止按旧归档清理。
-
-旧报告保持不变。读取者需要显式调用 `ArtifactStore.resolve()` 或使用 `storage resolve` 的结果。归档目录解析会校验整个工件，文件解析会校验对应文件。发现原目录引用时继续保留原位置；只有完成消费者迁移并重新审核引用，才能进入观察期。试验清理收据位于 `meta/lifecycle/experiment-purges/`，删除的是冗余原位置，封存工件保持可用。失败后重试同一计划会核验残留；路径被新试验复用时停止。
 
 现有其他清理器共享 hold：`staging/<run_id>`、`source_snapshot/<dataset>/source=<source>/data_version=<version>/run_id=<run>`、`log/<cne-*.log文件名>`。可通过 `storage hold` 保护已存在对象，或由 case 的 `requires_bytes` 提供保护。年龄、compact/readiness 和每类最新快照规则继续有效；`--force` 不绕过 hold。登记后的引用源发生变化或不可读时，这些清理器也停止并要求刷新清单。
 

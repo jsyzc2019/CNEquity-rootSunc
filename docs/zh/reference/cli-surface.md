@@ -67,19 +67,12 @@
 | `cne stats show` | 无 | 读取本地统计；过期或明细视图需要时自动重算 |
 | `cne status` | 无 | 读取运行状态与数据集覆盖 |
 | `cne storage apply` | 无 | 复核版本计划并 mark；CLI purge 禁用，删除须在 serve 网页确认 |
-| `cne storage archive` | 无 | 复制已登记试验、逐文件校验并登记封存工件；保留源目录 |
-| `cne storage artifact-verify` | 无 | 读取并校验封存工件完整内容 |
-| `cne storage experiment-apply` | 无 | 仅原地标记试验；CLI purge 禁用，删除须在 serve 网页确认 |
-| `cne storage experiment-create` | 无 | 创建空试验目录和独立实例身份并登记 active |
-| `cne storage experiment-plan` | 无 | 校验引用、原目录及归档，保存冗余原位置退出计划 |
-| `cne storage experiment-seal` | 无 | 显式结束试验并绑定已验证归档；源内容改变后不能按旧封存清理 |
 | `cne storage explain` | 无 | 读取版本保留依据 |
 | `cne storage hold` | 无 | 增加对象保护并取消待删除标记 |
 | `cne storage import` | 无 | 校验并登记引用清单；只增加保护 |
 | `cne storage inspect` | 无 | 读取版本、保留原因与登记试验 |
 | `cne storage plan` | 无 | 校验保留依赖并保存版本计划；不删除数据 |
 | `cne storage raw-external` | 无 | 登记外置原文目录；本地保留来源记录，不移动或删除文件 |
-| `cne storage resolve` | 无 | 校验旧路径对应的归档位置；不重写报告 |
 | `cne ths-official backfill` | 执行时 | 调用凭证源并补缺 |
 | `cne ths-official capture` | 执行时 | 调用凭证源并写对照证据 |
 | `cne ths-official repair-bars` | 执行时 | 预演也取数；--apply 写修复 |

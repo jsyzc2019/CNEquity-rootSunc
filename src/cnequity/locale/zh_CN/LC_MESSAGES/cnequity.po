@@ -1259,10 +1259,6 @@ msgstr "回环地址会同时监听 127.0.0.1 和 localhost。非回环地址必
 msgid "A manual selection can only be used for a new deletion, not together with marked or restore records."
 msgstr "手动选择只能用于新的删除，不能和标记或恢复记录一起用。"
 
-#: cnequity/storage/lifecycle/experiments.py
-msgid "A manual selection can only be used for deletion, without duplicates."
-msgstr "手动选择只能用于删除，且不能重复。"
-
 #: cnequity/storage/lifecycle/__init__.py
 msgid "A manual selection can only be used for deletion."
 msgstr "手动选择只能用于删除。"
@@ -1704,11 +1700,6 @@ msgstr ""
 "连不上 TDX：{exc}\n"
 "建议：换大陆网络 / VPN 出口再试，或者检查示例配置里的 `[tdx_protocol.hosts]`。"
 
-#: cnequity/storage/lifecycle/experiments.py
-#, python-brace-format
-msgid "Cannot delete experiment {oid}: it is still in use, referenced or retained, or has no verifiable archive yet."
-msgstr "不能删除试验 {oid}：仍在使用、被引用、被保留，或还没有可核对的归档。"
-
 #: cnequity/storage/lifecycle/purge.py
 #, python-brace-format
 msgid "Cannot delete {oid}: it is the current version, or is still referenced or retained, or has no receipt."
@@ -1954,10 +1945,6 @@ msgstr "某阶段失败后继续"
 msgid "Contract check passed"
 msgstr "契约检查通过"
 
-#: cnequity/cli/storage_cmds.py
-msgid "Copy a registered experiment and verify it file by file; seal the copy, keeping the original directory and its protection."
-msgstr "复制登记试验并逐文件校验；封存副本，保留原目录及其保护。"
-
 #: cnequity/serve/ops/catalog.py
 msgid "Copy the selected datasets into a verifiable lake snapshot. Does not contact data sources."
 msgstr "把明确选择的数据集复制成可校验的湖快照，不请求数据源。"
@@ -2022,10 +2009,6 @@ msgstr "覆盖窗口终点；--bars 默认上一个完整交易日，--derivativ
 #: cnequity/cli/govern_cmds.py
 msgid "Create NAME as an immutable add/replace/delete package."
 msgstr "把 NAME 创建成一个不可变的 增加/替换/删除 包。"
-
-#: cnequity/cli/storage_cmds.py
-msgid "Create an empty experiment directory with its own instance identity, and register it as active."
-msgstr "创建有独立实例身份的空试验目录，并登记为 active。"
 
 #: cnequity/serve/ops/catalog.py
 msgid "Create data backup"
@@ -2492,14 +2475,6 @@ msgstr "显式指定历史起点（YYYY-MM-DD）；覆盖 --profile。"
 msgid "Explicitly accept that the annual package lacks fields found only in the daily files; existing complete daily bars are not overwritten."
 msgstr "明确接受年度包缺少日文件独有字段；已有完整日线不会被覆盖。"
 
-#: cnequity/cli/storage_cmds.py
-msgid "Explicitly end an experiment working directory, and bind its sealed state to the verified archive."
-msgstr "显式结束试验工作目录，并将封存状态绑定到已验证的归档。"
-
-#: cnequity/cli/storage_cmds.py
-msgid "Explicitly select one artifact when several sealed versions exist."
-msgstr "存在多个封存版本时明确选择一个工件。"
-
 #: cnequity/cli/decision_data_cmds.py
 msgid "Export reviewed holder-specific rights tied to the current action revision."
 msgstr "导出已审核的、与当前公司行为修订版本绑定的持有人专属权益。"
@@ -2766,10 +2741,6 @@ msgstr "仅期货/期权日线：从已核验格式的本地上期所年度 ZIP 
 #: cnequity/diagnostics/source_health.py
 msgid "GFEX website (per-contract daily quotes)"
 msgstr "广期所官网（逐合约日行情）"
-
-#: cnequity/cli/storage_cmds.py
-msgid "Generate a retirement plan for an experiment's original directory that has no references, is not active, and already has a complete archive."
-msgstr "为无引用、非 active 且已有完整归档的试验原目录生成退出计划。"
 
 #: cnequity/serve/ops/settings.py
 msgid "Generate the config before changing fetch settings."
@@ -3249,10 +3220,6 @@ msgstr "宏观"
 #: cnequity/serve/storage.py
 msgid "Maintenance is running; follow its progress in the operation records."
 msgstr "维护正在执行，请通过操作记录查看进度。"
-
-#: cnequity/cli/storage_cmds.py
-msgid "Mark a redundant original directory in place; the CLI does not allow physical deletion, which must be confirmed on the serve web page."
-msgstr "原地标记冗余原目录；CLI 不允许物理删除，须到 serve 网页确认。"
 
 #: cnequity/cli/storage_cmds.py
 msgid "Mark after reviewing the plan; the CLI does not allow physical deletion."
@@ -3761,10 +3728,6 @@ msgstr "逐数据集的新鲜度：覆盖区间、水位，以及相对最后交
 #: cnequity/cli/maintain_cmds.py
 msgid "Per-partition detail for one dataset."
 msgstr "某一个数据集的逐分区明细。"
-
-#: cnequity/cli/storage_cmds.py
-msgid "Physical deletion must be reviewed and confirmed on the storage operations page of cne serve."
-msgstr "物理删除必须在 cne serve 的存储运维网页中检查并确认。"
 
 #: cnequity/cli/storage_cmds.py
 msgid "Physical deletion must be reviewed and confirmed on the storage operations page of cne serve; the CLI only allows previewing and marking."
@@ -5313,10 +5276,6 @@ msgstr "事件流设置或运行间隔已变化，没有重复取数。"
 msgid "The exchange's official definition, on a different risk-control surface from EastMoney; usable as a backup source."
 msgstr "交易所官方口径，与东财不同风控面，可作备源。"
 
-#: cnequity/serve/storage.py
-msgid "The experiment cleanup plan has changed."
-msgstr "试验清理计划已改变。"
-
 #: cnequity/diagnostics/report.py
 msgid "The first `cne init` creates it."
 msgstr "首次 `cne init` 会创建它。"
@@ -5840,10 +5799,6 @@ msgstr "校验 @ {value} —— {value2} 个缺口"
 msgid "Verify ARCHIVE and import it into the snapshot store atomically."
 msgstr "校验 ARCHIVE 并原子地导入快照库。"
 
-#: cnequity/cli/storage_cmds.py
-msgid "Verify and resolve the archived location of an old path; does not rewrite reports or create symlinks."
-msgstr "校验并解析旧路径的归档位置；不改写报告，不创建符号链接。"
-
 #: cnequity/serve/ops/catalog.py
 msgid "Verify coverage"
 msgstr "校验覆盖"
@@ -5851,10 +5806,6 @@ msgstr "校验覆盖"
 #: cnequity/serve/ops/catalog.py
 msgid "Verify data backup"
 msgstr "校验数据备份"
-
-#: cnequity/cli/storage_cmds.py
-msgid "Verify the full contents of an archived artifact against its sealed manifest."
-msgstr "按封存清单校验归档工件的完整内容。"
 
 #: cnequity/cli/govern_cmds.py
 msgid "Verify the hashes and change semantics of every add/replace payload."

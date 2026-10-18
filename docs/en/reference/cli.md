@@ -722,25 +722,18 @@ The preview also returns `staging_inventory`, `staging_run_count`, and `skipped_
 
 ## cne storage
 
-The version lifecycle comprises reference registration, immutable plans, an in-place observation period, and physical reclamation within a maintenance window. Nothing is deleted automatically after 7 days. Experiment directories can be archived first and then retired from their original location; external readers must be stopped by the operator.
+The version lifecycle comprises reference registration, immutable plans, an in-place observation period, and physical reclamation within a maintenance window. Nothing is deleted automatically after 7 days. External readers must be stopped by the operator.
 
 | Command | Behavior |
 |---|---|
-| `inspect --keep 5` | Read-only listing of the versions that still exist, their retention reasons and registered experiments; without imported references it is only a first-pass screen |
+| `inspect --keep 5` | Read-only listing of the versions that still exist and their retention reasons; without imported references it is only a first-pass screen |
 | `explain OBJECT_ID` | Show the grounds for a version, such as current/recent/hold |
 | `import --manifest FILE` | Validate and merge a reviewed local reference manifest; never lifts existing protection automatically |
-| `hold OBJECT_ID --reason TEXT` | Add a retention reason for a version, experiment, artifact or cleanup resource, canceling the corresponding pending-deletion mark |
+| `hold OBJECT_ID --reason TEXT` | Add a retention reason for a version or cleanup resource, canceling the corresponding pending-deletion mark |
 | `plan --keep 5 --phase mark` | After validating reference sources, save a content-addressed mark plan and return a `plan_id` |
 | `plan --keep 5 --phase purge` | Select only candidates whose observation period has ended and whose content is unchanged, checking SHA-256 file by file; outputs `purge_ids` and `logical_bytes_to_purge` |
 | `apply PLAN_ID --phase mark` | Revalidate pointers, references, registrations and file identity, and start an in-place observation period of at least 7 days |
 | `apply PLAN_ID --phase purge` | Disabled; must go to the serve storage operations page to recheck and confirm |
-| `experiment-create --parent DIR --case-id ID` | Create an empty experiment directory with its own instance identity, registered as active |
-| `archive OBJECT_ID --destination DIR` | Independently copy a registered experiment and seal the artifact after file-by-file verification; the original directory is kept |
-| `experiment-seal OBJECT_ID --artifact-id ID` | Explicitly declare an experiment finished; registered as sealed after verifying that the source identity matches the archive |
-| `artifact-verify OBJECT_ID` | Verify an artifact's file set, sizes and SHA-256 |
-| `resolve OLD_PATH [--artifact-id ID]` | Verify and return the archive location corresponding to an old path; with multiple versions an explicit choice is required |
-| `experiment-plan --phase mark\|purge` | Generate a plan for original experiment directories that are non-active, have no references/hold, and whose original content matches the archive |
-| `experiment-apply PLAN_ID` | Runs mark only; purge must go through web confirmation in serve |
 
 Every subcommand accepts `--config`. A version `OBJECT_ID` is `revision/<dataset>/<revision_id>` within the current lake; a plan is additionally bound to the lake identity and the metadata root, and cannot be used directly on another lake. A version that is referenced but temporarily missing can also be protected through manifest registration, so it stays protected after it is restored.
 
@@ -757,10 +750,6 @@ Every candidate is revalidated before deletion. The executor first records its i
 `logical_bytes_deleted` only accumulates versions that were deleted completely; bytes from partial failures are not counted, and `partial_deletion_possible` is reported. File-system free space is recorded separately before and after, and may be affected by other system activity. Neither pending-deletion marks nor deletion receipts replace backups.
 
 `logical_bytes_selected` comes from the versions' file lists and is not the actual disk space freed; APFS clones and system snapshots can make the two differ greatly. During the mark phase all bytes stay in place.
-
-Experiments use `experiment/<id>`, archives use `artifact/<manifest-digest>`. Archiving copies with independent inodes, using file-system clones where supported; an interrupted copy is kept as `.incomplete-*` and is never registered as sealed. Archiving does not automatically stop source writes or lift old holds, nor does it prove that a full replay is available. A managed experiment leaves active only through an explicit `experiment-seal`; archiving by itself does not change this state. Later changes to the source content block cleanup against the old archive.
-
-Old reports stay unchanged. Readers need to call `ArtifactStore.resolve()` explicitly or use the result of `storage resolve`. Resolving an archive directory verifies the whole artifact; resolving a file verifies that file. When a reference to the original directory is found, the original location is kept; it can enter the observation period only after consumers have been migrated and references re-reviewed. Experiment cleanup receipts are in `meta/lifecycle/experiment-purges/`; what is deleted is the redundant original location, and the sealed artifact stays available. Retrying the same plan after a failure verifies the leftovers; it stops when the path has been reused by a new experiment.
 
 The other existing cleaners share holds: `staging/<run_id>`, `source_snapshot/<dataset>/source=<source>/data_version=<version>/run_id=<run>`, `log/<cne-*.log filename>`. Existing objects can be protected with `storage hold`, or through a case's `requires_bytes`. Age, compact/readiness and newest-snapshot-per-type rules still apply; `--force` does not bypass holds. When a registered reference source changes or becomes unreadable, these cleaners also stop and require the manifest to be refreshed.
 

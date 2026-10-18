@@ -67,19 +67,12 @@ Checked against the Click command registry by `scripts/dev/sync_docs.py`. “Whe
 | `cne stats show` | none | Reads local stats; recomputes automatically when stale or when a detail view needs it |
 | `cne status` | none | Reads run state and dataset coverage |
 | `cne storage apply` | none | Rechecks the version plan and marks; CLI purge is disabled, deletion must be confirmed in the serve web UI |
-| `cne storage archive` | none | Copies a registered experiment, verifies it file by file and registers the sealed artifact; keeps the source directory |
-| `cne storage artifact-verify` | none | Reads and verifies the full contents of a sealed artifact |
-| `cne storage experiment-apply` | none | Only marks the experiment in place; CLI purge is disabled, deletion must be confirmed in the serve web UI |
-| `cne storage experiment-create` | none | Creates an empty experiment directory with its own instance identity and registers it as active |
-| `cne storage experiment-plan` | none | Validates references, the original directory and the archive, and saves an exit plan for the redundant original location |
-| `cne storage experiment-seal` | none | Explicitly ends an experiment and binds a verified archive; once source content changes it cannot be cleaned up under the old seal |
 | `cne storage explain` | none | Reads the retention reasons for versions |
 | `cne storage hold` | none | Adds object protection and clears pending-deletion marks |
 | `cne storage import` | none | Validates and registers a reference manifest; only adds protection |
 | `cne storage inspect` | none | Reads versions, retention reasons and registered experiments |
 | `cne storage plan` | none | Validates retention dependencies and saves a version plan; deletes no data |
 | `cne storage raw-external` | none | Registers external payload storage; retains local source sidecars and does not move or delete files |
-| `cne storage resolve` | none | Validates the archive location for an old path; does not rewrite reports |
 | `cne ths-official backfill` | when run | Calls the credentialed source and fills gaps |
 | `cne ths-official capture` | when run | Calls the credentialed source and writes comparison evidence |
 | `cne ths-official repair-bars` | when run | Fetches even in a dry run; --apply writes repairs |

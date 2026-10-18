@@ -7,9 +7,6 @@ const reasonText = code => ({
   recent_generation: tr("最近 5 代", "Latest 5 generations"),
   explicit_hold: tr("审计或人工保留", "Audit or manual hold"),
   referenced_path: tr("仍有路径引用", "Still referenced"),
-  active_experiment: tr("试验仍在使用", "Experiment still in use"),
-  archive_required: tr("缺少独立归档", "Needs its own archive"),
-  source_missing: tr("原目录不存在", "Source directory missing"),
   missing_current_pointer: tr("缺少当前版本指针", "Missing current pointer"),
   unreceipted_generation: tr("缺少版本收据", "Missing generation receipt"),
   missing_file_manifest: tr("缺少文件清单", "Missing file manifest"),
@@ -37,7 +34,7 @@ const datasetId = o => {
   return cut > 0 ? o.label.slice(0, cut) : o.label;
 };
 const groupKey = o => (o.kind !== "revisions" ? o.kind : datasetId(o));
-const groupTitle = key => (key === "experiments" ? tr("试验目录", "Experiments") : key === "staging" ? tr("采集暂存", "Ingestion staging") : dsWithCode(key));
+const groupTitle = key => (key === "staging" ? tr("采集暂存", "Ingestion staging") : dsWithCode(key));
 const versionName = o => {
   if (o.kind !== "revisions") return o.label;
   const mark = " · 第 "; // i18n-ignore
@@ -85,7 +82,7 @@ export async function renderStorage({ api, setPage, esc, dataTable }) {
   }
   function controls(disabled) {
     running = disabled;
-    document.querySelectorAll("[data-storage-action], #storage-kind, #storage-query").forEach(el => { el.disabled = disabled; });
+    document.querySelectorAll("[data-storage-action], #storage-query").forEach(el => { el.disabled = disabled; });
     if (!disabled) refreshSelection();
   }
   async function poll(job) {
@@ -176,7 +173,7 @@ export async function renderStorage({ api, setPage, esc, dataTable }) {
     document.getElementById("storage-review").innerHTML = "";
     showMessage(tr("正在核验引用、版本和文件完整性。大目录检查可能需要几分钟；这一步不会删除数据。", "Verifying references, versions, and file integrity. Large directories can take a few minutes; this step deletes nothing."));
     try {
-      const kind = resume?.kind || document.getElementById("storage-kind").value;
+      const kind = resume?.kind || "revisions";
       const job = await poll(await post("/api/storage/reviews", { kind, phase, ...(resume ? { resume_plan_id: resume.plan_id } : {}) }));
       if (job) showReview(job);
     } catch (err) { showMessage(err.message, true); }
@@ -211,16 +208,14 @@ export async function renderStorage({ api, setPage, esc, dataTable }) {
     document.getElementById("storage-review").innerHTML = "";
     const done = [];
     try {
-      for (const kind of ["revisions", "experiments", "staging"]) {
+      for (const kind of ["revisions", "staging"]) {
         const group = chosen.filter(o => o.kind === kind);
         for (let index = 0; index < group.length; index += 200) {
           const slice = group.slice(index, index + 200);
           const range = `${index + 1}–${index + slice.length} / ${group.length}`;
           showMessage(kind === "revisions"
             ? tr(`正在核验勾选的历史版本（${range}）。核验通过后会删除这些项目。`, `Verifying the selected old revisions (${range}). They are deleted once the check passes.`)
-            : kind === "staging"
-              ? tr(`正在核验已合并暂存（${range}）。核验通过后会删除这些项目。`, `Verifying compacted staging (${range}). It is deleted once the check passes.`)
-              : tr(`正在核验勾选的试验目录（${range}）。核验通过后会删除这些项目。`, `Verifying the selected experiment directories (${range}). They are deleted once the check passes.`));
+            : tr(`正在核验已合并暂存（${range}）。核验通过后会删除这些项目。`, `Verifying compacted staging (${range}). It is deleted once the check passes.`));
           const job = await poll(await post("/api/storage/reviews", { kind, phase: "purge", object_ids: slice.map(o => o.object_id) }));
           if (!job) return;
           const same = job.objects.map(o => o.object_id).sort().join("\n") === slice.map(o => o.object_id).sort().join("\n");
@@ -375,7 +370,7 @@ export async function renderStorage({ api, setPage, esc, dataTable }) {
     const deletable = summary.objects.filter(canPick);
     const kept = summary.objects.filter(o => !o.current && !canPick(o));
     const metric = (id, title, items, note) => `<button type="button" class="storage-metric${view === id ? " on" : ""}" data-storage-action data-view="${id}" aria-pressed="${view === id}"><span class="metric-label">${title}</span><span class="metric-value">${items.length.toLocaleString("zh-CN")}</span><span class="metric-note">${note || countText(items)}</span></button>`;
-    const unfinished = summary.unfinished.length ? `<section class="surface-panel report-panel storage-review"><h2>${tr("有未完成的删除记录", "An unfinished deletion is still open")}</h2><p class="panel-note">${tr("先重新审核原清单。已完成的项目不会重复删除，剩余项目仍需确认。", "Review the original list again. Finished items are not deleted twice; the rest still need confirmation.")}</p>${summary.unfinished.map((x, i) => `<div class="storage-resume"><code>${esc(x.plan_id)}</code><button class="button button-primary" data-storage-action data-resume="${i}" type="button">${tr("重新审核", "Review again")} ${x.kind === "revisions" ? tr("版本", "versions") : x.kind === "staging" ? tr("暂存", "staging") : tr("试验", "experiments")}</button></div>`).join("")}</section>` : "";
+    const unfinished = summary.unfinished.length ? `<section class="surface-panel report-panel storage-review"><h2>${tr("有未完成的删除记录", "An unfinished deletion is still open")}</h2><p class="panel-note">${tr("先重新审核原清单。已完成的项目不会重复删除，剩余项目仍需确认。", "Review the original list again. Finished items are not deleted twice; the rest still need confirmation.")}</p>${summary.unfinished.map((x, i) => `<div class="storage-resume"><code>${esc(x.plan_id)}</code><button class="button button-primary" data-storage-action data-resume="${i}" type="button">${tr("重新审核", "Review again")} ${x.kind === "revisions" ? tr("版本", "versions") : tr("暂存", "staging")}</button></div>`).join("")}</section>` : "";
     setPage(`<section class="page-heading"><div class="eyebrow">${tr("数据湖控制台 / 存储运维", "Lake console / Storage")}</div><div class="heading-row"><div><h1>${tr("存储运维", "Storage")}</h1><p class="sub">${tr("先看可以删除的历史。勾选后点删除，确认单核对通过才会执行。正在使用和受保护的版本分开列出，不能被选中。", "Start with history that can be deleted. Delete opens a confirmation and runs only after that check passes. In-use and protected versions are listed separately and cannot be selected.")}</p></div><span class="status-pill status-pill-fresh">${tr("自动删除已关闭", "Automatic deletion is off")}</span></div></section>
       ${unfinished}
       ${!summary.registered ? `<p class="panel-note err">${tr("尚未导入生命周期引用清单，按到期规则的检查会因缺少保护依据而停止。先在命令行运行 <code>cne storage import</code> 完成登记。", "The lifecycle reference list has not been imported, so a retention-rule check stops for lack of protection evidence. Run <code>cne storage import</code> first.")}</p>` : ""}
@@ -383,7 +378,7 @@ export async function renderStorage({ api, setPage, esc, dataTable }) {
       <p id="storage-message" class="panel-note" role="status" aria-live="polite">${tr("勾选历史版本后点删除。浏览或刷新此页不会删除数据。大小都是账面值，不能当成实际腾出的空间。", "Select history, then delete. Opening or refreshing this page does not delete anything. Sizes are logical values, not space you will get back.")}</p>
       <div id="storage-review" class="storage-review"></div>
       <section class="surface-panel storage-board"><div class="storage-toolbar"><label for="storage-query">${tr("筛选", "Filter")}</label><input id="storage-query" type="search" value="${esc(query)}" placeholder="${tr("数据集、版本或原因", "Dataset, version, or reason")}"></div><div id="storage-dock"></div><div id="storage-list"></div></section>
-      <details class="storage-fold" id="storage-tools"${toolsOpen ? " open" : ""}><summary>${tr("按到期规则检查", "Check by retention rule")}</summary><div class="storage-fold-body"><p class="panel-note">${tr("这一步只找出已经过观察期、或还没开始观察的项目，不会按上面的勾选删除。手动删除不需要先做检查。", "This only finds items past observation, or not yet observing. It does not delete the selection above. A manual delete does not need this check.")}</p><div class="storage-actions"><label for="storage-kind">${tr("检查范围", "Scope")}</label><select id="storage-kind"><option value="revisions">${tr("历史版本", "History")}</option><option value="experiments">${tr("试验目录", "Experiments")}</option></select><button class="button button-primary" data-storage-action id="storage-check" type="button">${tr("检查到期项目", "Check due items")}</button><button class="button button-ghost" data-storage-action id="storage-mark" type="button">${tr("检查待标记项目", "Check unmarked items")}</button></div></div></details>`, "storage");
+      <details class="storage-fold" id="storage-tools"${toolsOpen ? " open" : ""}><summary>${tr("按到期规则检查", "Check by retention rule")}</summary><div class="storage-fold-body"><p class="panel-note">${tr("这一步只找出已经过观察期、或还没开始观察的项目，不会按上面的勾选删除。手动删除不需要先做检查。", "This only finds items past observation, or not yet observing. It does not delete the selection above. A manual delete does not need this check.")}</p><div class="storage-actions"><button class="button button-primary" data-storage-action id="storage-check" type="button">${tr("检查到期项目", "Check due items")}</button><button class="button button-ghost" data-storage-action id="storage-mark" type="button">${tr("检查待标记项目", "Check unmarked items")}</button></div></div></details>`, "storage");
     document.getElementById("storage-query").oninput = event => { query = event.target.value; renderList(); };
     document.querySelectorAll("[data-view]").forEach(el => { el.onclick = () => setView(el.dataset.view); });
     document.getElementById("storage-check").onclick = () => check("purge");

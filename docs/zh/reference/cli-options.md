@@ -629,52 +629,6 @@
 | `--phase` | `mark` | mark 原地标记；purge 已禁用，请转到 serve 存储运维页。 |
 | `--maintenance-window` | `False` | 兼容选项；不能绕过网页删除确认。 |
 
-## `cne storage archive`
-
-| 参数 | 默认值 | 说明 |
-|---|---|---|
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
-| `object_id` | `—` | 必填；位置参数 |
-| `--destination` | `—` | 必填 |
-
-## `cne storage artifact-verify`
-
-| 参数 | 默认值 | 说明 |
-|---|---|---|
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
-| `object_id` | `—` | 必填；位置参数 |
-
-## `cne storage experiment-apply`
-
-| 参数 | 默认值 | 说明 |
-|---|---|---|
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
-| `plan_id` | `—` | 必填；位置参数 |
-| `--maintenance-window` | `False` | 兼容选项；不能绕过网页删除确认。 |
-
-## `cne storage experiment-create`
-
-| 参数 | 默认值 | 说明 |
-|---|---|---|
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
-| `--parent` | `—` | 必填 |
-| `--case-id` | `—` | 必填 |
-
-## `cne storage experiment-plan`
-
-| 参数 | 默认值 | 说明 |
-|---|---|---|
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
-| `--phase` | `mark` | — |
-
-## `cne storage experiment-seal`
-
-| 参数 | 默认值 | 说明 |
-|---|---|---|
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
-| `object_id` | `—` | 必填；位置参数 |
-| `--artifact-id` | `—` | 必填 |
-
 ## `cne storage explain`
 
 | 参数 | 默认值 | 说明 |
@@ -721,14 +675,6 @@
 | `--source` | `—` | 必填 |
 | `--root` | `—` | 必填 |
 | `--format` | `pdf` | — |
-
-## `cne storage resolve`
-
-| 参数 | 默认值 | 说明 |
-|---|---|---|
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
-| `old_path` | `—` | 必填；位置参数 |
-| `--artifact-id` | `—` | 存在多个封存版本时明确选择一个工件。 |
 
 ## `cne ths-official backfill`
 
