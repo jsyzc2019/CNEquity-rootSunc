@@ -343,6 +343,10 @@ class Config:
     # once on "busy" through every backoff. It serves most EastMoney datasets.
     eastmoney_datacenter_breaker: bool = True
     eastmoney_datacenter_breaker_strikes: int = 3
+    # Fast-news lane (handshake + list host): after this many refused sweeps in a
+    # row it is closed until local midnight instead of probing on every tick.
+    eastmoney_news_breaker: bool = True
+    eastmoney_news_breaker_strikes: int = 3
     # Requests per local day; 0 counts them (meta/rate_limits/eastmoney_guard.json)
     # without a cap. Set a cap from measured usage, not a guess: backfills of the
     # large reports legitimately need thousands.
@@ -726,6 +730,8 @@ def load_config(path: str | Path) -> Config:
     eastmoney_push2_shared_snapshot = True
     eastmoney_datacenter_breaker = True
     eastmoney_datacenter_breaker_strikes = 3
+    eastmoney_news_breaker = True
+    eastmoney_news_breaker_strikes = 3
     eastmoney_datacenter_daily_budget = 0
     eastmoney_daily_budget = 0
     # datacenter's own lane (source "eastmoney_dc"). It ran at 0.5 s / 4 in
@@ -782,6 +788,10 @@ def load_config(path: str | Path) -> Config:
                 eastmoney_datacenter_breaker = bool(val["datacenter_breaker"])
             if name == "eastmoney" and val.get("datacenter_breaker_strikes") is not None:
                 eastmoney_datacenter_breaker_strikes = int(val["datacenter_breaker_strikes"])
+            if name == "eastmoney" and val.get("news_breaker") is not None:
+                eastmoney_news_breaker = bool(val["news_breaker"])
+            if name == "eastmoney" and val.get("news_breaker_strikes") is not None:
+                eastmoney_news_breaker_strikes = int(val["news_breaker_strikes"])
             if name == "eastmoney" and val.get("datacenter_daily_budget") is not None:
                 eastmoney_datacenter_daily_budget = int(val["datacenter_daily_budget"])
             if name == "eastmoney" and val.get("daily_budget") is not None:
@@ -982,6 +992,8 @@ def load_config(path: str | Path) -> Config:
         eastmoney_push2_shared_snapshot=eastmoney_push2_shared_snapshot,
         eastmoney_datacenter_breaker=eastmoney_datacenter_breaker,
         eastmoney_datacenter_breaker_strikes=eastmoney_datacenter_breaker_strikes,
+        eastmoney_news_breaker=eastmoney_news_breaker,
+        eastmoney_news_breaker_strikes=eastmoney_news_breaker_strikes,
         eastmoney_datacenter_daily_budget=eastmoney_datacenter_daily_budget,
         eastmoney_daily_budget=eastmoney_daily_budget,
         ths_js_runtime=ths_js_runtime,

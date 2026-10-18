@@ -128,6 +128,11 @@ push2_max_concurrency = 1
 # a refusal), or at once when "busy" survives every backoff.
 datacenter_breaker = true
 datacenter_breaker_strikes = 3
+# Fast-news lane (handshake + list host): after news_breaker_strikes refused
+# sweeps in a row it stays closed until local midnight, instead of sending one
+# more probe on every 15-minute tick. A dead proxy or a timeout does not count.
+news_breaker = true
+news_breaker_strikes = 3
 # 0 = count requests per day (meta/rate_limits/eastmoney_guard.json) without a cap;
 # set a cap from the measured count.
 datacenter_daily_budget = 0

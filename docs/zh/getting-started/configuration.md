@@ -92,6 +92,7 @@ cne config validate --config configs/cnequity.toml
 | `push2_shared_snapshot`（eastmoney） | 默认开。instruments、valuation_metrics、fund_flow 和 clist 行情兜底共用一次全市场翻页（取字段并集），收盘后到次日开盘前重复使用 |
 | `push2_min_interval_seconds` / `push2_max_concurrency`（eastmoney） | 默认 4.0 秒 / 1。push2 单独的限速通道，不和 datacenter 共用 |
 | `datacenter_breaker` / `datacenter_breaker_strikes`（eastmoney） | 默认开 / 3。datacenter 连续 3 次被拒（403 / 429 / 5xx、连接被拒/重置/断开）当天停用；读超时不算；「请求过于频繁」退避后仍在则立即停用 |
+| `news_breaker` / `news_breaker_strikes`（eastmoney） | 默认开 / 3。快讯通道（握手 + 列表主机）连续 3 次扫描被拒（403 / 429 / 共享冷却）后当天停用，次日恢复；代理不通、读超时不算，成功一次清零 |
 | `datacenter_daily_budget`（eastmoney） | 默认 0：只计数、不设上限（计数在 `CNE_RATE_LIMIT_ROOT/eastmoney_guard.json`，默认本湖 `meta/rate_limits/`）。按实测用量设上限 |
 | `daily_budget`（eastmoney） | 默认 0：只计数；设置后对同一出口的 push2 与 datacenter 请求实施共享日上限，避免分别未超额但厂商总请求过多。共享账本位于 `CNE_RATE_LIMIT_ROOT`。 |
 | `datacenter_min_interval_seconds` / `datacenter_max_concurrency`（eastmoney） | 默认 1.0 秒 / 2。datacenter 单独的限速通道；其他东财主机仍按 `min_interval_seconds` 和 `source_concurrency.eastmoney` |
