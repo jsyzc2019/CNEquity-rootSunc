@@ -334,9 +334,7 @@ class StorageMaintenance:
                 raise LifecycleError(_("Nothing to execute this time."))
             if review["phase"] == "purge" and not maintenance:
                 raise LifecycleError(
-                    _(
-                        "First confirm that external queries, services, schedules and experiment writes have stopped."
-                    )
+                    _("First confirm that external queries, services and schedules have stopped.")
                 )
             if review["phase"] == "purge":
                 from cnequity.serve.ops.records import purge_blocked_reason

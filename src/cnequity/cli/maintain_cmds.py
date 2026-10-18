@@ -582,7 +582,7 @@ def clean(
     "Cleanable" means: the run is in a terminal state (success/warning/degraded/failed), every batch has settled,
     and a successful compact has been recorded. Staging that did not finish or was never compacted stays for a retry;
     --force only widens the preview. Source snapshots and logs are preview-only too, with bytes_freed 0 throughout.
-    Old versions, registered experiments, and staging that merged successfully with no unfinished batches can be deleted after confirming on the serve storage page.
+    Old versions and staging that merged successfully with no unfinished batches can be deleted after confirming on the serve storage page.
     Orphaned staging, source snapshots and logs are only reported for now.
 
     """

@@ -64,7 +64,7 @@ def raw_external(config_path: str, dataset: str, source: str, root: Path, format
 @config_option
 @click.option("--keep", type=click.IntRange(min=1), default=5, show_default=True)
 def inspect(config_path: str, keep: int):
-    """List versions, retention reasons and registered experiments, read-only."""
+    """List versions and their retention reasons, read-only."""
     _emit(_store(config_path).inspect(keep=keep))
 
 
@@ -97,7 +97,6 @@ def import_references(config_path: str, manifest: Path):
         {
             "lake_id": value["lake_id"],
             "held_objects": len(value["holds"]),
-            "registered_experiments": len(value["experiments"]),
         }
     )
 
@@ -107,7 +106,7 @@ def import_references(config_path: str, manifest: Path):
 @click.argument("object_id")
 @click.option("--reason", required=True)
 def hold(config_path: str, object_id: str, reason: str):
-    """Retain a version, experiment, artifact or existing cleanup resource, and cancel its pending-deletion mark."""
+    """Retain a version or an existing cleanup resource, and cancel its pending-deletion mark."""
     _store(config_path).hold(object_id, reason)
     _emit({"object_id": object_id, "held": True})
 

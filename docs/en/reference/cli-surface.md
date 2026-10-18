@@ -70,7 +70,7 @@ Checked against the Click command registry by `scripts/dev/sync_docs.py`. “Whe
 | `cne storage explain` | none | Reads the retention reasons for versions |
 | `cne storage hold` | none | Adds object protection and clears pending-deletion marks |
 | `cne storage import` | none | Validates and registers a reference manifest; only adds protection |
-| `cne storage inspect` | none | Reads versions, retention reasons and registered experiments |
+| `cne storage inspect` | none | Reads versions and retention reasons |
 | `cne storage plan` | none | Validates retention dependencies and saves a version plan; deletes no data |
 | `cne storage raw-external` | none | Registers external payload storage; retains local source sidecars and does not move or delete files |
 | `cne ths-official backfill` | when run | Calls the credentialed source and fills gaps |

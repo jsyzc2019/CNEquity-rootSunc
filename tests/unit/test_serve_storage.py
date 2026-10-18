@@ -448,8 +448,12 @@ def test_registered_experiments_from_older_versions_are_left_alone(web, tmp_path
             "references": [],
         }
     ]
+    value["holds"]["experiment/test"] = ["kept by an older version"]
     store._save(value)
 
+    report = store.inspect()
+    assert "experiments" not in report
+    assert "experiment/test" not in report["resource_holds"]
     summary = client.get("/api/storage").json()
     assert all(not o["object_id"].startswith("experiment/") for o in summary["objects"])
     response = client.post(

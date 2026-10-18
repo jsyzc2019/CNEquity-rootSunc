@@ -224,7 +224,7 @@ The scheduler scripts and the operations page share a different lock, whose dire
 ## Symptom: low disk space / staging bloat
 
 1. `cne run compact`: automatically finds and publishes all finished runs that have staging data and have not been successfully compacted
-2. `cne run clean` to view candidates; it now only previews and no longer deletes. Confirm historical versions and registered experiments on the storage operations page in serve; staging is report-only for now
+2. `cne run clean` to view candidates; it now only previews and no longer deletes. Confirm historical versions on the storage operations page in serve; staging is report-only for now
 3. Incomplete / uncompacted failed runs are kept by default for `cne run retry`; use `--force` only when you have confirmed they can be discarded
 4. Compress or archive old `meta/source_snapshots/` (it grows over time)
 5. Do not delete curated data; recollect with backfill rather than deleting parts of it

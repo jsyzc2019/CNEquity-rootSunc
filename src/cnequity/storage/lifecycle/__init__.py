@@ -476,11 +476,12 @@ class LifecycleStore:
             "lake_id": registry["lake_id"] if registry else None,
             "registry_digest": digest(registry),
             "objects": objects,
-            "experiments": registry["experiments"] if registry else [],
-            "artifacts": registry.get("artifacts", {}) if registry else {},
-            "experiment_pending": registry.get("experiment_pending", {}) if registry else {},
+            # Experiment and artifact entries an older version registered stay
+            # in the registry for compatibility, but nothing acts on them now.
             "resource_holds": {
-                k: v for k, v in registry["holds"].items() if not k.startswith("revision/")
+                k: v
+                for k, v in registry["holds"].items()
+                if not k.startswith(("revision/", "experiment/", "artifact/"))
             }
             if registry
             else {},

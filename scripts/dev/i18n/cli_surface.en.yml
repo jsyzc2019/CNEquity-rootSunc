@@ -63,7 +63,7 @@ storage apply: ["none", "Rechecks the version plan and marks; CLI purge is disab
 storage explain: ["none", "Reads the retention reasons for versions"]
 storage hold: ["none", "Adds object protection and clears pending-deletion marks"]
 storage import: ["none", "Validates and registers a reference manifest; only adds protection"]
-storage inspect: ["none", "Reads versions, retention reasons and registered experiments"]
+storage inspect: ["none", "Reads versions and retention reasons"]
 storage plan: ["none", "Validates retention dependencies and saves a version plan; deletes no data"]
 storage raw-external: ["none", "Registers external payload storage; retains local source sidecars and does not move or delete files"]
 ths-official backfill: ["when run", "Calls the credentialed source and fills gaps"]
