@@ -1701,6 +1701,7 @@ def sources_substitutes(config_path: str, vantage: str, probe: bool, as_json: bo
 
     from cnequity.diagnostics.source_health import HealthReport, run_probes, validate_vantage
     from cnequity.diagnostics.substitutes import (
+        IGNORED,
         render_substitutions,
         substitution_report,
         to_dict,
@@ -1733,7 +1734,8 @@ def sources_substitutes(config_path: str, vantage: str, probe: bool, as_json: bo
                 generated_at=report.generated_at, vantage=report.vantage
             )
         )
-        for line in render_substitutions(entries):
+        probed_any = any(r.status not in IGNORED for r in report.results)
+        for line in render_substitutions(entries, probed_any=probed_any):
             click.echo(line)
     if any(entry.stranded for entry in entries):
         raise SystemExit(1)

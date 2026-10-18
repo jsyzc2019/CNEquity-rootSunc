@@ -694,6 +694,10 @@ msgstr " · 约剩 %s"
 msgid " … {value} more days"
 msgstr " … 还有 {value} 天"
 
+#: cnequity/cli/backfill_cmds.py
+msgid "! This backfill fetched nothing usable: the sources were unavailable, so the range stays a gap in the coverage record. `fallback` above lists the sources tried, and the log has the reason for each key."
+msgstr "! 本次回填没有取到可用数据：数据源不可用，该范围作为缺口留在覆盖记录中。上方 `fallback` 列出了尝试过的来源，日志里有每个键的原因。"
+
 #: cnequity/diagnostics/source_health.py
 #, python-format
 msgid "%d K-lines"
@@ -3362,6 +3366,10 @@ msgstr "没有可从面板回填的数据集。"
 #, python-brace-format
 msgid "No datasets lag as of {value}"
 msgstr "截至 {value} 没有落后的数据集"
+
+#: cnequity/diagnostics/substitutes.py
+msgid "No endpoint was probed (every source was skipped), so nothing can be compared."
+msgstr "没有探测任何端点（所有来源都被跳过），无法比较。"
 
 #: cnequity/cli/demo.py
 msgid "No exact adjustment example is available in this window; the research example was skipped, and the fetched daily bars stay readable."

@@ -758,16 +758,29 @@ def backfill(
         result["followup"] = followup
         if followup.get("status") != "success":
             result["status"] = followup.get("status", "degraded")
-    if actions_before is not None and result.get("status") != "failed":
+    # Sources that all failed end as `degraded` with exit 0 by the documented
+    # contract (coverage, not execution). The lineage summary would then print
+    # "✓ nothing changed", which reads as success; say what happened instead.
+    fetched_nothing = result.get("usable_result") is False and not result.get("rows_written")
+    if actions_before is not None and result.get("status") != "failed" and not fetched_nothing:
         result["adj_factors_sync"] = _follow_lineage(
             result, lambda: _after_corporate_actions(cfg, actions_before, result)
         )
-    if bars_before is not None and result.get("status") != "failed":
+    if bars_before is not None and result.get("status") != "failed" and not fetched_nothing:
         _follow_lineage(result, lambda: _after_daily_bars(cfg, bars_before, bar_window, result))
     if outstanding:
         result["outstanding"] = _settle_outstanding(cfg, dataset)
     _explain_watermark_pullback(cfg, dataset, watermark_before, result)
     click.echo(json.dumps(result, indent=2, default=str))
+    if fetched_nothing:
+        click.echo(
+            _(
+                "! This backfill fetched nothing usable: the sources were unavailable, so the range "
+                "stays a gap in the coverage record. `fallback` above lists the sources tried, and "
+                "the log has the reason for each key."
+            ),
+            err=True,
+        )
     code = _run_status_exit_code(result["status"])
     if code:
         raise SystemExit(code)

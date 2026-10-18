@@ -105,6 +105,9 @@ def test_empty_source_backfill_cli_finishes_with_truthful_fallback(tmp_path, mon
     assert payload["execution_status"] == "completed"
     assert payload["coverage_status"] == "partial"
     assert payload["usable_result"] is False
+    # Exit 0 is the coverage contract, but the summary must not read as success.
+    assert "fetched nothing usable" in result.stderr
+    assert "✓" not in result.stderr
     assert payload["publication_status"] == "none"
     assert payload["results"][0]["status"] == "warning"
     fallback = payload["fallback"][0]
