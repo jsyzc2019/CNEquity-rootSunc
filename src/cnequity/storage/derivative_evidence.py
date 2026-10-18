@@ -66,9 +66,9 @@ def parser_identity() -> str:
     files = sorted(
         path
         for path in (package / "adapters" / "futures_exchange").glob("*.py")
-        # These readers never parse daily bars. Their independent changes must
+        # This reader never parses daily bars. Its independent changes must
         # not invalidate daily receipts and trigger a historical redownload.
-        if path.name not in {"shfe_archive.py", "shfe_parameters.py"}
+        if path.name != "shfe_archive.py"
     )
     files += [
         package / "adapters" / "sina" / "dce_futures.py",

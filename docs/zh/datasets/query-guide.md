@@ -93,7 +93,7 @@ bars = load("daily_bars", start="2024-01-01", adjust="total_return", symbols=["5
 
 - 湖内 `daily_bars` 存**未复权**价
 - `adj_factors` 在 `derived/`，仅存 `hfq`（`adjust_type="hfq"`）
-- ETF/LOF 已记录的拆分和转增会在日常因子派生中校正，历史漏跳可用 `cne repair fund-factors --apply` 重建；修正来源为 `derived_fund_actions`。保留其他来源台阶，现金分红仍由总回报读取单独计入。
+- ETF/LOF 已记录的拆分和转增会在日常因子派生中校正，0.17 及更早版本留下的历史漏跳可用 `cne repair fund-factors --apply` 重建（已弃用，将在 0.20.0 移除）；修正来源为 `derived_fund_actions`。保留其他来源台阶，现金分红仍由总回报读取单独计入。
 - DuckDB 视图 `daily_bars_adj` / `daily_bars_hfq` / `daily_bars_qfq` 与上述语义一致；`daily_bars_total_return(start, end)` 表宏对应 `adjust="total_return"`，输出 `tr_*` 与 `adj_close`
 
 ## Universe 过滤

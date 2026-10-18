@@ -2,6 +2,10 @@
 
 这里记录面向用户的主要功能、修复与兼容性变化。历史版本中的命令名反映当时的接口；当前用法以 [CLI 参考](docs/zh/reference/cli.md)为准。升级前阅读[升级与兼容性](docs/zh/getting-started/installation.md#升级与兼容性)。
 
+## [0.18.0] — 未发布
+
+- **弃用：** 11 个一次性迁移命令 `cne repair missing-values`、`financial-announcements`、`fund-factors`、`daily-bar-coverage`、`fund-listing-dates`、`valuation-basis`、`orphan-symbols`、`stale-suspensions`、`status-outages`、`status-listing-window`、`misdated-valuation` 已弃用，将在 0.20.0 移除。它们只修 0.17 及更早版本写入的数据，当前版本采集时已不再产生这些问题，新建的湖不需要运行。旧湖如需迁移（包括 0.17.0 升级步骤里的 `status-outages` 和 `misdated-valuation`），请在升级到 0.20.0 之前用 0.18 或 0.19 运行。`cne repair --help` 中这些命令标有「已弃用」，运行时在 stderr 打印警告，stdout 的 JSON 报告不变。
+
 ## [0.17.1] — 2026-10-18
 
 - **升级步骤：** `pip install -U cnequity` 后重启 `cne serve`。数据集契约没有变化，不需要迁移数据或改配置。

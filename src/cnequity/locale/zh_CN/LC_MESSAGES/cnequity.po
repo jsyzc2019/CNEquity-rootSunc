@@ -2239,6 +2239,10 @@ msgstr "demo 窗口：{value} → {value2}（目标 {window_days} 个交易日�
 msgid "Dependencies"
 msgstr "依赖"
 
+#: cnequity/cli/repair_cmds.py
+msgid "Deprecated: a one-time migration for lakes written by cnequity 0.17 or earlier; current versions no longer write this defect. It will be removed in 0.20.0."
+msgstr "已弃用：仅用于迁移 cnequity 0.17 及更早版本写入的湖，当前版本已不再写出这类问题。将在 0.20.0 移除。"
+
 #: cnequity/serve/ops/catalog.py
 msgid "Depth"
 msgstr "深度"
@@ -5857,6 +5861,11 @@ msgstr "警告："
 msgid "Warning: Sina returned no adjustment factors for: {value}"
 msgstr "警告：Sina 没有返回这些的复权因子：{value}"
 
+#: cnequity/cli/repair_cmds.py
+#, python-brace-format
+msgid "Warning: `{command}` is deprecated and will be removed in 0.20.0; it only migrates lakes written by cnequity 0.17 or earlier."
+msgstr "警告：`{command}` 已弃用，将在 0.20.0 移除；它只用于迁移 cnequity 0.17 及更早版本写入的湖。"
+
 #: cnequity/cli/ths_official_cmds.py
 msgid "Warning: applying without --adjudicator switches every disputed row, including the ones an independent source would judge wrong"
 msgstr "警告：不带 --adjudicator 直接 apply，会把每一条有争议的行都切过去，包括那些独立源会判它错的行"
@@ -6057,6 +6066,10 @@ msgstr "XLSX 解析"
 #: cnequity/diagnostics/packages.py
 msgid "XLS·XLSX parsing of SW / CNI constituent history"
 msgstr "申万 / 国证成分历史的 XLS·XLSX 解析"
+
+#: cnequity/cli/repair_cmds.py
+msgid "[deprecated] "
+msgstr "[已弃用] "
 
 #: cnequity/cli/backfill_cmds.py
 #, python-brace-format

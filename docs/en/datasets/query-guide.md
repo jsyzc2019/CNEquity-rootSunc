@@ -93,7 +93,7 @@ Choose by purpose: unadjusted prices for price action; `hfq` for split-comparabl
 
 - `daily_bars` in the lake stores **unadjusted** prices
 - `adj_factors` lives in `derived/` and stores only `hfq` (`adjust_type="hfq"`)
-- Recorded ETF/LOF splits and share transfers are corrected during daily factor derivation; historical omissions can be rebuilt with `cne repair fund-factors --apply`, using source `derived_fund_actions`. Other vendor steps are preserved, while cash distributions remain separately included by total-return reads.
+- Recorded ETF/LOF splits and share transfers are corrected during daily factor derivation; omissions left by 0.17 or earlier can be rebuilt with `cne repair fund-factors --apply` (deprecated, removed in 0.20.0), using source `derived_fund_actions`. Other vendor steps are preserved, while cash distributions remain separately included by total-return reads.
 - The DuckDB views `daily_bars_adj` / `daily_bars_hfq` / `daily_bars_qfq` follow the semantics above; the table macro `daily_bars_total_return(start, end)` corresponds to `adjust="total_return"` and outputs `tr_*` and `adj_close`
 
 ## Universe filtering
