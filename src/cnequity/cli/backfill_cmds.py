@@ -25,6 +25,7 @@ from cnequity.cli._shared import (
     comma_values,
     config_option,
     parse_date_option,
+    warn_deprecated_migration,
 )
 from cnequity.domain.datasets import get_dataset
 from cnequity.domain.market_time import shanghai_today
@@ -190,14 +191,14 @@ from cnequity.orchestrator.engine import JobEngine
     "--ths-repair",
     is_flag=True,
     help=N_(
-        "corporate_actions only, for historical migration: fill historical dividends and ex-rights of delisted BSE symbols from THS."
+        "corporate_actions only: explicitly repair delisted Beijing symbols with THS historical dividends and ex-rights."
     ),
 )
 @click.option(
     "--eastmoney-bj-repair",
     is_flag=True,
     help=N_(
-        "corporate_actions only, for historical migration: fill historical dividends and ex-rights of old BSE codes via the current 920xxx EastMoney codes."
+        "Deprecated, removed in 0.20.0: corporate_actions only, for lakes that still store old BSE codes: fill their historical dividends and ex-rights via the current 920xxx EastMoney codes."
     ),
 )
 @click.option(
@@ -220,7 +221,7 @@ from cnequity.orchestrator.engine import JobEngine
     is_flag=True,
     help=(
         N_(
-            "daily_bars only, for historical migration: fill BJ turnover for existing current-period trading days from the BSE website without refetching Sina. Daily updates already use the BSE quote board as the primary current-period source for BJ."
+            "daily_bars only: fill BJ turnover for a current-period session already in the lake from the BSE quote board, without refetching Sina, for example when the board was unavailable during the daily update. The board is a current snapshot, so only the latest session qualifies."
         )
     ),
 )
@@ -229,7 +230,7 @@ from cnequity.orchestrator.engine import JobEngine
     is_flag=True,
     help=(
         N_(
-            "daily_bars only, superseded by --tdx-amount-repair: fill BSE turnover that Sina never published from TDX; stored prices and volumes are never touched. Requires --start/--end."
+            "Deprecated, removed in 0.20.0; use --tdx-amount-repair: daily_bars only: fill BSE turnover that Sina never published from TDX; stored prices and volumes are never touched. Requires --start/--end."
         )
     ),
 )
@@ -247,7 +248,7 @@ from cnequity.orchestrator.engine import JobEngine
     is_flag=True,
     help=(
         N_(
-            "daily_bars only: re-read TDX and rewrite only the volume of stored TDX rows (fixes the decoding bug before 2026-09-17); prices must match, and turnover values under 64.5 yuan, which the same bug inflated, are rewritten too; adds no rows. Requires --symbols and --start/--end."
+            "Deprecated, removed in 0.20.0: daily_bars only: re-read TDX and rewrite only the volume of stored TDX rows (fixes the decoding bug before 2026-09-17); prices must match, and turnover values under 64.5 yuan, which the same bug inflated, are rewritten too; adds no rows. Requires --symbols and --start/--end."
         )
     ),
 )
@@ -585,10 +586,14 @@ def backfill(
     if bj_amount_repair:
         click.echo(
             _(
-                "Note: --bj-amount-repair has been replaced by --tdx-amount-repair, which fills turnover only after checking open/high/low/close and volume, and covers Shanghai, Shenzhen and Beijing."
+                "Warning: --bj-amount-repair is deprecated and will be removed in 0.20.0; use --tdx-amount-repair, which fills turnover only after checking open/high/low/close and volume, and covers Shanghai, Shenzhen and Beijing."
             ),
             err=True,
         )
+    if eastmoney_bj_repair:
+        warn_deprecated_migration("cne backfill --eastmoney-bj-repair")
+    if tdx_volume_repair:
+        warn_deprecated_migration("cne backfill --tdx-volume-repair")
     if baostock_repair:
         cfg._corporate_actions_baostock_repair = True
     if ths_repair:

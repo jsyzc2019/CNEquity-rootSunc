@@ -60,3 +60,31 @@ def test_run_warns_on_stderr_and_keeps_stdout_json(monkeypatch):
     assert json.loads(result.stdout) == {"applied": False}
     assert "`cne repair orphan-symbols` is deprecated" in result.stderr
     assert "0.20.0" in result.stderr
+
+
+def test_deprecated_derive_targets_warn_before_running(monkeypatch):
+    from cnequity.cli import maintain_cmds
+
+    def stop(path):
+        raise SystemExit(0)
+
+    monkeypatch.setattr(maintain_cmds, "_cfg", stop)
+    for name in ("bse_code_migration", "valuation_orphans"):
+        result = CliRunner().invoke(cli, ["derive", name], prog_name="cne")
+        assert f"`cne derive {name}` is deprecated" in result.stderr
+    result = CliRunner().invoke(cli, ["derive", "adj_factors"], prog_name="cne")
+    assert "deprecated" not in result.stderr
+
+
+def test_deprecated_backfill_flags_warn(monkeypatch, tmp_path):
+    from cnequity.cli import backfill_cmds
+    from cnequity.config import Config
+
+    monkeypatch.setattr(backfill_cmds, "_cfg", lambda path: Config(data_root=tmp_path / "lake"))
+    for flag in ("--tdx-volume-repair", "--bj-amount-repair"):
+        # Neither has the window it needs, so the command stops before any fetch.
+        result = CliRunner().invoke(cli, ["backfill", "daily_bars", flag], prog_name="cne")
+        assert result.exit_code != 0
+        assert "deprecated" in result.stderr and "0.20.0" in result.stderr
+    page = CliRunner().invoke(cli, ["backfill", "--help"]).output
+    assert "Deprecated, removed in 0.20.0: corporate_actions only" in " ".join(page.split())

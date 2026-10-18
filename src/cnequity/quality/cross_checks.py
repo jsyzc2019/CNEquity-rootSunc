@@ -412,8 +412,8 @@ def valuation_bars_coverage_findings(config: Config, trade_date: date) -> list[d
                 "message": (
                     f"{len(no_bar_ever)} valuation symbol(s) have no daily_bars row "
                     f"anywhere (delisted/non-tradable; "
-                    f"e.g. {', '.join(no_bar_ever[:_SAMPLE])}) — filter the valuation "
-                    "step to the bar universe"
+                    f"e.g. {', '.join(no_bar_ever[:_SAMPLE])}) — `cne backfill "
+                    "valuation_metrics` drops them"
                 ),
                 "orphan_count": len(no_bar_ever),
                 "orphan_sample": no_bar_ever[:_SAMPLE],

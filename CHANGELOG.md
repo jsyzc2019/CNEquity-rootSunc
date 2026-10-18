@@ -5,6 +5,7 @@
 ## [0.18.0] — 未发布
 
 - **弃用：** 11 个一次性迁移命令 `cne repair missing-values`、`financial-announcements`、`fund-factors`、`daily-bar-coverage`、`fund-listing-dates`、`valuation-basis`、`orphan-symbols`、`stale-suspensions`、`status-outages`、`status-listing-window`、`misdated-valuation` 已弃用，将在 0.20.0 移除。它们只修 0.17 及更早版本写入的数据，当前版本采集时已不再产生这些问题，新建的湖不需要运行。旧湖如需迁移（包括 0.17.0 升级步骤里的 `status-outages` 和 `misdated-valuation`），请在升级到 0.20.0 之前用 0.18 或 0.19 运行。`cne repair --help` 中这些命令标有「已弃用」，运行时在 stderr 打印警告，stdout 的 JSON 报告不变。
+- **弃用：** `cne derive bse_code_migration`、`cne derive valuation_orphans`，以及 `cne backfill` 的 `--eastmoney-bj-repair`、`--tdx-volume-repair`、`--bj-amount-repair` 同样将在 0.20.0 移除，规则同上；`--bj-amount-repair` 请改用 `--tdx-amount-repair`，孤立估值行在 `valuation_metrics` 回填时会自动清理。`--ths-repair` 和 `--bse-tip-repair` 对新建的湖仍然有用，继续保留，帮助中去掉了「历史迁移用」的说法。
 - **移除：** `cne storage` 的试验与归档子命令（`experiment-create`、`archive`、`experiment-seal`、`artifact-verify`、`resolve`、`experiment-plan`、`experiment-apply`），以及 serve 存储页的「试验目录」清理。版本保留、标记与网页确认删除不受影响；旧注册表里登记的试验照常读取，其目录不会被删除，不再需要时可自行处理。
 - 新增 `cne storage raw-external`：把财报 PDF 等大原文登记到独立磁盘或 iCloud Drive 等外置目录，本地保留来源、观察时间和哈希记录；只登记，不移动或删除已有文件。
 - `cne init` 与日更、事件任务不再同时运行；Ctrl-C 中断写湖命令时说明已完成的部分会保留，以及如何续跑。`cne serve` 把进程已退出、仍记为运行中的 run 显示为中断。

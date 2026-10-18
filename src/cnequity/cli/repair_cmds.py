@@ -7,7 +7,7 @@ import json
 import click
 
 from cnequity.cli._root import CneCommand, cli
-from cnequity.cli._shared import _cfg, comma_option, config_option
+from cnequity.cli._shared import _cfg, comma_option, config_option, warn_deprecated_migration
 from cnequity.i18n import N_, _
 
 
@@ -38,13 +38,7 @@ class DeprecatedMigration(CneCommand):
         return label + super().get_short_help_str(limit=max(limit - len(label), 10))
 
     def invoke(self, ctx: click.Context):
-        click.echo(
-            _(
-                "Warning: `{command}` is deprecated and will be removed in 0.20.0; "
-                "it only migrates lakes written by cnequity 0.17 or earlier."
-            ).format(command=ctx.command_path),
-            err=True,
-        )
+        warn_deprecated_migration(ctx.command_path)
         return super().invoke(ctx)
 
 

@@ -20,6 +20,7 @@ from cnequity.cli._shared import (
     attach_log_file,
     config_option,
     parse_date_option,
+    warn_deprecated_migration,
 )
 from cnequity.derive.adj_factors import compute_adj_factors
 from cnequity.domain.datasets import RESAMPLED_MINUTE_DATASETS
@@ -307,7 +308,13 @@ def _published_derive(cfg, dataset: str):
         raise
 
 
-@cli.command()
+@cli.command(
+    epilog=N_(
+        "Deprecated targets: bse_code_migration and valuation_orphans only migrate lakes written "
+        "by cnequity 0.17 or earlier and will be removed in 0.20.0; a valuation_metrics backfill "
+        "already drops orphan valuation rows."
+    )
+)
 @click.argument("name", default="adj_factors")
 @config_option
 @click.option(
@@ -378,6 +385,8 @@ def derive(
     # Derive targets are lower case in the registry, and command names are
     # already case-insensitive; a target typed in caps should resolve the same.
     name = name.lower()
+    if name in {"bse_code_migration", "valuation_orphans"}:
+        warn_deprecated_migration(f"cne derive {name}")
     cfg = _cfg(config_path)
     attach_log_file(cfg, "derive")
     start = parse_date_option(start_str, "--start")

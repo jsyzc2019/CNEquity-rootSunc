@@ -395,19 +395,19 @@ diff 会把删列、改类型、改主键、单位/PIT/历史语义变化识别�
 | `--shfe-annual-archive ZIP --archive-year YYYY --accept-partial-fields` | 仅 `futures_bars` / `option_bars`：显式离线导入上期所年度包，保留缺失字段标记，跳过已有日线主键；`--archive-url` / `--archive-downloaded-at` 可附原始来源证据。默认回填仍用完整日文件，细节见[衍生品指南](../recipes/derivatives.md#官方年度包已验证格式与使用限制) |
 | `--symbols` | 日内、`daily_bars`、`trading_status`、`corporate_actions`、`share_structure` 的临时标的范围（`share_structure` 按证券一次取回全部股本变动，用于审计提示的股本滞后）；其他数据集仍使用配置中的范围 |
 | `--baostock-repair` | 仅 `corporate_actions`：显式补抓已退市 SH/SZ 标的的 Baostock 分红除权数据；建议与 `--symbols` 配合 |
-| `--ths-repair` | 仅 `corporate_actions`，历史迁移用：显式补抓已退市 BJ 标的的同花顺历史分红除权数据；建议与 `--symbols` 配合 |
-| `--eastmoney-bj-repair` | 仅 `corporate_actions`，历史迁移用：按北交所旧码→920 新码映射向 EastMoney 定向补抓历史分红除权数据；建议与 `--symbols` 配合 |
+| `--ths-repair` | 仅 `corporate_actions`：显式补抓已退市 BJ 标的的同花顺历史分红除权数据；建议与 `--symbols` 配合 |
+| `--eastmoney-bj-repair` | **已弃用。** 仅 `corporate_actions`，只用于仍以北交所旧码存储的湖：按北交所旧码→920 新码映射向 EastMoney 定向补抓历史分红除权数据；建议与 `--symbols` 配合 |
 | `--issuer-notice-repair` | 仅 `corporate_actions`：只用发行人实施公告（已审清单、巨潮、北交所）补现金到账日并应用已审送转条款；早于除权日的已存到账日当作未知，找不到就清空。不请求 Baostock。需要 `--symbols`/`--start`/`--end` |
 | `--payment-date-repair` | 同上，发行人公告之后再用 Baostock `dividPayDate` 匹配余下事件；两者不能同时使用 |
 | `--outstanding` | 精确修复被容忍缺口记下的欠账键：作用域与窗口取自 ledger，而不是 `--symbols`/`--start`/`--end`。补上的键即刻销账，仍缺的继续欠着 |
-| `--bj-amount-repair` | 已由 `--tdx-amount-repair` 取代，保留以兼容旧脚本：从 TDX 补 Sina 从未发布的 BJ 成交额，已存的价格与成交量一律不动。需要 `--start`/`--end` |
+| `--bj-amount-repair` | **已弃用**，请改用 `--tdx-amount-repair`：从 TDX 补 Sina 从未发布的 BJ 成交额，已存的价格与成交量一律不动。需要 `--start`/`--end` |
 | `--tdx-amount-repair` | 仅 `daily_bars`：新浪补上的沪深北历史行与通达信一起核对，只在开高低收一致且成交量差小于一手时补成交额；通达信没有的代码保留新浪行。需要 `--start`/`--end` |
 | `--turnover-repair` | 仅 `daily_bars`：成交额缺失、为 0 或量额单位错位的沪深股票行，用 Baostock 同日行整行替换；开高低收须在半分钱内一致，不一致或未提供的保留原值并计数。需要 `--start`/`--end` |
 | `--turnover-peer-review` | 与 `--turnover-repair` 同用，先用上交所历史日 K 或深交所实际日期报表核对 Baostock 价格，再用通达信和东财复查其余冲突。整行替换须有一致价格和可用量额；交易所汇总成交量、成交额不能拼接进竞价日线，仍有冲突或来源不可用的保留并计数。 |
-| `--tdx-volume-repair` | 仅 `daily_bars`：重读 TDX，只改写已存 TDX 行的成交量（及 64.5 元以下被放大的成交额），修 2026-09-17 前的解码错误；价格须一致，不新增行，不经内部缺口门禁。需要 `--symbols` 和 `--start`/`--end` |
-| `--bse-tip-repair` | 仅 `daily_bars`，历史迁移用：读取已有 session 的 OHLCV，仅向 BSE 请求成交额并严格核对；必须同时指定相同的 `--start/--end` 与 `--symbols` |
+| `--tdx-volume-repair` | **已弃用。** 仅 `daily_bars`：重读 TDX，只改写已存 TDX 行的成交量（及 64.5 元以下被放大的成交额），修 2026-09-17 前的解码错误；价格须一致，不新增行，不经内部缺口门禁。需要 `--symbols` 和 `--start`/`--end` |
+| `--bse-tip-repair` | 仅 `daily_bars`：读取已有当期 session 的 OHLCV，仅向 BSE 请求成交额并严格核对；必须同时指定相同的 `--start/--end` 与 `--symbols` |
 
-北交所的修复开关（`--ths-repair`、`--eastmoney-bj-repair`、`--bse-tip-repair`、`--bj-amount-repair`）只用于整理既有历史，日更不会用到。新数据由写入时的规则保证：
+`--eastmoney-bj-repair`、`--bj-amount-repair` 和 `--tdx-volume-repair` 已弃用，将在 0.20.0 移除：它们只修 0.17 及更早版本写入的数据（`--bj-amount-repair` 请改用 `--tdx-amount-repair`），使用时在 stderr 打印弃用警告。`--ths-repair` 补已退市北交所标的的公司行为，`--bse-tip-repair` 在日更时行情板不可用后补最近一个交易日的成交额，两者仍然保留。日更不会用到这些开关，新数据由写入时的规则保证：
 
 | 以前靠修复开关处理的问题 | 现在的处理 |
 |---|---|
@@ -513,6 +513,8 @@ python scripts/delisted_ops.py coverage --start 2016-01-01 --universe all_a_sh_s
 ```bash
 cne derive trading_status --start 2001-01-01 --end 2001-12-31
 ```
+
+`cne derive bse_code_migration`（把北交所旧码合并到 920 新码）和 `cne derive valuation_orphans`（删除没有日线的证券的估值行）已弃用，将在 0.20.0 移除。它们只迁移 0.17 及更早版本写入的湖：新采集不会再把北交所改名记成退市，`valuation_metrics` 回填时也会自动清理孤立的估值行。运行时在 stderr 打印弃用警告。
 
 ## cne repair
 

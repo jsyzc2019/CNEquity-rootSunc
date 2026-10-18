@@ -398,19 +398,19 @@ The result JSON also has `adj_factors_sync` / `trading_status_derive` fields. Se
 | `--shfe-annual-archive ZIP --archive-year YYYY --accept-partial-fields` | `futures_bars` / `option_bars` only: explicit offline import of an SHFE annual package, keeping missing-field markers and skipping daily-bar primary keys that already exist; `--archive-url` / `--archive-downloaded-at` can attach evidence of the original source. Default backfill still uses complete daily files; see the [derivatives guide](../recipes/derivatives.md#official-annual-packages) for details |
 | `--symbols` | Ad hoc symbol scope for intraday, `daily_bars`, `trading_status`, `corporate_actions` and `share_structure` (`share_structure` fetches all share-capital changes per security in one go, for the share-capital lag the audit hints at); other datasets still use the configured scope |
 | `--baostock-repair` | `corporate_actions` only: explicitly fetch Baostock dividend and ex-rights data for delisted SH/SZ symbols; best combined with `--symbols` |
-| `--ths-repair` | `corporate_actions` only, for historical migration: explicitly fetch THS historical dividend and ex-rights data for delisted BJ symbols; best combined with `--symbols` |
-| `--eastmoney-bj-repair` | `corporate_actions` only, for historical migration: fetch historical dividend and ex-rights data from EastMoney in a targeted way, using the BSE old-code → new 920-code mapping; best combined with `--symbols` |
+| `--ths-repair` | `corporate_actions` only: explicitly fetch THS historical dividend and ex-rights data for delisted BJ symbols; best combined with `--symbols` |
+| `--eastmoney-bj-repair` | **Deprecated.** `corporate_actions` only, for lakes that still store old BSE codes: fetch historical dividend and ex-rights data from EastMoney in a targeted way, using the BSE old-code → new 920-code mapping; best combined with `--symbols` |
 | `--issuer-notice-repair` | `corporate_actions` only: use only issuer implementation announcements (reviewed list, CNINFO, BSE) to fill cash payment dates and apply reviewed bonus/conversion terms; stored payment dates earlier than the ex-date are treated as unknown and cleared if nothing is found. No Baostock requests. Requires `--symbols`/`--start`/`--end` |
 | `--payment-date-repair` | As above, then after issuer announcements also match remaining events with Baostock `dividPayDate`; the two cannot be used together |
 | `--outstanding` | Precisely repair the debt keys recorded by tolerated gaps: scope and window come from the ledger, not from `--symbols`/`--start`/`--end`. Keys that are filled are written off immediately; those still missing stay outstanding |
-| `--bj-amount-repair` | Superseded by `--tdx-amount-repair`, kept for old scripts: fill from TDX the BJ turnover Sina never published, never touching stored prices or volumes. Requires `--start`/`--end` |
+| `--bj-amount-repair` | **Deprecated**; use `--tdx-amount-repair` instead: fill from TDX the BJ turnover Sina never published, never touching stored prices or volumes. Requires `--start`/`--end` |
 | `--tdx-amount-repair` | `daily_bars` only: Shanghai, Shenzhen and Beijing historical rows filled from Sina are checked against TDX, and turnover is filled only when open/high/low/close agree and the volume difference is less than one lot; codes TDX does not have keep the Sina row. Requires `--start`/`--end` |
 | `--turnover-repair` | `daily_bars` only: Shanghai/Shenzhen stock rows whose turnover is missing, 0, or has mismatched volume/turnover units are replaced as whole rows by Baostock's same-day row; open/high/low/close must agree within half a cent, and rows that disagree or are not provided keep the original values and are counted. Requires `--start`/`--end` |
 | `--turnover-peer-review` | With `--turnover-repair`, first confirm BaoStock prices using SSE historical K-lines or explicitly dated SZSE reports, then review remaining conflicts with TDX and EastMoney. Replacements are whole bars with agreeing prices and usable turnover; exchange-wide turnover is never spliced into auction bars. Unresolved conflicts and unavailable sources remain reported. |
-| `--tdx-volume-repair` | `daily_bars` only: reread TDX and rewrite only the volume of stored TDX rows (and turnover inflated below 64.5 yuan), fixing decoding errors before 2026-09-17; prices must agree, no rows are added, and it bypasses the internal gap gate. Requires `--symbols` and `--start`/`--end` |
-| `--bse-tip-repair` | `daily_bars` only, for historical migration: read the OHLCV of existing sessions and request only turnover from BSE, with strict checks; the same `--start/--end` and `--symbols` must be given together |
+| `--tdx-volume-repair` | **Deprecated.** `daily_bars` only: reread TDX and rewrite only the volume of stored TDX rows (and turnover inflated below 64.5 yuan), fixing decoding errors before 2026-09-17; prices must agree, no rows are added, and it bypasses the internal gap gate. Requires `--symbols` and `--start`/`--end` |
+| `--bse-tip-repair` | `daily_bars` only: read the OHLCV of existing current-period sessions and request only turnover from BSE, with strict checks; the same `--start/--end` and `--symbols` must be given together |
 
-The BSE repair switches (`--ths-repair`, `--eastmoney-bj-repair`, `--bse-tip-repair`, `--bj-amount-repair`) are only for cleaning up existing history; daily updates never use them. New data is guaranteed by rules applied at write time:
+`--eastmoney-bj-repair`, `--bj-amount-repair` and `--tdx-volume-repair` are deprecated and will be removed in 0.20.0: they only fix data written by 0.17 or earlier (use `--tdx-amount-repair` instead of `--bj-amount-repair`), and print a deprecation warning on stderr. `--ths-repair` fills corporate actions of delisted BSE securities, and `--bse-tip-repair` fills the latest session's turnover after the quote board was unavailable during the daily update; both stay. Daily updates never use these switches; new data is guaranteed by rules applied at write time:
 
 | Problem previously handled by a repair switch | Current handling |
 |---|---|
@@ -516,6 +516,8 @@ the directory before modification is saved in `meta/state/history/`, the quality
 ```bash
 cne derive trading_status --start 2001-01-01 --end 2001-12-31
 ```
+
+`cne derive bse_code_migration` (collapse old BSE codes onto the 920 codes) and `cne derive valuation_orphans` (drop valuation rows of securities without daily bars) are deprecated and will be removed in 0.20.0. They only migrate lakes written by 0.17 or earlier: ingestion no longer records a BSE rename as a delisting, and a `valuation_metrics` backfill drops orphan valuation rows by itself. They print a deprecation warning on stderr.
 
 ## cne repair
 

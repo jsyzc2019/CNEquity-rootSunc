@@ -2232,6 +2232,22 @@ msgstr "demo 窗口：{value} → {value2}（目标 {window_days} 个交易日�
 msgid "Dependencies"
 msgstr "依赖"
 
+#: cnequity/cli/maintain_cmds.py
+msgid "Deprecated targets: bse_code_migration and valuation_orphans only migrate lakes written by cnequity 0.17 or earlier and will be removed in 0.20.0; a valuation_metrics backfill already drops orphan valuation rows."
+msgstr "已弃用的目标：bse_code_migration 和 valuation_orphans 只用于迁移 cnequity 0.17 及更早版本写入的湖，将在 0.20.0 移除；valuation_metrics 回填时已会自动清理孤立的估值行。"
+
+#: cnequity/cli/backfill_cmds.py
+msgid "Deprecated, removed in 0.20.0: corporate_actions only, for lakes that still store old BSE codes: fill their historical dividends and ex-rights via the current 920xxx EastMoney codes."
+msgstr "已弃用，将在 0.20.0 移除：仅 corporate_actions，用于仍以北交所老代码存储的湖：通过现行的 920xxx 东财代码补这些老代码的历史分红除权。"
+
+#: cnequity/cli/backfill_cmds.py
+msgid "Deprecated, removed in 0.20.0: daily_bars only: re-read TDX and rewrite only the volume of stored TDX rows (fixes the decoding bug before 2026-09-17); prices must match, and turnover values under 64.5 yuan, which the same bug inflated, are rewritten too; adds no rows. Requires --symbols and --start/--end."
+msgstr "已弃用，将在 0.20.0 移除：仅 daily_bars：重读 TDX，只改写已存 TDX 行的成交量（修 2026-09-17 前的解码错误）；价格须一致，64.5 元以下被放大的成交额一并改写；不新增行。需要 --symbols 和 --start/--end。"
+
+#: cnequity/cli/backfill_cmds.py
+msgid "Deprecated, removed in 0.20.0; use --tdx-amount-repair: daily_bars only: fill BSE turnover that Sina never published from TDX; stored prices and volumes are never touched. Requires --start/--end."
+msgstr "已弃用，将在 0.20.0 移除，请改用 --tdx-amount-repair：仅 daily_bars：从 TDX 补 Sina 从未发布过的北交所成交额，已存的价格和成交量一律不动。需要 --start/--end。"
+
 #: cnequity/cli/repair_cmds.py
 msgid "Deprecated: a one-time migration for lakes written by cnequity 0.17 or earlier; current versions no longer write this defect. It will be removed in 0.20.0."
 msgstr "已弃用：仅用于迁移 cnequity 0.17 及更早版本写入的湖，当前版本已不再写出这类问题。将在 0.20.0 移除。"
@@ -3431,10 +3447,6 @@ msgstr "本次未探测（配置关闭、--only 排除，或高成本端点需�
 #: cnequity/diagnostics/source_health.py
 msgid "Not the same host as Sina daily bars, but shares the same per-account 456 quota."
 msgstr "与 sina 日线不是同一台主机，但共用同一个按账号计的 456 配额。"
-
-#: cnequity/cli/backfill_cmds.py
-msgid "Note: --bj-amount-repair has been replaced by --tdx-amount-repair, which fills turnover only after checking open/high/low/close and volume, and covers Shanghai, Shenzhen and Beijing."
-msgstr "提示：--bj-amount-repair 已由 --tdx-amount-repair 取代，后者按开高低收与成交量核对后才补成交额，并覆盖沪深北。"
 
 #: cnequity/cli/run_cmds.py
 #, python-brace-format
@@ -5839,12 +5851,16 @@ msgstr "查看带版本的研究 universe profile。"
 msgid "Warning: "
 msgstr "警告："
 
+#: cnequity/cli/backfill_cmds.py
+msgid "Warning: --bj-amount-repair is deprecated and will be removed in 0.20.0; use --tdx-amount-repair, which fills turnover only after checking open/high/low/close and volume, and covers Shanghai, Shenzhen and Beijing."
+msgstr "警告：--bj-amount-repair 已弃用，将在 0.20.0 移除；请改用 --tdx-amount-repair，后者按开高低收与成交量核对后才补成交额，并覆盖沪深北。"
+
 #: cnequity/cli/demo.py
 #, python-brace-format
 msgid "Warning: Sina returned no adjustment factors for: {value}"
 msgstr "警告：Sina 没有返回这些的复权因子：{value}"
 
-#: cnequity/cli/repair_cmds.py
+#: cnequity/cli/_shared.py
 #, python-brace-format
 msgid "Warning: `{command}` is deprecated and will be removed in 0.20.0; it only migrates lakes written by cnequity 0.17 or earlier."
 msgstr "警告：`{command}` 已弃用，将在 0.20.0 移除；它只用于迁移 cnequity 0.17 及更早版本写入的湖。"
@@ -6171,16 +6187,12 @@ msgid "corporate actions"
 msgstr "公司行为"
 
 #: cnequity/cli/backfill_cmds.py
-msgid "corporate_actions only, for historical migration: fill historical dividends and ex-rights of delisted BSE symbols from THS."
-msgstr "仅 corporate_actions，历史迁移用：用同花顺补已退市北交所标的的历史分红除权。"
-
-#: cnequity/cli/backfill_cmds.py
-msgid "corporate_actions only, for historical migration: fill historical dividends and ex-rights of old BSE codes via the current 920xxx EastMoney codes."
-msgstr "仅 corporate_actions，历史迁移用：通过现行的 920xxx 东财代码补北交所老代码的历史分红除权。"
-
-#: cnequity/cli/backfill_cmds.py
 msgid "corporate_actions only: apply reviewed issuer announcements first, then match actual payment dates with Baostock; payment dates earlier than the ex-date are treated as unknown."
 msgstr "仅 corporate_actions：先应用已审发行人公告，再用 Baostock 匹配真实派息日；早于除息日的付款日视为未知。"
+
+#: cnequity/cli/backfill_cmds.py
+msgid "corporate_actions only: explicitly repair delisted Beijing symbols with THS historical dividends and ex-rights."
+msgstr "仅 corporate_actions：显式用同花顺历史分红除权补已退市的北交所标的。"
 
 #: cnequity/cli/backfill_cmds.py
 msgid "corporate_actions only: explicitly repair delisted Shanghai and Shenzhen symbols with Baostock."
@@ -6223,20 +6235,12 @@ msgstr ""
 "解决之后重跑 `cne init --profile demo`。"
 
 #: cnequity/cli/backfill_cmds.py
-msgid "daily_bars only, for historical migration: fill BJ turnover for existing current-period trading days from the BSE website without refetching Sina. Daily updates already use the BSE quote board as the primary current-period source for BJ."
-msgstr "仅 daily_bars，历史迁移用：用北交所官网补已有当期交易日的 BJ 成交额，不重抓 Sina。日更已以北交所行情板为 BJ 当期主源。"
-
-#: cnequity/cli/backfill_cmds.py
-msgid "daily_bars only, superseded by --tdx-amount-repair: fill BSE turnover that Sina never published from TDX; stored prices and volumes are never touched. Requires --start/--end."
-msgstr "仅 daily_bars，已由 --tdx-amount-repair 取代：从 TDX 补 Sina 从未发布过的北交所成交额，已存的价格和成交量一律不动。需要 --start/--end。"
-
-#: cnequity/cli/backfill_cmds.py
 msgid "daily_bars only: cross-check historical Shanghai, Shenzhen and Beijing rows filled from Sina against TDX, filling turnover only when OHLC match and the volume difference is under one lot; codes TDX lacks keep the Sina rows. Stored prices and volumes are never touched. Requires --start/--end."
 msgstr "仅 daily_bars：新浪补上的沪深北历史行与通达信一起核对，只在开高低收一致且成交量差小于一手时补成交额；通达信没有的代码保留新浪行。已存的价格和成交量一律不动。需要 --start/--end。"
 
 #: cnequity/cli/backfill_cmds.py
-msgid "daily_bars only: re-read TDX and rewrite only the volume of stored TDX rows (fixes the decoding bug before 2026-09-17); prices must match, and turnover values under 64.5 yuan, which the same bug inflated, are rewritten too; adds no rows. Requires --symbols and --start/--end."
-msgstr "仅 daily_bars：重读 TDX，只改写已存 TDX 行的成交量（修 2026-09-17 前的解码错误）；价格须一致，64.5 元以下被放大的成交额一并改写；不新增行。需要 --symbols 和 --start/--end。"
+msgid "daily_bars only: fill BJ turnover for a current-period session already in the lake from the BSE quote board, without refetching Sina, for example when the board was unavailable during the daily update. The board is a current snapshot, so only the latest session qualifies."
+msgstr "仅 daily_bars：用北交所行情板补湖中已有当期交易日的 BJ 成交额，不重抓 Sina，例如日更时行情板不可用。行情板只提供当前快照，因此只适用于最近一个交易日。"
 
 #: cnequity/cli/backfill_cmds.py
 msgid "daily_bars only: replace Shanghai/Shenzhen stock rows whose turnover is missing, zero or has misaligned volume/amount units with the whole same-day Baostock row; OHLC must agree within half a cent, otherwise or if unavailable the original values are kept. Requires --start/--end."
