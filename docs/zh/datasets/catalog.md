@@ -272,7 +272,7 @@ THS 官方估值快照只能从启用后按日积累，不能用旧日期重放�
 历史回填（C2）：`cne backfill industry_members` = 申万 SwClass2021 月度（`classification_system=sw`，2020 起）；
 `cne backfill index_constituents` = 国证调样史（399001/399006，约 2021-12 起）。沪深 300、科创 50 等其他指数依赖采集后积累的 EM 快照及下面的官方带日期文件；更早历史仍可能缺失。当前名单不能回填到更早日期，否则会产生幸存者偏差；EM 适配器只接受当前已收盘交易日。历史读取只使用当时已存的快照，早于最早快照的成员关系未知。
 
-EM 和国证调样史都不提供成分权重，`weight=null`，不能把它当成真实零权重或自动推断为等权。`cne repair missing-values index_constituents` 列出每个指数、来源的快照起止与数量，并预览将旧占位零改为空值；`--apply` 发布新版本，不制造缺失的历史成分或权重。该命令已弃用，将在 0.20.0 移除。
+EM 和国证调样史都不提供成分权重，`weight=null`，不能把它当成真实零权重或自动推断为等权。每个指数、来源的快照起止与数量可直接查询：`cne query --sql "SELECT index_symbol, source, min(as_of_date), max(as_of_date), count(DISTINCT as_of_date) FROM index_constituents GROUP BY ALL ORDER BY ALL"`。0.17 及更早版本留下的权重占位零可用 `cne repair missing-values index_constituents` 预览，`--apply` 改为空值并发布新版本，不制造缺失的历史成分或权重；该命令已弃用，将在 0.20.0 移除。
 
 `cne repair index-snapshots --refresh-sources` 取得沪深 300、科创 50、深证成指、创业板指可公开下载的官方文件；默认预览，`--apply` 按文件实际日期替换该指数的完整快照并保留旧版本。权重文件的百分数转换为比例（总和约为 1），来源为 `exchange` 或 `cni_weights`。成分文件和权重文件可能日期不同，不跨日期填权重；更晚的无权重观察也不能抹去同日已验证权重。这条路径只能恢复官方当前仍提供的带日期文件及已归档快照，不提供任意历史日期的完整权重，也不会把最新样本倒推到历史。
 
