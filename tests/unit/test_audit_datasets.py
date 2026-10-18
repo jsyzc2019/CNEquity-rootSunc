@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 
 import polars as pl
 import pytest
@@ -104,6 +104,23 @@ def test_audit_on_a_demo_lake_judges_only_the_datasets_it_holds(tmp_path):
     )
     exists_checks = {f["dataset"] for f in payload["findings"] if f.get("check") == "exists"}
     assert exists_checks == set(), "a dataset this profile never ingests is not a finding"
+
+
+@pytest.mark.parametrize(("profile", "expected"), [("demo", False), (None, True)])
+def test_fragmented_partitions_are_not_flagged_on_a_demo_lake(tmp_path, profile, expected):
+    from cnequity.quality.audit import _collect_lake_findings
+
+    cfg = Config(data_root=tmp_path / "data", lake_profile=profile)
+    for offset in range(31):
+        day = date(2024, 5, 1) + timedelta(days=offset)
+        part = cfg.curated_root / "daily_bars" / f"trade_date={day.isoformat()}"
+        part.mkdir(parents=True, exist_ok=True)
+        pl.DataFrame([_bar_row("600519.SH", day)]).write_parquet(part / "part-0.parquet")
+
+    findings = _collect_lake_findings(cfg, date(2024, 6, 28), full=True)
+
+    flagged = any(f.get("check") == "partition_fragmentation" for f in findings)
+    assert flagged is expected
 
 
 def test_row_count_mutation_warns_on_partial_market_drop():
@@ -817,3 +834,27 @@ def test_an_unregistered_source_that_is_not_only_mock_stays_an_error():
     ]
 
     assert _profile_adjusted_findings(_Cfg(), findings)[0]["severity"] == "error"
+
+
+def test_trading_status_coverage_warning_names_the_keys_it_left_out(tmp_path):
+    from cnequity.quality.trading_status_coverage import trading_state_coverage_findings
+
+    cfg = Config(data_root=tmp_path / "data")
+    part = cfg.curated_root / "daily_bars" / "trade_date=2024-06-28"
+    part.mkdir(parents=True, exist_ok=True)
+    pl.DataFrame([_bar_row("600519.SH", date(2024, 6, 28))]).write_parquet(part / "part-0.parquet")
+    inst = cfg.curated_root / "instruments"
+    inst.mkdir(parents=True, exist_ok=True)
+    pl.DataFrame(
+        {
+            "symbol": ["600519.SH"],
+            "asset_type": ["stock"],
+            "list_date": pl.Series([None], dtype=pl.Date),
+            "delist_date": pl.Series([None], dtype=pl.Date),
+        }
+    ).write_parquet(inst / "part-0.parquet")
+
+    [finding] = trading_state_coverage_findings(cfg, date(2024, 6, 28))
+
+    assert finding["severity"] == "warning"
+    assert "unknown_listing_date: 1" in finding["message"]

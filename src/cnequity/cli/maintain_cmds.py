@@ -226,7 +226,15 @@ def _published_derive(cfg, dataset: str):
                 if not dataset_has_parquet(store.current_root(name))
             ]
             if missing:
-                raise InputUnavailableError(f"{dataset}: missing input {', '.join(missing)}")
+                from cnequity.research.packs import next_command_for_dataset
+
+                remedies = ", ".join(
+                    f"`{next_command_for_dataset(name) or f'cne backfill {name}'}`"
+                    for name in missing
+                )
+                raise InputUnavailableError(
+                    f"{dataset}: missing input {', '.join(missing)}; build it first with {remedies}"
+                )
             yield outcome
             revision = _publish_derived_revision(
                 cfg,
@@ -456,12 +464,18 @@ def derive(
     elif name == "sector_routing":
         from cnequity.derive.sector_routing import derive_sector_routing
 
-        summary = derive_sector_routing(cfg)
+        try:
+            summary = derive_sector_routing(cfg)
+        except RuntimeError as exc:  # missing input or source: the message says what to do
+            raise click.ClickException(str(exc)) from exc
         click.echo(json.dumps(summary, indent=2, default=str))
     elif name == "sector_code_map":
         from cnequity.derive.sector_code_map import derive_sector_code_map
 
-        summary = derive_sector_code_map(cfg)
+        try:
+            summary = derive_sector_code_map(cfg)
+        except RuntimeError as exc:  # missing input or source: the message says what to do
+            raise click.ClickException(str(exc)) from exc
         click.echo(json.dumps(summary, indent=2, default=str))
     elif name == "valuation_orphans":
         from cnequity.storage.repairs.valuation_orphans import purge_valuation_orphan_symbols
@@ -756,7 +770,13 @@ def stats_rebuild(config_path: str, dataset_names: tuple[str, ...], if_stale: bo
         )
     )
     if result.empty:
-        click.echo(_("No parquet yet: {value}").format(value=", ".join(sorted(result.empty))))
+        # A first lake holds a few of the registered datasets; the other fifty
+        # names are noise, and `cne status --datasets` already lists them.
+        click.echo(
+            _(
+                "{value} registered datasets have no parquet yet (see `cne status --datasets`)"
+            ).format(value=len(result.empty))
+        )
 
 
 def _scan_curated_datasets(cfg) -> list[dict]:

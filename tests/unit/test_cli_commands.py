@@ -335,6 +335,35 @@ def test_run_daily_refuses_a_config_with_no_waves(tmp_path):
     assert "cne config create" in result.output
 
 
+def _demo_config(tmp_path):
+    cfg = tmp_path / "demo.toml"
+    cfg.write_text(
+        f'[data]\nroot = "{path_for_toml(tmp_path / "data")}"\nprofile = "demo"\n\n'
+        "[orchestrator]\nworkers = 1\n",
+        encoding="utf-8",
+    )
+    return str(cfg)
+
+
+@pytest.mark.parametrize("extra", [[], ["--stale-only"]])
+def test_run_daily_on_a_demo_lake_explains_there_is_no_schedule(tmp_path, extra):
+    result = CliRunner().invoke(cli, ["run", "daily", "--config", _demo_config(tmp_path), *extra])
+    assert result.exit_code != 0
+    assert "demo lake" in result.output
+    assert "cne init" in result.output
+    assert "cne config create" not in result.output
+
+
+@pytest.mark.parametrize("action", ["diff", "upgrade"])
+def test_config_diff_and_upgrade_leave_a_demo_config_alone(tmp_path, action):
+    path = _demo_config(tmp_path)
+    before = open(path, encoding="utf-8").read()
+    result = CliRunner().invoke(cli, ["config", action, "--config", path])
+    assert result.exit_code == 0, result.output
+    assert "demo lake" in result.output
+    assert open(path, encoding="utf-8").read() == before
+
+
 @pytest.mark.usefixtures("chinese_output")
 def test_status_no_runs(cfg_path):
     result = CliRunner().invoke(cli, ["status", "--config", cfg_path])
@@ -437,6 +466,33 @@ def test_status_datasets_all_fresh(cfg_path, monkeypatch):
     result = CliRunner().invoke(cli, ["status", "--gate", "--datasets", "--config", cfg_path])
     assert result.exit_code == 0, result.output
     assert "最后交易日：2024-06-28" in result.output
+
+
+def test_status_datasets_keeps_long_dataset_names_on_one_line(cfg_path, monkeypatch):
+    names = ["earnings_disclosure_schedule", "financial_statement_items"]
+    monkeypatch.setattr(
+        "cnequity.cli.quality_cmds._last_trading_day",
+        lambda cfg, today: date(2024, 6, 28),
+    )
+    monkeypatch.setattr(
+        "cnequity.query.reader.list_datasets",
+        lambda config=None: pl.DataFrame(
+            {
+                "dataset": names,
+                "layer": ["curated"] * 2,
+                "has_data": [False, False],
+                "watermarked": [False, False],
+                "watermark": pl.Series([None, None], dtype=pl.Date),
+                "coverage_start": pl.Series([None, None], dtype=pl.Date),
+                "coverage_end": pl.Series([None, None], dtype=pl.Date),
+            }
+        ),
+    )
+    monkeypatch.setattr("cnequity.domain.datasets.is_stale", lambda *a, **k: False)
+    result = CliRunner().invoke(cli, ["status", "--datasets", "--config", cfg_path])
+    assert result.exit_code == 0, result.output
+    for name in names:
+        assert name in result.output
 
 
 @pytest.mark.usefixtures("chinese_output")
@@ -1563,6 +1619,35 @@ def test_shfe_annual_plan_is_offline_and_requires_partial_fields(cfg_path, tmp_p
     assert "必须带时区" in naive.output
 
 
+def test_backfill_explains_a_watermark_it_pulled_back(cfg_path, monkeypatch):
+    from cnequity.config import load_config
+    from cnequity.storage.state import StateStore
+
+    state = StateStore(load_config(cfg_path).meta_root)
+    state.set_date("margin_trading", date(2024, 3, 29))
+
+    class FakeEngine:
+        def __init__(self, cfg):
+            self.manifest = SimpleNamespace(finish_run=lambda *a, **k: None)
+
+        def run_job(self, *a, **k):
+            # An older window left a hole, so finalize pulled the watermark back.
+            state.set_date("margin_trading", date(2024, 1, 5))
+            return {"run_id": "bf", "status": "success", "rows_read": 1, "rows_written": 1}
+
+        def run_step(self, name, trade_date, run_id):
+            return {"rows_written": 1}
+
+    monkeypatch.setattr("cnequity.cli.backfill_cmds.JobEngine", FakeEngine)
+    result = CliRunner().invoke(
+        cli,
+        ["backfill", "margin_trading", "--config", cfg_path, "--start", "2024-01-01"],
+    )
+    assert result.exit_code == 0, result.output
+    assert "2024-03-29" in result.output and "2024-01-05" in result.output
+    assert "cne backfill margin_trading --start 2024-01-06" in result.output
+
+
 def test_backfill_snapshot_dataset_reports_capability_and_fallback(cfg_path):
     result = CliRunner().invoke(cli, ["backfill", "fund_flow", "--config", cfg_path])
     assert result.exit_code == 0, result.output
@@ -2516,3 +2601,130 @@ def test_every_scope_report_names_its_dataset(tmp_path):
     report = _tip_scope(cfg, catalog, "daily_bars")
     assert report["state"] == "unverified"
     assert report["dataset"] == "daily_bars"
+
+
+@pytest.mark.parametrize(
+    ("args", "needle"),
+    [
+        (["decision-data", "stock-terms"], "corporate_actions"),
+        (["derive", "industry_index"], "industry_members"),
+    ],
+)
+def test_a_missing_input_dataset_is_an_error_not_a_traceback(tmp_path, args, needle):
+    from cnequity.config import load_config
+    from cnequity.storage.layout import init_data_layout
+
+    cfg_path = _demo_config(tmp_path)
+    init_data_layout(load_config(cfg_path))
+
+    result = CliRunner().invoke(cli, [*args, "--config", cfg_path])
+
+    assert result.exit_code == 1
+    assert needle in result.output
+    assert "cne backfill" in result.output
+    assert "Traceback" not in result.output
+    assert not isinstance(result.exception, (ValueError, RuntimeError))
+
+
+def test_comma_option_joins_repeats_and_stays_none_when_absent():
+    import click
+
+    from cnequity.cli._shared import comma_option
+
+    @click.command()
+    @comma_option("--only", default=None)
+    def probe(only):
+        click.echo(repr(only))
+
+    runner = CliRunner()
+    assert runner.invoke(probe, []).output.strip() == "None"
+    assert runner.invoke(probe, ["--only", "a,b"]).output.strip() == "'a,b'"
+    assert runner.invoke(probe, ["--only", "a", "--only", "b,c"]).output.strip() == "'a,b,c'"
+
+
+@pytest.mark.parametrize("dataset", ["adj_factors", "valuation_metrics"])
+def test_backfill_symbols_on_an_unscoped_dataset_is_a_clear_error(tmp_path, dataset):
+    """`code, _, exchange = ...` shadowed gettext, so this path raised UnboundLocalError."""
+    result = CliRunner().invoke(
+        cli,
+        [
+            "backfill",
+            dataset,
+            "--symbols",
+            "600519.SH",
+            "--plan",
+            "--config",
+            _demo_config(tmp_path),
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "does not support overriding the scope by symbol" in result.output
+    assert not isinstance(result.exception, UnboundLocalError)
+
+
+def test_backfill_futures_minute_rejects_a_bad_contract_cleanly(tmp_path):
+    result = CliRunner().invoke(
+        cli,
+        [
+            "backfill",
+            "futures_minute_bars",
+            "--symbols",
+            "NOPE.SHF",
+            "--config",
+            _demo_config(tmp_path),
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert not isinstance(result.exception, UnboundLocalError)
+
+
+def test_corporate_action_gaps_without_evidence_names_the_command_to_run(tmp_path):
+    from cnequity.config import load_config
+    from cnequity.storage.layout import init_data_layout
+
+    cfg_path = _demo_config(tmp_path)
+    init_data_layout(load_config(cfg_path))
+
+    result = CliRunner().invoke(cli, ["repair", "corporate-action-gaps", "--config", cfg_path])
+
+    assert result.exit_code == 1
+    assert "cne derive adj_factor_source" in result.output
+    assert isinstance(result.exception, SystemExit)
+
+
+@pytest.mark.parametrize(
+    ("target", "needle"),
+    [("sector_code_map", "sector_bars")],
+)
+def test_derive_with_missing_input_data_is_an_error_not_a_traceback(tmp_path, target, needle):
+    from cnequity.config import load_config
+    from cnequity.storage.layout import init_data_layout
+
+    cfg_path = _demo_config(tmp_path)
+    init_data_layout(load_config(cfg_path))
+
+    result = CliRunner().invoke(cli, ["derive", target, "--config", cfg_path])
+
+    assert result.exit_code == 1
+    assert needle in result.output
+    assert isinstance(result.exception, SystemExit)
+
+
+def test_retry_of_a_succeeded_run_says_there_is_nothing_to_retry(cfg_path, monkeypatch):
+    class FakeManifest:
+        def get_run(self, run_id):
+            return {"run_id": run_id, "job_name": "daily", "status": "success"}
+
+    class FakeEngine:
+        def __init__(self, cfg):
+            self.manifest = FakeManifest()
+
+        def run_job(self, *a, **k):
+            raise AssertionError("a succeeded run must not be re-run")
+
+    monkeypatch.setattr("cnequity.cli.run_cmds.JobEngine", FakeEngine)
+    result = CliRunner().invoke(cli, ["run", "retry", "--config", cfg_path, "--run-id", "d1"])
+    assert result.exit_code == 0, result.output
+    assert "already succeeded" in result.output

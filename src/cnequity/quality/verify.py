@@ -52,6 +52,7 @@ from cnequity.query.parquet_scan import (
     scan_parquet_root,
     uses_hive_partitions,
 )
+from cnequity.storage.observation import freshness_mark
 
 logger = logging.getLogger(__name__)
 
@@ -353,7 +354,8 @@ def verify_dataset(
     last = max(days) if days else None
 
     # --- stale head ---------------------------------------------------------
-    mark = watermark or last
+    # An event dataset is also as fresh as the last clean look at its source.
+    mark = freshness_mark(config, spec.name, watermark or last)
     if mark is not None and is_stale(spec.name, mark, anchor, config):
         gaps.append(
             Gap(

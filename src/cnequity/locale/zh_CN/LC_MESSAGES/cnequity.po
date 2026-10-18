@@ -528,12 +528,21 @@ msgstr "  正在重跑全湖审计（读每个历史分区）…"
 
 #: cnequity/cli/quality_cmds.py
 #, python-brace-format
+msgid "  Research readiness is not assessed for a {profile} lake"
+msgstr "  {profile} 湖不评估研究就绪度"
+
+#: cnequity/cli/quality_cmds.py
+#, python-brace-format
 msgid "  STALE datasets: {value}"
 msgstr "  STALE 数据集：{value}"
 
 #: cnequity/cli/quality_cmds.py
 msgid "  Sample lake: source=mock is the expected evidence of this offline profile and does not count toward the health gate; it is still not usable for research."
 msgstr "  sample 湖：source=mock 是这个离线 profile 的预期证据，不参与健康门禁；它仍不可用于研究。"
+
+#: cnequity/cli/quality_cmds.py
+msgid "  Sample lake: the data is synthetic, so no quality audit applies"
+msgstr "  sample 湖：数据是合成的，不做质量审计"
 
 #: cnequity/cli/init_summary.py
 msgid "  See which data source is unreachable: cne sources probe"
@@ -605,6 +614,11 @@ msgstr "  findings：{value} error、{value2} warning、{value3} info"
 #, python-brace-format
 msgid "  {value} datasets, {value2:,} rows, {value3:.1f} GB (counted at {value4})"
 msgstr "  {value} 个数据集、{value2:,} 行、{value3:.1f} GB（统计于 {value4}）"
+
+#: cnequity/cli/quality_cmds.py
+#, python-brace-format
+msgid "  {value} registered datasets hold no data, as expected for a {profile} lake"
+msgstr "  {value} 个已注册数据集没有数据，符合 {profile} 湖的预期"
 
 #: cnequity/orchestrator/worker_pool.py
 #, python-format
@@ -1258,6 +1272,10 @@ msgstr "定时日更或收尾补抓正在运行。"
 #: cnequity/serve/ops/preflight.py
 msgid "A scheduled event stream is running."
 msgstr "定时事件流正在运行。"
+
+#: cnequity/orchestrator/recovery.py
+msgid "A snapshot source cannot recreate missed history; a retry only obtains the observations the source can still offer."
+msgstr "快照源不能补造错过的历史；重试只取得来源仍可提供的观察。"
 
 #: cnequity/research/packs.py
 msgid "A snapshot such as trading status that misses a day cannot be filled by the next dated daily update; the closing catch-up tries again that same day. Announcements and news are not part of the research-pack daily update; run `cne run events` separately when needed."
@@ -3111,6 +3129,14 @@ msgstr "版本编号无效。"
 msgid "Keep going after a stage fails instead of stopping."
 msgstr "某个阶段失败后继续往下跑，而不是停下来。"
 
+#: cnequity/orchestrator/recovery.py
+msgid "Keep the existing lake and deliver the data that passed verification; the gaps stay in the coverage record and can be backfilled later."
+msgstr "保留已有湖，交付本次通过校验的数据；缺口留在覆盖记录中，可稍后补数。"
+
+#: cnequity/orchestrator/recovery.py
+msgid "Keep the existing snapshot; add this dataset to the daily configuration so it accumulates from later collections."
+msgstr "保留已有快照；将该数据集加入日更配置，从后续采集开始积累。"
+
 #: cnequity/cli/maintain_cmds.py
 msgid "Keep the latest this many generations plus current/hold per dataset; other versions are only listed as candidates, not marked, and no bytes are freed. Import a reference manifest before marking in the web UI. 0 skips version handling."
 msgstr "每个数据集保留最近这么多代及 current/hold；其他版本只列出候选，不标记、不释放字节。网页标记前须导入引用清单。0 表示跳过版本处理。"
@@ -3351,11 +3377,6 @@ msgstr "没有致命问题，{warnings} 个警告。"
 #: cnequity/diagnostics/source_health.py
 msgid "No futures daily quote file was fetched for either of the last two weekdays"
 msgstr "最近两个工作日都没有取到期货日行情文件"
-
-#: cnequity/cli/maintain_cmds.py
-#, python-brace-format
-msgid "No parquet yet: {value}"
-msgstr "还没有 parquet：{value}"
 
 #: cnequity/cli/quality_cmds.py
 #, python-brace-format
@@ -3992,6 +4013,10 @@ msgstr ""
 "重建名录本身 —— 代码空间扫描、终态对账、instruments 修复和覆盖门禁 ——\n"
 "是一次性的工程而不是日常运维，放在 `scripts/delisted_ops.py` 里。"
 
+#: cnequity/cli/consume_cmds.py
+msgid "Read-only DuckDB SQL; each dataset is a view named as in `cne status --datasets`."
+msgstr "只读 DuckDB SQL；每个数据集是一个视图，名称同 `cne status --datasets`。"
+
 #: cnequity/cli/quality_cmds.py
 msgid "Read-only acceptance check of a derivatives research window; requires --dataset, --start, --end."
 msgstr "只读验收衍生品研究窗口；需 --dataset、--start、--end。"
@@ -4313,6 +4338,10 @@ msgstr "每个日更调度组最近一次失败的 run 各重试一次。"
 msgid "Retry the most recent failed run of each daily schedule group."
 msgstr "重试每个 daily 调度组最近一次失败的 run。"
 
+#: cnequity/orchestrator/recovery.py
+msgid "Retry with the original range; ranges beyond the source's capability stay as gaps."
+msgstr "按原请求范围重试；来源能力不足的范围继续保留为缺口。"
+
 #: cnequity/cli/run_cmds.py
 #, python-brace-format
 msgid "Retrying failed daily schedule-group run {run_id} ({job_name})"
@@ -4475,6 +4504,16 @@ msgstr "用 backfill 语义跑：跳过交易日门禁和每个 step 自己的�
 #, python-brace-format
 msgid "Run without --core-only, or run a schedule group instead: `cne run daily --group <name>` (available: {groups})."
 msgstr "不带 --core-only 运行，或改跑调度组：`cne run daily --group <名字>`（有 {groups}）。"
+
+#: cnequity/cli/run_cmds.py
+#, python-brace-format
+msgid "Run {run_id} ({job_name}) already succeeded; nothing to retry."
+msgstr "运行 {run_id}（{job_name}）已成功，无需重试。"
+
+#: cnequity/cli/quality_cmds.py
+#, python-brace-format
+msgid "Run {run_id} ({job_name}): {status}"
+msgstr "运行 {run_id}（{job_name}）：{status}"
 
 #: cnequity/serve/ops/catalog.py
 #, python-brace-format
@@ -6041,6 +6080,11 @@ msgstr "[{dataset}] 本次 run 的范围被覆盖为 {value} 只标的"
 
 #: cnequity/cli/backfill_cmds.py
 #, python-brace-format
+msgid "[{dataset}] watermark moved back from {before} to {after}: sessions after {after} are not all in the lake, so it reads STALE until they are. The next daily run fills them, or now: `cne backfill {dataset} --start {start}`"
+msgstr "[{dataset}] 水位线从 {before} 回退到 {after}：{after} 之后的交易日尚未全部入湖，补齐前状态显示 STALE。下一次日常更新会补齐，也可现在运行：`cne backfill {dataset} --start {start}`"
+
+#: cnequity/cli/backfill_cmds.py
+#, python-brace-format
 msgid "[{dataset}] {deferred} keys belong to sessions not yet settled; they stay owed for a later run"
 msgstr "[{dataset}] 有 {deferred} 个 key 属于尚未收定的交易日；继续欠着，留给后面的 run"
 
@@ -6674,6 +6718,11 @@ msgstr "{action!r} 不是 {value} 之一"
 
 #: cnequity/cli/run_cmds.py
 #, python-brace-format
+msgid "{config_path} belongs to a {profile} lake, which has no daily schedule: a few symbols are not worth updating. Build a lake `cne run daily` can keep current with `cne init`, which writes configs/cnequity.toml."
+msgstr "{config_path} 是 {profile} 湖的配置，没有日更计划（几只股票不值得更新）。要得到能用 `cne run daily` 保持最新的湖，请运行 `cne init`，它会写入 configs/cnequity.toml。"
+
+#: cnequity/cli/run_cmds.py
+#, python-brace-format
 msgid "{config_path} has no [[job.daily.waves]]: without schedule groups `cne run daily` runs this wave DAG, and this config defines none, so a run would fetch nothing and still report success. {remedy}"
 msgstr "{config_path} 里没有 [[job.daily.waves]]：没有调度组时 `cne run daily` 跑的就是这张 wave DAG，而这份配置一条都没定义，跑起来会一行数据都没抓却报成功。{remedy}"
 
@@ -6785,6 +6834,11 @@ msgstr "{name}（{step}）"
 msgid "{note}, {found}"
 msgstr "{note}，{found}"
 
+#: cnequity/cli/setup_cmds.py
+#, python-brace-format
+msgid "{path} belongs to a {profile} lake, which has no schedule to compare or upgrade; `cne init` builds a lake with a full config."
+msgstr "{path} 是 {profile} 湖的配置，没有可比较或升级的调度；`cne init` 会建立带完整配置的湖。"
+
 #: cnequity/config/drift.py
 #, python-brace-format
 msgid "{path} matches the packaged example config."
@@ -6855,6 +6909,11 @@ msgstr "{value} 需要是开关。"
 msgid "{value} only applies with --http"
 msgstr "{value} 只用于 --http"
 
+#: cnequity/cli/maintain_cmds.py
+#, python-brace-format
+msgid "{value} registered datasets have no parquet yet (see `cne status --datasets`)"
+msgstr "{value} 个已注册数据集还没有 parquet（见 `cne status --datasets`）"
+
 #: cnequity/config/drift.py
 msgid "→ Run `cne config upgrade` to add the missing steps and schedule groups (it backs up the config first)."
 msgstr "→ 运行 `cne config upgrade` 自动补上缺少的 step 和调度组（会先备份原配置）。"
@@ -6866,6 +6925,10 @@ msgstr "✓ 公司行为没有改变任何复权因子输入，无需重算"
 #: cnequity/cli/backfill_cmds.py
 msgid "✓ Daily bars did not change; adjustment factors and suspensions need no recompute"
 msgstr "✓ 日线没有变化，复权因子与停牌无需重算"
+
+#: cnequity/cli/quality_cmds.py
+msgid "✓ Install verified: the offline sample lake reads back correctly (synthetic data, not for research)"
+msgstr "✓ 安装验证通过：离线 sample 湖读取正常（合成数据，不可用于研究）"
 
 #: cnequity/cli/init_summary.py
 #, python-brace-format

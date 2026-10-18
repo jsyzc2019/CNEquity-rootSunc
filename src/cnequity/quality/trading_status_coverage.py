@@ -184,7 +184,14 @@ def trading_state_coverage_findings(config: Config, end: date) -> list[dict]:
             if missing or report["excluded_rows"] or report["contradictory_rows"]
             else "info",
             "message": f"{missing} traded stock/ETF key(s) lack status, including pre-inception history; "
-            f"{report['risk_warning_unknown_rows']} lack ST evidence",
+            f"{report['risk_warning_unknown_rows']} lack ST evidence"
+            + (
+                f"; {report['excluded_rows']} key(s) are left out of the count ("
+                + ", ".join(f"{name}: {n}" for name, n in report["exclusions"].items())
+                + ")"
+                if report["excluded_rows"]
+                else ""
+            ),
             **report,
         }
     ]

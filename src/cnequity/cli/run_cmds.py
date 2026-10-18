@@ -707,6 +707,18 @@ def run_daily(
     attach_log_file(cfg, "run-daily", quiet=quiet)
     engine = JobEngine(cfg)
     td = parse_date_option(trade_date_str, "--trade-date")
+    if (
+        getattr(cfg, "lake_profile", None) in {"demo", "sample"}
+        and not (getattr(cfg, "daily_waves", None) or [])
+        and not getattr(cfg, "schedule_groups", None)
+    ):
+        # Every mode is refused, --stale-only included: judged against the
+        # whole registry it fetched market-wide snapshots into a 2-symbol lake.
+        raise click.ClickException(
+            _(
+                "{config_path} belongs to a {profile} lake, which has no daily schedule: a few symbols are not worth updating. Build a lake `cne run daily` can keep current with `cne init`, which writes configs/cnequity.toml."
+            ).format(config_path=config_path, profile=cfg.lake_profile)
+        )
     if snapshots_only and not stale_only:
         raise click.ClickException(_("--snapshots-only only works with --stale-only"))
     if stale_groups is not None and not stale_only:
@@ -985,6 +997,15 @@ def _retry_single_run(engine: JobEngine, run_id: str) -> dict:
     record = engine.manifest.get_run(run_id)
     if record is None:
         raise click.ClickException(_("Unknown run_id: {run_id}").format(run_id=run_id))
+    if dict(record).get("status") == "success":
+        # Retrying re-runs the whole job and could only turn a finished run
+        # into a failed one, so say there is nothing to do.
+        click.echo(
+            _("Run {run_id} ({job_name}) already succeeded; nothing to retry.").format(
+                run_id=run_id, job_name=record["job_name"]
+            )
+        )
+        return {"run_id": run_id, "status": "success", "retried": 0}
     try:
         if record["job_name"] == "init":
             result = engine.resume_init(run_id=run_id)

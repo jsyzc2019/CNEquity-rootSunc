@@ -249,7 +249,12 @@ def serve(
 
 @cli.command()
 @config_option
-@click.option("--sql", default="SELECT COUNT(*) AS n FROM daily_bars")
+@click.option(
+    "--sql",
+    default="SELECT COUNT(*) AS n FROM daily_bars",
+    show_default=True,
+    help=N_("Read-only DuckDB SQL; each dataset is a view named as in `cne status --datasets`."),
+)
 @click.option("--dataset", default=None, help=N_("Dataset name to fetch on demand"))
 @click.option("--symbol", default=None, help=N_("Symbol to fetch on demand"))
 @click.option(

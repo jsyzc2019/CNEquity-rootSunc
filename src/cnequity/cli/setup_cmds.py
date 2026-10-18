@@ -19,6 +19,7 @@ from cnequity.cli._shared import (
     _progress_logging,
     _run_status_exit_code,
     attach_log_file,
+    comma_option,
     comma_values,
     config_option,
     ingest_scope_label,
@@ -195,7 +196,7 @@ def _reject_foreign_options(profile: str, names: tuple[str, ...]) -> None:
         "later with `cne backfill daily_bars`."
     ),
 )
-@click.option(
+@comma_option(
     "--symbols",
     default=",".join(("600519.SH", "000001.SZ", "000858.SZ", "300750.SZ", "601318.SH")),
     show_default=True,
@@ -656,6 +657,21 @@ def config_cmd(
         )
     if dry_run and action != "upgrade":
         raise click.UsageError(_("--dry-run only applies to `cne config upgrade`"))
+    if action in {"upgrade", "diff"}:
+        # A demo or sample config deliberately schedules nothing; comparing it
+        # with the full example would list every step as missing, and
+        # upgrading it would turn five symbols into a whole-market schedule.
+        try:
+            profile = getattr(_cfg(config_path), "lake_profile", None)
+        except (click.ClickException, ValueError, OSError):
+            profile = None  # a config that does not load is the action's own error to report
+        if profile in {"demo", "sample"}:
+            click.echo(
+                _(
+                    "{path} belongs to a {profile} lake, which has no schedule to compare or upgrade; `cne init` builds a lake with a full config."
+                ).format(path=resolve_config_path(config_path), profile=profile)
+            )
+            return
     if action == "upgrade":
         _config_upgrade(resolve_config_path(config_path), dry_run=dry_run)
         return

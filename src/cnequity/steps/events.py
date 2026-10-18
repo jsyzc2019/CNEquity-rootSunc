@@ -40,7 +40,7 @@ from cnequity.domain.symbols import filter_ingest_universe
 from cnequity.orchestrator.manifest import Manifest
 from cnequity.orchestrator.outcomes import SourcePayloadError, SourceUnavailableError
 from cnequity.orchestrator.registry import register_step
-from cnequity.orchestrator.source_gaps import record_source_gap
+from cnequity.orchestrator.source_gaps import record_source_gap, source_gap_dates
 from cnequity.progress import sweep_progress
 from cnequity.quality.ex_events import (
     EX_EVENT_LOOKBACK_SESSIONS,
@@ -53,10 +53,12 @@ from cnequity.quality.failover import (
 )
 from cnequity.steps.common import (
     fetch_incremental_daily,
+    incremental_trade_dates,
     instrument_metadata,
     load_symbols,
 )
 from cnequity.steps.http_common import run_incremental_fetched, verify_raw_archive, write_fetched
+from cnequity.storage.observation import note_observation
 
 # TDX xdxr is per-symbol (backfill); EastMoney datacenter supports ex-date filter (daily).
 _CANONICAL_BACKFILL = "tdx_protocol"
@@ -846,6 +848,9 @@ def step_corporate_actions(config: Config, trade_date: date, run_id: str, contex
     findings: list[dict] = []
     failed_symbols: list[str] = []
     heal_written = 0
+    # The [start, through] window this run asked of the whole lake and got a
+    # clean answer for; None when it did not (see storage/observation.py).
+    observed: tuple[date | None, date] | None = None
 
     if backfill:
         symbols = list(
@@ -1386,12 +1391,22 @@ def step_corporate_actions(config: Config, trade_date: date, run_id: str, contex
                 len(failed_symbols),
                 len(symbols),
             )
+        swept = set(symbols) | completed_symbols
+        scoped = context.get("_retry_symbols") or getattr(config, "_backfill_symbols", None)
+        # A `--symbols` sweep answers for those names only; it counts as a look
+        # at the lake when, with this run's earlier chunks, it covered them all.
+        if swept and not failed_symbols and (not scoped or swept >= set(_sweep_universe(config))):
+            observed = (
+                getattr(config, "_backfill_start", None),
+                min(getattr(config, "_backfill_end", None) or trade_date, trade_date),
+            )
         canonical_source = _CANONICAL_BACKFILL
     else:
         if not config.sources.get("eastmoney", True):
             raise SourceUnavailableError(
                 "corporate_actions daily: eastmoney source disabled in config"
             )
+        window = incremental_trade_dates(config, "corporate_actions", trade_date)
         df, findings = fetch_incremental_daily(
             config,
             "corporate_actions",
@@ -1401,6 +1416,14 @@ def step_corporate_actions(config: Config, trade_date: date, run_id: str, contex
             date_col="ex_date",
         )
         canonical_source = _CANONICAL_DAILY
+        # The EastMoney ex-date query is market-wide, so a window with no
+        # failed or source-gapped day is a clean look at the whole lake.
+        if (
+            window
+            and not any(f.get("check") == "fetch_failed_days" for f in findings)
+            and not set(window) & source_gap_dates("corporate_actions")
+        ):
+            observed = (min(window), max(window))
         if config.failover_enabled:
             failover = failover_spec(config, "corporate_actions")
             if failover is not None and failover.snapshot_cadence == "daily":
@@ -1484,6 +1507,18 @@ def step_corporate_actions(config: Config, trade_date: date, run_id: str, contex
                 f"requested window {start.isoformat()}..{end.isoformat()}"
             )
         df = df.with_columns(parsed_dates.alias("ex_date"))
+
+    if observed is not None:
+        # Fetched rows count once compaction publishes them (finalize commits
+        # the claim); an empty answer has nothing to publish and counts now.
+        note_observation(
+            config,
+            "corporate_actions",
+            run_id,
+            start=observed[0],
+            through=observed[1],
+            pending_publish=not df.is_empty(),
+        )
 
     context_updates: dict = {"symbols_to_rebackfill": []}
     if findings:

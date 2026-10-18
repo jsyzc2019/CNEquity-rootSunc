@@ -561,7 +561,7 @@ def fetch_daily_bars_parallel(
             logger.info(
                 "daily_bars: finished symbols can be loaded before this sweep ends, "
                 'for example load("daily_bars", symbols=[%r]). '
-                "Adjusted prices publish with adj_factors at the end of init.",
+                "Adjusted prices follow once adj_factors covers these sessions.",
                 symbols_ready[0],
             )
 

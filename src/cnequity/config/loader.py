@@ -71,7 +71,7 @@ class Config:
     data_root: Path
     # "demo" / "sample" for the tiny lakes `cne init --profile demo|sample`
     # writes. Whole-lake judgements read it: a five-symbol lake measured
-    # against the 42-dataset registry reports forty absences and exits 1,
+    # against the full dataset registry reports forty absences and exits 1,
     # which tells a new user their first run failed when it did exactly what
     # it promised. Nothing else branches on it, and a production config has
     # no reason to set it.

@@ -773,8 +773,8 @@ def _manifest_state_issues(snapshot: Path, manifest: Mapping[str, Any]) -> list[
             # relative to the snapshot itself.  For trade-date watermarks also
             # require a row at or beyond the claimed date; a marker ahead of
             # the bytes is the classic forged-watermark failure.
-            if created_day is not None and marker > created_day:
-                issues.append(f"state:{dataset}:{field}")
+            ahead_of_snapshot = created_day is not None and marker > created_day
+            backed_by_bytes = False
             if field == "last_success_trade_date":
                 date_column = spec.query_date_col or spec.date_col
                 if date_column:
@@ -784,8 +784,16 @@ def _manifest_state_issues(snapshot: Path, manifest: Mapping[str, Any]) -> list[
                             maximum_day = maximum.date() if hasattr(maximum, "date") else maximum
                             if marker > maximum_day:
                                 issues.append(f"state:{dataset}:{field}")
+                            else:
+                                backed_by_bytes = True
                         except (AttributeError, TypeError, ValueError):
                             issues.append(f"state:{dataset}:{field}")
+            # A watermark may run ahead of the snapshot day when the rows that
+            # justify it do too: trading_calendar is written a year ahead on
+            # purpose, and refusing that made every snapshot with a calendar
+            # (`--research` among them) unverifiable.
+            if ahead_of_snapshot and not backed_by_bytes:
+                issues.append(f"state:{dataset}:{field}")
 
         revision = state.get("revision")
         if revision is not None:

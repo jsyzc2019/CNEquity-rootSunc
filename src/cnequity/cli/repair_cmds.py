@@ -7,7 +7,7 @@ import json
 import click
 
 from cnequity.cli._root import cli
-from cnequity.cli._shared import _cfg, config_option
+from cnequity.cli._shared import _cfg, comma_option, config_option
 from cnequity.i18n import N_, _
 
 
@@ -85,7 +85,7 @@ def fund_volume(config_path: str, apply: bool, refresh_sources: bool, max_symbol
 
 @repair.command("financial-originals")
 @config_option
-@click.option("--symbols", help=N_("Comma-separated stock symbols."))
+@comma_option("--symbols", help=N_("Comma-separated stock symbols."))
 @click.option(
     "--all-stocks", is_flag=True, help=N_("Use the lake stock catalogue; choose this or --symbols.")
 )
@@ -244,7 +244,7 @@ def fund_factors(config_path: str, apply: bool):
     is_flag=True,
     help=N_("Fetch independent factor evidence; uses local caches only by default."),
 )
-@click.option(
+@comma_option(
     "--symbols",
     default=None,
     help=N_("Comma-separated symbols; checks historical issues in bounded batches by default."),
@@ -311,7 +311,7 @@ def fund_listing_dates(config_path: str, apply: bool):
 
 @repair.command("index-snapshots")
 @config_option
-@click.option(
+@comma_option(
     "--indices",
     default=None,
     help=N_(
@@ -493,7 +493,10 @@ def corporate_action_gaps(config_path: str, apply: bool):
     """
     from cnequity.storage.repairs.corporate_action_gaps import repair_corporate_action_gaps
 
-    _emit(repair_corporate_action_gaps(_cfg(config_path), apply=apply))
+    try:
+        _emit(repair_corporate_action_gaps(_cfg(config_path), apply=apply))
+    except (ValueError, RuntimeError) as exc:
+        raise click.ClickException(str(exc)) from exc
 
 
 @repair.command("orphan-symbols")

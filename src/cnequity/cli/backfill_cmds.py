@@ -21,6 +21,7 @@ from cnequity.cli._shared import (
     _cfg,
     _run_status_exit_code,
     attach_log_file,
+    comma_option,
     comma_values,
     config_option,
     parse_date_option,
@@ -134,7 +135,7 @@ from cnequity.orchestrator.engine import JobEngine
         )
     ),
 )
-@click.option(
+@comma_option(
     "--symbols",
     "symbols_str",
     default=None,
@@ -724,6 +725,7 @@ def backfill(
         cfg.st_history_symbols_per_run = 0
 
     spec = get_dataset(dataset)
+    watermark_before = _watermark(cfg, dataset)
     # Explicit lineage: fingerprint the inputs a derive reads before fetching,
     # so the follow-up below derives exactly what this backfill changed.
     actions_before = bars_before = bar_window = None
@@ -759,10 +761,52 @@ def backfill(
         _follow_lineage(result, lambda: _after_daily_bars(cfg, bars_before, bar_window, result))
     if outstanding:
         result["outstanding"] = _settle_outstanding(cfg, dataset)
+    _explain_watermark_pullback(cfg, dataset, watermark_before, result)
     click.echo(json.dumps(result, indent=2, default=str))
     code = _run_status_exit_code(result["status"])
     if code:
         raise SystemExit(code)
+
+
+def _watermark(cfg, dataset: str) -> date | None:
+    """Current watermark, or None; this feeds an advisory note and must not fail a backfill."""
+    from cnequity.storage.state import StateStore
+
+    meta_root = getattr(cfg, "meta_root", None)
+    if meta_root is None:
+        return None
+    try:
+        return StateStore(meta_root).get_date(dataset)
+    except (OSError, ValueError):
+        return None
+
+
+def _explain_watermark_pullback(cfg, dataset: str, before: date | None, result: dict) -> None:
+    """Say why a backfill made the dataset read STALE.
+
+    A dense dataset's watermark stops before its first missing session, so an
+    older window that leaves a hole between itself and the existing data pulls
+    the watermark back. That is deliberate — the next run fills the hole — but
+    without a word here `cne status` simply turned STALE after a successful run.
+    """
+    after = _watermark(cfg, dataset)
+    if before is None or after is None or after >= before:
+        return
+    gap_start = after + timedelta(days=1)
+    result["watermark"] = {"before": before.isoformat(), "after": after.isoformat()}
+    click.echo(
+        _(
+            "[{dataset}] watermark moved back from {before} to {after}: sessions after {after} "
+            "are not all in the lake, so it reads STALE until they are. The next daily run "
+            "fills them, or now: `cne backfill {dataset} --start {start}`"
+        ).format(
+            dataset=dataset,
+            before=before.isoformat(),
+            after=after.isoformat(),
+            start=gap_start.isoformat(),
+        ),
+        err=True,
+    )
 
 
 def _follow_lineage(result: dict, derive) -> dict:
@@ -1413,7 +1457,7 @@ def _override_scope(cfg, dataset: str, symbols: list[str]) -> None:
         from cnequity.domain.derivatives import parse_future_code
 
         for symbol in symbols:
-            code, _, exchange = symbol.partition(".")
+            code, _sep, exchange = symbol.partition(".")
             try:
                 contract = parse_future_code(code, exchange, shanghai_today())
             except ValueError as exc:

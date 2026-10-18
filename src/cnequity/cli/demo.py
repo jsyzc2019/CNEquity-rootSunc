@@ -106,7 +106,7 @@ def _write_demo_toml(path: Path, data_root: Path, *, force: bool = False) -> Non
 [data]
 root = "{root}"
 # Says what this lake is, so whole-lake checks do not judge five symbols
-# against the full 42-dataset registry.
+# against the full dataset registry.
 profile = "demo"
 
 [orchestrator]
@@ -144,8 +144,14 @@ allow_mock = false
     _write_demo_config(path, text, force=force)
 
 
-def _demo_config(data_root: Path, config_path: Path | None = None) -> Config:
-    """Minimal real-source config (workers=1, no mock, TDX only)."""
+def _demo_config(
+    data_root: Path, config_path: Path | None = None, *, research: bool = False
+) -> Config:
+    """Minimal real-source config (workers=1, no mock, TDX only).
+
+    ``research`` also enables Sina, which serves the hfq factors the research
+    view derives; without it ``--research`` died on "source disabled".
+    """
     return Config(
         data_root=data_root.resolve(),
         lake_profile="demo",
@@ -165,7 +171,7 @@ def _demo_config(data_root: Path, config_path: Path | None = None) -> Config:
         ],
         sources={
             "eastmoney": False,
-            "sina": False,
+            "sina": research,
             "cninfo": False,
             "baostock": False,
         },
@@ -715,7 +721,7 @@ def run_demo(
     steps = 8 if research and intraday else 7 if (research or intraday) else 6
     _banner(f"1/{steps}", _("Preparing a demo lake at {data_root}").format(data_root=data_root))
     _write_demo_toml(config_out, data_root, force=force)
-    cfg = _demo_config(data_root, config_path=config_out.resolve())
+    cfg = _demo_config(data_root, config_path=config_out.resolve(), research=research)
     init_data_layout(cfg)
     click.echo(f"data_root = {cfg.data_root}")
     click.echo(f"config    = {config_out}")
@@ -801,11 +807,17 @@ def run_demo(
                 "daily_bars failed:\n{detail}\nRe-run `cne init --profile demo` once it is fixed."
             ).format(detail=detail)
         )
+    # The run total also counts compact re-publishing the same rows, so the
+    # fetched figure is the daily_bars step's own.
+    fetched = next(
+        (r.get("rows_written") for r in bars.get("results", []) if r.get("step") == "daily_bars"),
+        bars.get("rows_written", "?"),
+    )
     click.echo(
         _("Daily bars run {value}: status={value2} rows_written≈{value3}").format(
             value=bars.get("run_id"),
             value2=bars.get("status"),
-            value3=bars.get("rows_written", "?"),
+            value3=fetched,
         )
     )
 

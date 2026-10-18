@@ -216,15 +216,16 @@ def trading_calendar_horizon_findings(config: Config, trade_date: date) -> list[
     and a year of "trading days" that are not would land in every window,
     watermark and backtest built on them.
 
-    Verified against the current table (ends 2027-10-07): asking for 2028-01-26,
-    the first day of that 春节, returns is_trading=True.
+    The table's end is the seed's last covered date, not its last closure: the
+    final holiday of a year is followed by weekdays that are real sessions.
     """
+    from cnequity.adapters.calendar.exchange_calendar import calendar_seed_end
     from cnequity.adapters.calendar.holidays_cn import CLOSED_DATES
 
     cal_root = config.curated_root / "trading_calendar"
     if not dataset_has_parquet(cal_root) or not CLOSED_DATES:
         return []
-    table_end = date.fromisoformat(max(CLOSED_DATES))
+    table_end = calendar_seed_end()
 
     written = (
         dedupe_lazy_by_primary_key(scan_parquet_root(cal_root), "trading_calendar")

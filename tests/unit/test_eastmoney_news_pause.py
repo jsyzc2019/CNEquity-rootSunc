@@ -103,13 +103,15 @@ def test_the_breaker_can_be_switched_off(tmp_path):
 
 def test_config_defaults_and_toml_override(tmp_path):
     path = tmp_path / "cnequity.toml"
-    root = path_for_toml(tmp_path / "data")
-    path.write_text(f'[data]\nroot = "{root}"\n[sources.eastmoney]\nenabled = true\n', "utf-8")
+    path.write_text(
+        f'[data]\nroot = "{path_for_toml(tmp_path / "data")}"\n[sources.eastmoney]\nenabled = true\n',
+        "utf-8",
+    )
     cfg = load_config(path)
     assert (cfg.eastmoney_news_breaker, cfg.eastmoney_news_breaker_strikes) == (True, 3)
 
     path.write_text(
-        f'[data]\nroot = "{root}"\n[sources.eastmoney]\nenabled = true\n'
+        f'[data]\nroot = "{path_for_toml(tmp_path / "data")}"\n[sources.eastmoney]\nenabled = true\n'
         "news_breaker = false\nnews_breaker_strikes = 5\n",
         "utf-8",
     )

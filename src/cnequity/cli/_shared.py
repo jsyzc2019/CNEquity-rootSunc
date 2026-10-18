@@ -97,6 +97,24 @@ def _cfg(config: str):
     return cfg
 
 
+def _join_repeats(
+    ctx: click.Context, param: click.Parameter, values: tuple[str, ...]
+) -> str | None:
+    return ",".join(values) if values else None
+
+
+def comma_option(*param_decls: str, **attrs):
+    """A comma-separated option that also accepts repeats: `--only a --only b`.
+
+    A plain option keeps only its last occurrence, so a repeated flag used to
+    narrow a scope to the final value without a word; here the occurrences are
+    joined and every comma-separated form means the same thing.
+    """
+    default = attrs.pop("default", None)
+    attrs["default"] = (default,) if default is not None else None
+    return click.option(*param_decls, multiple=True, callback=_join_repeats, **attrs)
+
+
 def comma_values(value: str | None, flag: str) -> list[str] | None:
     """An explicit empty scope must never become an unscoped network sweep."""
     if value is None:
@@ -161,6 +179,7 @@ def _progress_logging(quiet: bool = False, *, take_over: bool = True) -> bool:
         return False
     handler = logging.StreamHandler()
     handler.setFormatter(terminal_formatter(handler.stream))
+    handler.addFilter(lambda record: not getattr(record, "echoed_by_click", False))
     logging.basicConfig(
         level=logging.WARNING if quiet else logging.INFO,
         handlers=[handler],

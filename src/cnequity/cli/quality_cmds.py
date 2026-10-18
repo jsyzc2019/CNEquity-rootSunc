@@ -8,6 +8,8 @@ have landed, landed. Different failures, so different commands.
 from __future__ import annotations
 
 import json
+import shutil
+import sys
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -19,6 +21,7 @@ from cnequity.cli._shared import (
     _cfg,
     _progress_logging,
     attach_log_file,
+    comma_option,
     comma_values,
     config_option,
     ingest_scope_label,
@@ -399,9 +402,16 @@ def audit(
                     err=True,
                 )
         if health["empty_datasets"]:
-            click.echo(
-                _("  Empty datasets: {value}").format(value=", ".join(health["empty_datasets"]))
-            )
+            if getattr(cfg, "lake_profile", None) in {"demo", "sample"}:
+                click.echo(
+                    _(
+                        "  {value} registered datasets hold no data, as expected for a {profile} lake"
+                    ).format(value=len(health["empty_datasets"]), profile=cfg.lake_profile)
+                )
+            else:
+                click.echo(
+                    _("  Empty datasets: {value}").format(value=", ".join(health["empty_datasets"]))
+                )
         if health.get("expected_empty_datasets"):
             click.echo(
                 _("  Datasets expected to be empty: {value}").format(
@@ -420,70 +430,80 @@ def audit(
             if f.get("source_limited"):
                 click.echo(f"  [info]    {f.get('dataset', ''):22} {f.get('message', '')}")
         validity = health["historical_universe_validity"]
-        research_state = "READY" if validity["universe_ready"] else "BLOCKED"
-        universe_label = (
-            "all-A"
-            if validity.get("universe", research_universe) == "all_a"
-            else validity.get("universe", research_universe)
-        )
-        click.echo(
-            _("  History {universe_label} {start}..{end}: {research_state}").format(
-                universe_label=universe_label,
-                start=validity["window"]["start"],
-                end=validity["window"]["end"],
-                research_state=research_state,
-            )
-        )
-        supported = validity.get("supported_window")
-        # Only worth a line when it adds something: a READY gate with no
-        # computed window (a caller passing its own manifest) would otherwise
-        # print a contradiction.
-        if supported:
+        small_lake = getattr(cfg, "lake_profile", None) in {"demo", "sample"}
+        if small_lake:
+            # Research readiness is judged on a full-market lake; a lake of a few
+            # symbols is never ready for it, so the verdict would only alarm.
             click.echo(
-                _(
-                    "  Endorsable window: {start}..{end} (the longest range the evidence supports; a research window inside it passes)"
-                ).format(start=supported["start"], end=supported["end"])
-            )
-        elif not validity["universe_ready"]:
-            detail = validity.get("checks", {}).get("historical_st_labels", {})
-            blocked_by = detail.get("supported_window_blocked_by")
-            per_source = detail.get("supported_window_by_source") or {}
-            offered = _(", ").join(
-                f"{name} {item['start']}..{item['end']}"
-                for name, item in sorted(per_source.items())
-            )
-            short = detail.get("supported_window_missing_symbols")
-            total = detail.get("supported_window_current_symbols")
-            near = (
-                _(", the closest receipt is short {short}/{total} symbols").format(
-                    short=short, total=total
+                _("  Research readiness is not assessed for a {profile} lake").format(
+                    profile=cfg.lake_profile
                 )
-                if short and total
-                else ""
+            )
+        else:
+            research_state = "READY" if validity["universe_ready"] else "BLOCKED"
+            universe_label = (
+                "all-A"
+                if validity.get("universe", research_universe) == "all_a"
+                else validity.get("universe", research_universe)
             )
             click.echo(
-                _("  Endorsable window: none")
-                + (
-                    _(
-                        " ({blocked_by} has no receipt covering the current stock pool yet{near})"
-                    ).format(blocked_by=blocked_by, near=near)
-                    if blocked_by
-                    else ""
-                )
-                + (
-                    _("; ranges each source has: {offered}").format(offered=offered)
-                    if offered
-                    else ""
+                _("  History {universe_label} {start}..{end}: {research_state}").format(
+                    universe_label=universe_label,
+                    start=validity["window"]["start"],
+                    end=validity["window"]["end"],
+                    research_state=research_state,
                 )
             )
-        for blocker in validity["blockers"]:
-            click.echo(f"  [research] {blocker['message']}")
-            if blocker.get("remediation"):
+            supported = validity.get("supported_window")
+            # Only worth a line when it adds something: a READY gate with no
+            # computed window (a caller passing its own manifest) would otherwise
+            # print a contradiction.
+            if supported:
                 click.echo(
-                    _("              Suggested fix: {remediation}").format(
-                        remediation=blocker["remediation"]
+                    _(
+                        "  Endorsable window: {start}..{end} (the longest range the evidence supports; a research window inside it passes)"
+                    ).format(start=supported["start"], end=supported["end"])
+                )
+            elif not validity["universe_ready"]:
+                detail = validity.get("checks", {}).get("historical_st_labels", {})
+                blocked_by = detail.get("supported_window_blocked_by")
+                per_source = detail.get("supported_window_by_source") or {}
+                offered = _(", ").join(
+                    f"{name} {item['start']}..{item['end']}"
+                    for name, item in sorted(per_source.items())
+                )
+                short = detail.get("supported_window_missing_symbols")
+                total = detail.get("supported_window_current_symbols")
+                near = (
+                    _(", the closest receipt is short {short}/{total} symbols").format(
+                        short=short, total=total
+                    )
+                    if short and total
+                    else ""
+                )
+                click.echo(
+                    _("  Endorsable window: none")
+                    + (
+                        _(
+                            " ({blocked_by} has no receipt covering the current stock pool yet{near})"
+                        ).format(blocked_by=blocked_by, near=near)
+                        if blocked_by
+                        else ""
+                    )
+                    + (
+                        _("; ranges each source has: {offered}").format(offered=offered)
+                        if offered
+                        else ""
                     )
                 )
+            for blocker in validity["blockers"]:
+                click.echo(f"  [research] {blocker['message']}")
+                if blocker.get("remediation"):
+                    click.echo(
+                        _("              Suggested fix: {remediation}").format(
+                            remediation=blocker["remediation"]
+                        )
+                    )
         if not health["healthy"]:
             click.echo("UNHEALTHY")
         elif research_start and not validity["universe_ready"]:
@@ -686,7 +706,7 @@ def _verify_mode(bars: bool, runs: bool, given: dict) -> str:
     is_flag=True,
     help=N_("Check run evidence over consecutive trading days instead; fills no gaps."),
 )
-@click.option(
+@comma_option(
     "--dataset",
     "only",
     default=None,
@@ -699,7 +719,7 @@ def _verify_mode(bars: bool, runs: bool, given: dict) -> str:
     is_flag=True,
     help=N_("Run backfill over fillable gaps, dataset by dataset from newest to oldest."),
 )
-@click.option(
+@comma_option(
     "--kind",
     "kinds",
     default=None,
@@ -1132,7 +1152,15 @@ def status(
             listed = pl_mod.col("has_data") | (pl_mod.col("freshness") == "STALE")
             hidden = view.filter(~listed)["dataset"].to_list()
             view = view.filter(listed)
-        with pl_mod.Config(tbl_rows=-1, tbl_cols=-1, fmt_str_lengths=32):
+        # Piped output has no terminal to measure, and polars then wraps at 100
+        # columns, splitting long dataset names mid-word.
+        width = max(shutil.get_terminal_size((120, 24)).columns, 112)
+        with pl_mod.Config(
+            tbl_rows=-1,
+            tbl_cols=-1,
+            fmt_str_lengths=32,
+            **({} if all_columns else {"tbl_width_chars": width}),
+        ):
             click.echo(view)
         if hidden:
             click.echo(
@@ -1376,6 +1404,17 @@ def status(
             f">={int(cfg.batch_stale_seconds)}s — next cne run reconciles them; "
             "or `cne run clean --reconcile-runs`"
         )
+    if sys.stderr.isatty():
+        # The JSON below is the stable contract for scripts; a person at a
+        # terminal gets the one-line answer first, on stderr so pipes stay clean.
+        click.echo(
+            _("Run {run_id} ({job_name}): {status}").format(
+                run_id=summary.get("run_id"),
+                job_name=summary.get("job_name"),
+                status=summary.get("status"),
+            ),
+            err=True,
+        )
     click.echo(json.dumps(summary, indent=2, default=str))
     run_status = str(summary.get("dataset_status") or summary.get("status") or "success")
     if gate and run_status == "degraded":
@@ -1546,7 +1585,7 @@ def source_limits(config_path: str):
         "Where this probe runs from — 'cn', 'overseas', or any label you use. Some sources reject non-mainland egress, so results without this label cannot be interpreted."
     ),
 )
-@click.option(
+@comma_option(
     "--only",
     default=None,
     help=N_(
@@ -1819,6 +1858,13 @@ def check(ctx: click.Context, config_path: str, full: bool, pack_names: tuple[st
     worst = 1 if 1 in codes else max(codes, default=0)
     click.echo(_("\n== Verdict =="))
     if worst == 0:
+        if getattr(cfg, "lake_profile", None) == "sample":
+            click.echo(
+                _(
+                    "✓ Install verified: the offline sample lake reads back correctly (synthetic data, not for research)"
+                )
+            )
+            return
         click.echo(_("✓ The lake is usable: freshness, coverage and quality all pass"))
         return
     click.echo(f"✗ {_('; ').join(problems)}")
@@ -1893,6 +1939,9 @@ def _check_quality(cfg, *, full: bool) -> tuple[int, str | None]:
             found if note is None else _("{note}, {found}").format(note=note, found=found),
         )
     if not runs and not full:
+        if getattr(cfg, "lake_profile", None) == "sample":
+            click.echo(_("  Sample lake: the data is synthetic, so no quality audit applies"))
+            return code, note
         return 2, _("no audit records, quality cannot be proven (add --full to audit now)")
     return code, note
 

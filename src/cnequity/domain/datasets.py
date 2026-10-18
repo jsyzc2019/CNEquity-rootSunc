@@ -1705,10 +1705,17 @@ def is_stale(dataset: str, mark, anchor, config=None) -> bool:
     A retired source is never stale once the lake has caught up to its last
     published session: there is nothing further to fetch, and calling that
     "stale" forever is how a freshness signal stops being read.
+
+    With *config*, the lake's last clean look at the source also counts: an
+    event dataset's newest row is its newest event, and a quiet window has none
+    (``storage/observation.py``).
     """
     if mark is None or anchor is None:
         return False
     if config is not None:
+        from cnequity.storage.observation import freshness_mark
+
+        mark = freshness_mark(config, dataset, mark)
         # A history dataset fetched by a weekly group is due through that
         # group's last scheduled session, not today (orchestrator/cadence.py).
         from cnequity.orchestrator.cadence import freshness_anchor

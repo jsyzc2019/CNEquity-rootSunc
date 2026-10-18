@@ -16,6 +16,7 @@ from typing import Any
 from cnequity.config import Config, WaveConfig
 from cnequity.domain.datasets import DATASETS, history_mode_for
 from cnequity.domain.market_time import shanghai_today
+from cnequity.domain.request_meter import request_meter_scope
 from cnequity.i18n import N_, NP_, Message
 from cnequity.orchestrator.backfill_scope import capture_backfill_scope, restore_backfill_scope
 from cnequity.orchestrator.deps import step_execution_levels, validate_steps_registered
@@ -724,10 +725,20 @@ class JobEngine:
             logger.info(N_("Step %s starting"), name)
             from cnequity.orchestrator.source_gaps import source_gap_scope
 
-            with step_scope(name), source_gap_scope(step_config) as source_gaps:
+            with (
+                step_scope(name),
+                source_gap_scope(step_config) as source_gaps,
+                request_meter_scope() as request_meter,
+            ):
                 if name == "daily_bars" and step_context["_init"]:
                     self._recover_init_delisted_bars(run_id, trade_date, step_context)
                 out = entry.fn(step_config, trade_date, run_id, step_context)
+            if request_meter.requests and "requests" not in out:
+                # Only fill what the step did not count itself.
+                reported = out.setdefault("metrics", {})
+                reported.setdefault("requests", request_meter.requests)
+                if request_meter.request_retries:
+                    reported.setdefault("request_retries", request_meter.request_retries)
             step_status = out.pop("status", "success")
             if step_status not in {
                 "success",

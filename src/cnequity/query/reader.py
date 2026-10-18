@@ -273,7 +273,7 @@ def resolve_config(
     )
 
 
-def _missing_dataset_message(dataset: str, root, data_root) -> str:
+def _missing_dataset_message(dataset: str, root, config) -> str:
     """Say what is absent and what fills it.
 
     The path alone answers "is it there" and nothing else, which is the wrong
@@ -283,11 +283,16 @@ def _missing_dataset_message(dataset: str, root, data_root) -> str:
     """
     from cnequity.research.packs import next_command_for_dataset
 
-    remedy = next_command_for_dataset(dataset) or (
+    direct = (
         f"cne derive {dataset}" if dataset in DERIVE_COMMAND_DATASETS else f"cne backfill {dataset}"
     )
+    # A demo or sample lake is never grown by `cne init` or a pack's daily
+    # run (both refuse it, or would build a whole market); only the direct
+    # command fills the one dataset that is missing.
+    demo = getattr(config, "lake_profile", None) in {"demo", "sample"}
+    remedy = direct if demo else (next_command_for_dataset(dataset) or direct)
     return (
-        f"no parquet data for dataset {dataset!r} under {root} (data_root={data_root}); "
+        f"no parquet data for dataset {dataset!r} under {root} (data_root={config.data_root}); "
         f"build it with `{remedy}`"
     )
 
@@ -509,7 +514,7 @@ def _read_dataset(
         committed=read_context is None,
     )
     if not published and not _preview_can_answer(dataset, symbols, revision, read_context):
-        raise ReaderError(_missing_dataset_message(dataset, root, config.data_root))
+        raise ReaderError(_missing_dataset_message(dataset, root, config))
 
     partition_col = DATE_COLUMNS.get(dataset) or partition_col_for_dataset(dataset)
     df = pl.DataFrame()
@@ -527,7 +532,7 @@ def _read_dataset(
                 committed=read_context is None,
             )
         except FileNotFoundError as exc:
-            raise ReaderError(_missing_dataset_message(dataset, root, config.data_root)) from exc
+            raise ReaderError(_missing_dataset_message(dataset, root, config)) from exc
     df = _with_daily_bar_preview(
         config,
         df,
@@ -539,7 +544,7 @@ def _read_dataset(
         read_context=read_context,
     )
     if df.is_empty() and not published:
-        raise ReaderError(_missing_dataset_message(dataset, root, config.data_root))
+        raise ReaderError(_missing_dataset_message(dataset, root, config))
     if not include_otc and dataset in OTC_SCOPED_DATASETS and not df.is_empty():
         df = _drop_otc_quotes(df, config, read_context, DATE_COLUMNS.get(dataset, "trade_date"))
     # Apply semantic scope before strict schema validation.  Live snapshots
@@ -1174,7 +1179,7 @@ def scan(
         meta_root=cfg.meta_root,
         revision=_revision_for_dataset(revision_selection, dataset),
     ):
-        raise ReaderError(_missing_dataset_message(dataset, root, cfg.data_root))
+        raise ReaderError(_missing_dataset_message(dataset, root, cfg))
     return scan_parquet_root(
         root,
         partition_col=DATE_COLUMNS.get(dataset) or partition_col_for_dataset(dataset),

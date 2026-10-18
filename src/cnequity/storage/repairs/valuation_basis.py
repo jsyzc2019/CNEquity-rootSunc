@@ -109,10 +109,10 @@ def repair_valuation_basis(config: Config, *, apply: bool = False) -> dict:
 
 def _repair_locked(config: Config, *, apply: bool) -> dict:
     store = RevisionStore(config.meta_root, config.curated_root, config.derived_root)
-    store.ensure_current(_DATASET)
-    base = store.current_root(_DATASET)
+    base = store.repair_base(_DATASET, register=apply)
     report: dict = {"dataset": _DATASET, "applied": False, "rows": 0, "partitions_changed": 0}
     if base is None:
+        report["note"] = f"no {_DATASET} data; nothing to repair"
         return report
     by_partition: dict[str, list[Path]] = {}
     for path in sorted(base.rglob("*.parquet")):

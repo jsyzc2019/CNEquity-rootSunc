@@ -42,6 +42,7 @@ from cnequity.adapters.eastmoney.host_guard import (  # noqa: F401 — re-export
 )
 from cnequity.domain.http_policy import record_http_response, record_request_event
 from cnequity.domain.rate_limit import source_request
+from cnequity.domain.request_meter import count_request
 
 if TYPE_CHECKING:
     from cnequity.config import Config
@@ -318,6 +319,7 @@ class EastMoneyClient:
                 host_guard.admit(self.config, url)
                 direct_client = self._get_direct_client()
                 record_request_event(self.config, _request_source(url), "fallback")
+                count_request()
                 response = direct_client.get(url, headers=headers, **kwargs)
                 record_http_response(
                     self.config, _request_source(url), response, expected_json=True
@@ -381,6 +383,7 @@ class EastMoneyClient:
                 host_guard.admit(self.config, url)
                 if request_event is not None:
                     record_request_event(self.config, _request_source(url), request_event)
+                count_request(retry=request_event == "retry")
                 response = self._client.get(url, headers=headers, **kwargs)
                 record_http_response(
                     self.config, _request_source(url), response, expected_json=True

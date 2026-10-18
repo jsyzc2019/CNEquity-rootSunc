@@ -208,7 +208,7 @@
 | 参数 | 默认值 | 说明 |
 |---|---|---|
 | `--config` | `configs/cnequity.toml` | 配置文件路径。 |
-| `--sql` | `SELECT COUNT(*) AS n FROM daily_bars` | — |
+| `--sql` | `SELECT COUNT(*) AS n FROM daily_bars` | 只读 DuckDB SQL；每个数据集是一个视图，名称同 `cne status --datasets`。 |
 | `--dataset` | `—` | 按需抓取的数据集名 |
 | `--symbol` | `—` | 按需抓取的标的代码 |
 | `--refresh` | `False` | 抓取前先刷新按需缓存（需要同时给 --dataset 和 --symbol）。 |

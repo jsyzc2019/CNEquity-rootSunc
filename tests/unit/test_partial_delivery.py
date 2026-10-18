@@ -445,3 +445,16 @@ def test_program_and_storage_errors_still_fail(tmp_path, monkeypatch, error):
     assert result["status"] == "failed"
     assert result["execution_status"] == "failed"
     assert result["fallback"] == []
+
+
+@pytest.mark.parametrize("dataset", ["fund_flow", "market_breadth"])
+def test_fallback_guidance_is_english_unless_chinese_is_chosen(tmp_path, monkeypatch, dataset):
+    """The action and history note were Chinese literals in an English-source CLI."""
+    import re
+
+    cfg = Config(data_root=tmp_path / "data")
+    _entries(monkeypatch, {dataset: StepEntry(fn=_outage, group="core")})
+    result = _backfill_once(cfg, dataset)
+    option = result["fallback"][0]
+
+    assert not re.search(r"[一-鿿]", option["action"] + option["history_note"])
