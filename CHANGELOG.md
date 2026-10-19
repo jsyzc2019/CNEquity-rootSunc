@@ -2,6 +2,10 @@
 
 这里记录面向用户的主要功能、修复与兼容性变化。历史版本中的命令名反映当时的接口；当前用法以 [CLI 参考](docs/zh/reference/cli.md)为准。升级前阅读[升级与兼容性](docs/zh/getting-started/installation.md#升级与兼容性)。
 
+## [0.18.1] — 未发布
+
+- 恢复 0.18.0 误删的 `cnequity.domain.security_identifiers`（证券代码延续注册表）。它是下游直接导入的公开接口，0.18.0 删除后 EquityLab 无法导入；内容与 0.17.1 逐字节相同，见 [Python API](docs/zh/reference/python-api.md#证券代码延续)。
+
 ## [0.18.0] — 2026-10-19
 
 - **升级步骤：** `pip install -U cnequity` 后重启 `cne serve` 和已在运行的 `cne mcp`。数据集契约没有变化，不需要迁移数据或改配置。调度或脚本里依赖 `cne backfill` 退出 0 的，按下方「退出码变化」改为读取 `usable_result` / `coverage_status`；调用了已移除的 `cne storage` 试验与归档子命令的，需要删去这些调用；仍需运行已弃用迁移命令的旧湖，请在升级到 0.20.0 之前完成。

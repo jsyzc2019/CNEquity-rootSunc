@@ -193,6 +193,22 @@ def dataset_schema(dataset: str) -> dict[str, pl.DataType]
 
 返回 `domain/schemas.py` 中注册的 Polars 类型映射。
 
+## 证券代码延续
+
+模块：`cnequity.domain.security_identifiers`。这是公开的读取契约，下游（如 EquityLab 的回测账本和研究样本）直接导入；删除或改名须先经弃用周期。
+
+```python
+from cnequity.domain.security_identifiers import (
+    canonical_symbol,
+    canonicalize_dated_identifiers,
+    identifier_aliases,
+    identifier_changes,
+    transitions_on,
+)
+```
+
+注册表只收录生效日和换股比例都有存档公告佐证的代码变更；不能按相近的价格或名称推断变更。`canonicalize_dated_identifiers(frame, date_col=..., key_columns=...)` 把带日期的行改回当日有效的代码，同一业务键同时有原生行和厂商回溯行时保留原生行。下游可以对模块源文件取哈希，作为冻结样本的身份，因此修改注册表会让这些样本失效。
+
 ## 配置解析
 
 ```python

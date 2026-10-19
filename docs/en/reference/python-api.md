@@ -193,6 +193,22 @@ def dataset_schema(dataset: str) -> dict[str, pl.DataType]
 
 Returns the Polars type mapping registered in `domain/schemas.py`.
 
+## Security identifier continuity
+
+Module: `cnequity.domain.security_identifiers`. This is a public read contract that downstream consumers (such as EquityLab's backtest ledger and research samples) import directly; removing or renaming it requires a deprecation cycle.
+
+```python
+from cnequity.domain.security_identifiers import (
+    canonical_symbol,
+    canonicalize_dated_identifiers,
+    identifier_aliases,
+    identifier_changes,
+    transitions_on,
+)
+```
+
+The registry holds only code changes whose effective date and share ratio are backed by an archived announcement; never infer a change from similar prices or names. `canonicalize_dated_identifiers(frame, date_col=..., key_columns=...)` moves dated rows back to the code effective on that date, and keeps the native row when a native and a vendor-restated row share a business key. Downstream consumers may hash the module source as the identity of frozen samples, so editing the registry invalidates those samples.
+
 ## Configuration resolution
 
 ```python
