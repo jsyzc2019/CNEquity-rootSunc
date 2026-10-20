@@ -337,3 +337,216 @@ def test_the_board_reading_is_snapshotted_every_session(tmp_path, monkeypatch):
     assert snapshot.get_column("source").to_list() == ["exchange"]
     curated = cfg.curated_root / "trading_status"
     assert not curated.exists() or not any(curated.rglob("*.parquet")), "authority is unchanged"
+
+
+# --- ETFs and LOFs -------------------------------------------------------------
+# EastMoney was the only feed that answered for funds. With it down the equity
+# boards cover stocks only, so ~2,000 traded funds a day had no status row and
+# the audit failed every run. The fund boards fill that, but only as far as they
+# can prove: a fund that traded is `normal`; one that did not is simply unknown.
+
+
+def _sse_fund_payload(*items):
+    return {"date": 20260915, "time": 153000, "list": [list(i) for i in items]}
+
+
+def _szse_fund_workbook(*records):
+    import io
+
+    import pandas as pd
+
+    book = io.BytesIO()
+    pd.DataFrame(
+        [
+            {
+                "交易日期": DAY.isoformat(),
+                "证券代码": code,
+                "证券简称": "某某ETF",
+                "前收": "1.000",
+                "今收": "1.010",
+                "成交金额(元)": amount,
+            }
+            for code, amount in records
+        ]
+    ).to_excel(book, index=False)
+    return book.getvalue()
+
+
+class _FundClient:
+    def __init__(self, sse_items, szse_records):
+        self.calls: list[str] = []
+        self._sse = sse_items
+        self._szse = szse_records
+
+    def get(self, url, **kwargs):
+        self.calls.append(url)
+        client = self
+
+        class Response:
+            content = b"" if "yunhq" in url else _szse_fund_workbook(*client._szse)
+
+            def raise_for_status(self):
+                pass
+
+            def json(self):
+                return _sse_fund_payload(*client._sse)
+
+        return Response()
+
+
+def test_a_fund_that_traded_is_normal_and_one_that_did_not_is_unknown(monkeypatch):
+    client = _FundClient(
+        sse_items=[
+            ("510300", "沪深300ETF", 4.0, 4.1, 3.9, 4.0, 1000, 4000, 3.95),
+            ("510310", "无成交ETF", 0.0, 0.0, 0.0, 1.0, 0, 0, 1.0),
+            ("501018", "南方原油LOF", 1.0, 1.1, 0.9, 1.0, 500, 500, 1.0),
+            # A subscription stub, not a tradable fund.
+            ("510301", "沪深300ETF申赎", 4.0, 4.1, 3.9, 4.0, 100, 400, 3.95),
+        ],
+        szse_records=[("159915", "1,232,924.85"), ("159000", "0.000"), ("000001", "5.0")],
+    )
+    monkeypatch.setattr(mod, "_client", lambda: client)
+
+    result = mod.fetch_fund_trading_status_exchange(None, DAY, config=None)
+
+    assert result.covered == {"sse", "szse"}
+    assert sorted(result.rows.get_column("symbol").to_list()) == [
+        "159915.SZ",
+        "501018.SH",
+        "510300.SH",
+    ]
+    assert result.rows.get_column("is_trading").all()
+    assert set(result.rows.get_column("status")) == {STATUS_NORMAL}
+    assert result.rows.get_column("risk_warning").to_list() == [False] * 3
+    assert set(result.rows.columns) == {
+        "symbol",
+        "trade_date",
+        "is_trading",
+        "status",
+        "risk_warning",
+    }
+    assert any("exchange/fund" in url for url in client.calls)
+    assert any("1815_stock_lf_snapshot" in url for url in client.calls)
+
+
+def test_the_fund_boards_follow_the_requested_scope_and_survive_one_failing(monkeypatch):
+    monkeypatch.setattr(
+        mod,
+        "_fetch_sse_funds",
+        lambda day, config=None: [mod._fund_row("510300.SH", day), mod._fund_row("510050.SH", day)],
+    )
+
+    def boom(day, config=None):
+        raise RuntimeError("Connection reset by peer")
+
+    monkeypatch.setattr(mod, "_fetch_szse_funds", boom)
+
+    result = mod.fetch_fund_trading_status_exchange({"510300.SH"}, DAY, config=None)
+
+    assert result.covered == {"sse"}
+    assert "szse" in result.failures
+    assert result.rows.get_column("symbol").to_list() == ["510300.SH"]
+
+
+def test_both_fund_boards_failing_is_empty_rather_than_an_exception(monkeypatch):
+    for name in ("_fetch_sse_funds", "_fetch_szse_funds"):
+        monkeypatch.setattr(
+            mod, name, lambda day, config=None: (_ for _ in ()).throw(RuntimeError("down"))
+        )
+
+    result = mod.fetch_fund_trading_status_exchange(None, DAY, config=None)
+
+    assert result.is_empty
+    assert result.covered == frozenset()
+
+
+def test_a_fund_board_for_another_session_is_refused(monkeypatch):
+    class Response:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {"date": "20260914", "time": 153000, "list": [["510300"]]}
+
+    monkeypatch.setattr(
+        mod, "_client", lambda: type("C", (), {"get": lambda *a, **k: Response()})()
+    )
+
+    with pytest.raises(ValueError, match="serves 2026-09-14"):
+        mod._fetch_sse_funds(DAY, config=None)
+
+
+def test_an_outage_day_gives_traded_funds_a_first_hand_row(tmp_path, monkeypatch):
+    from cnequity.config import Config
+    from cnequity.orchestrator.manifest import Manifest
+    from cnequity.steps import reference
+
+    cfg = Config(data_root=tmp_path / "data", workers=1)
+    instruments = cfg.curated_root / "instruments"
+    instruments.mkdir(parents=True)
+    symbols = ["600519.SH", "510300.SH", "159915.SZ", "159000.SZ"]
+    pl.DataFrame(
+        {
+            "symbol": symbols,
+            "name": ["贵州茅台", "沪深300ETF", "创业板ETF", "无成交ETF"],
+            "exchange": ["SH", "SH", "SZ", "SZ"],
+            "asset_type": ["stock", "etf", "etf", "etf"],
+            "list_date": [
+                date(2001, 8, 27),
+                date(2012, 5, 28),
+                date(2011, 12, 9),
+                date(2010, 1, 4),
+            ],
+            "delist_date": [None] * 4,
+        }
+    ).write_parquet(instruments / "part-merged.parquet")
+
+    monkeypatch.setattr(
+        reference,
+        "fetch_trading_status",
+        lambda *a, **k: (_ for _ in ()).throw(RuntimeError("outage")),
+    )
+    monkeypatch.setattr(
+        "cnequity.adapters.exchange.trading_status.fetch_trading_status_exchange",
+        lambda symbols, day, config=None: mod.ExchangeStatusResult(
+            rows=pl.DataFrame(
+                [mod._row("600519.SH", "贵州茅台", day, (1.0, 1.1, 0.9), 1.0)],
+                schema_overrides={"risk_warning": pl.Boolean},
+            ),
+            covered=frozenset({"sse", "szse"}),
+            failures={},
+        ),
+    )
+    asked: list[list[str]] = []
+
+    def funds(symbols, day, config=None):
+        asked.append(sorted(symbols))
+        return mod.ExchangeStatusResult(
+            rows=pl.DataFrame(
+                [mod._fund_row("510300.SH", day), mod._fund_row("159915.SZ", day)],
+                schema_overrides={"risk_warning": pl.Boolean},
+            ),
+            covered=frozenset({"sse", "szse"}),
+            failures={},
+        )
+
+    monkeypatch.setattr(
+        "cnequity.adapters.exchange.trading_status.fetch_fund_trading_status_exchange", funds
+    )
+
+    run_id = Manifest(cfg.manifest_path).start_run("test")
+    reference.step_trading_status(cfg, DAY, run_id, {})
+
+    staged = pl.concat(
+        [
+            pl.read_parquet(path)
+            for path in (cfg.staging_root / "trading_status" / f"run_id={run_id}").glob("*.parquet")
+        ],
+        how="diagonal_relaxed",
+    )
+    assert asked == [["159000.SZ", "159915.SZ", "510300.SH"]]
+    owners = dict(zip(staged["symbol"].to_list(), staged["source"].to_list(), strict=True))
+    assert owners["510300.SH"] == "exchange"
+    assert owners["159915.SZ"] == "exchange"
+    # No turnover, no evidence, and no cache to carry: unknown, not suspended.
+    assert "159000.SZ" not in owners

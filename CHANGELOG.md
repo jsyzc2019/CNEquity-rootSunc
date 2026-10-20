@@ -6,6 +6,7 @@
 
 - 恢复 0.18.0 误删的 `cnequity.domain.security_identifiers`（证券代码延续注册表）。它是下游直接导入的公开接口，0.18.0 删除后 EquityLab 无法导入；内容与 0.17.1 逐字节相同，见 [Python API](docs/zh/reference/python-api.md#证券代码延续)。
 - 东财走本地代理时，代理没启动（如 Clash 随登出退出）导致的连接被拒不再被当作东财拒绝本机 IP：push2 和 datacenter 的熔断器不会触发，报错直接写明代理地址。
+- 东财不可用的日更里，`trading_status` 现在用沪深交易所的基金行情板块给当日有成交的 ETF/LOF 补写 `normal` 行（`source=exchange`）。无成交的基金仍不写行，不会被记为停牌；此前东财不可用时约 2,000 只 ETF 没有状态行，健康检查因此持续报错。已缺失的历史日期仍可用 `cne repair status-traded` 补派生行。
 
 ## [0.18.0] — 2026-10-19
 
