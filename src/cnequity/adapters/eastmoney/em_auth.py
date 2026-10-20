@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import logging
 import random
+import socket
 import threading
 import time
 from typing import TYPE_CHECKING
@@ -209,6 +210,19 @@ def rate_limit_if_unconfigured(client: object, config: Config | None) -> None:
         config.rate_limit("eastmoney")
 
 
+def _proxy_accepts_connections(proxy: str) -> bool:
+    """Whether a TCP connection to the proxy itself succeeds."""
+    parsed = urlparse(proxy)
+    default_port = {"https": 443, "socks5": 1080, "socks5h": 1080}.get(parsed.scheme, 80)
+    try:
+        with socket.create_connection(
+            (parsed.hostname or "127.0.0.1", parsed.port or default_port), timeout=2.0
+        ):
+            return True
+    except OSError:
+        return False
+
+
 def is_transport_fail_fast(exc: BaseException) -> bool:
     """True for failures that retrying the same request will not fix.
 
@@ -330,6 +344,25 @@ class EastMoneyClient:
         self._note_outcome(url, status_code=response.status_code)
         return response
 
+    def _proxy_failure(self, exc: BaseException) -> BaseException:
+        """Name a refused connection to the proxy itself.
+
+        A proxy that is not running (Clash gone after a logout) raises a plain
+        ``ConnectError``, which the breaker would read as EastMoney refusing
+        this IP and close every host until midnight. The proxy is probed
+        directly so a genuine refusal from EastMoney is never relabelled.
+        """
+        if (
+            self._proxy is None
+            or not isinstance(exc, httpx.ConnectError)
+            or isinstance(exc, host_guard.EastMoneyHostBlockedError)
+            or _proxy_accepts_connections(self._proxy)
+        ):
+            return exc
+        return host_guard.EastMoneyProxyUnreachableError(
+            f"EastMoney proxy {self._proxy} is unreachable (is it running?): {exc}"
+        )
+
     def _note_outcome(
         self, url: str, *, status_code: int | None = None, exc: BaseException | None = None
     ) -> None:
@@ -394,10 +427,13 @@ class EastMoneyClient:
             httpx.ProxyError,
             httpx.RemoteProtocolError,
         ) as exc:
-            self.last_route_outcome["primary_error"] = type(exc).__name__
-            self._note_outcome(url, exc=exc)
+            failure = self._proxy_failure(exc)
+            self.last_route_outcome["primary_error"] = type(failure).__name__
+            self._note_outcome(url, exc=failure)
             if not self._can_fallback_direct(url):
-                raise
+                if failure is exc:
+                    raise
+                raise failure from exc
             self.last_route_outcome["proxy_failed"] = True
             try:
                 direct = self._get_direct(url, headers=headers, **kwargs)
@@ -442,8 +478,11 @@ class EastMoneyClient:
                     self.config, _request_source(url), response, expected_json=True
                 )
         except Exception as exc:
-            self._note_outcome(url, exc=exc)
-            raise
+            failure = self._proxy_failure(exc)
+            self._note_outcome(url, exc=failure)
+            if failure is exc:
+                raise
+            raise failure from exc
         self._note_outcome(url, status_code=response.status_code)
         return response
 
