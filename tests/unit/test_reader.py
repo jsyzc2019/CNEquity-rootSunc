@@ -846,3 +846,49 @@ def test_traded_bar_without_a_factor_stays_inexact(tmp_path):
 
     assert df["adj_is_exact"].to_list() == [True, False]
     assert df["adj_close"].to_list() == pytest.approx([20.0, 12.0])
+
+
+def test_qfq_prices_a_suspended_gap_like_hfq(tmp_path):
+    """Both modes read the same carried factor; qfq only rescales it."""
+    cfg = Config(data_root=tmp_path / "lake")
+    _write_daily(cfg, date(2024, 6, 26), close=10.0, volume=1000)
+    _write_daily(cfg, date(2024, 6, 27), close=10.0, volume=0)
+    _write_daily(cfg, date(2024, 6, 28), close=11.0, volume=800)
+    _write_factor(cfg, date(2024, 6, 26), 2.0)
+    _write_factor(cfg, date(2024, 6, 28), 4.0)
+
+    frames = {
+        adjust: load(
+            "daily_bars",
+            start="2024-06-26",
+            end="2024-06-28",
+            adjust=adjust,
+            strict_adj=True,
+            config=cfg,
+        ).sort("trade_date")
+        for adjust in ("hfq", "qfq")
+    }
+
+    assert frames["qfq"]["adj_is_exact"].to_list() == [True, True, True]
+    assert frames["qfq"]["adj_close"].to_list() == pytest.approx([5.0, 5.0, 11.0])
+    hfq = frames["hfq"]["adj_close"].to_list()
+    assert [price / 4.0 for price in hfq] == pytest.approx(frames["qfq"]["adj_close"].to_list())
+
+
+def test_qfq_window_inside_a_suspension_anchors_on_the_carried_factor(tmp_path):
+    cfg = Config(data_root=tmp_path / "lake")
+    _write_daily(cfg, date(2024, 6, 26), close=10.0, volume=1000)
+    _write_daily(cfg, date(2024, 6, 27), close=10.0, volume=0)
+    _write_factor(cfg, date(2024, 6, 26), 2.5)
+
+    df = load(
+        "daily_bars",
+        start="2024-06-27",
+        end="2024-06-27",
+        adjust="qfq",
+        strict_adj=True,
+        config=cfg,
+    )
+
+    assert df["adj_is_exact"].to_list() == [True]
+    assert df["adj_close"].to_list() == pytest.approx([10.0])

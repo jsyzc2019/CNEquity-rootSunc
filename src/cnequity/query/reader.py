@@ -755,20 +755,21 @@ def _with_distribution_multiplier(
 # on every adjusted load.
 _SUSPENDED_FACTOR_LOOKBACK_DAYS = 400
 
+_FACTOR_SCHEMA = {"symbol": pl.Utf8, "trade_date": pl.Date, "factor": pl.Float64}
+
 
 def _positive_hfq_factors(factors: pl.DataFrame) -> pl.DataFrame:
     """Keep one finite positive stored hfq factor per symbol and session."""
 
-    empty = pl.DataFrame(schema={"symbol": pl.Utf8, "trade_date": pl.Date, "factor": pl.Float64})
     if factors.is_empty():
-        return empty
+        return pl.DataFrame(schema=_FACTOR_SCHEMA)
     frame = factors
     if "adjust_type" in frame.columns:
         frame = frame.filter(pl.col("adjust_type") == STORED_ADJUST_TYPE)
     if not {"symbol", "trade_date", "factor"} <= set(frame.columns):
-        return empty
+        return pl.DataFrame(schema=_FACTOR_SCHEMA)
     return (
-        frame.select(["symbol", "trade_date", "factor"])
+        frame.select(["symbol", "trade_date", pl.col("factor").cast(pl.Float64)])
         .filter(
             pl.col("factor").is_not_null() & pl.col("factor").is_finite() & (pl.col("factor") > 0)
         )
@@ -776,57 +777,34 @@ def _positive_hfq_factors(factors: pl.DataFrame) -> pl.DataFrame:
     )
 
 
-def _asof_fill_missing_factor(joined: pl.DataFrame, factors: pl.DataFrame) -> pl.DataFrame:
-    """Copy the last known factor onto zero-volume rows that lack one.
+def _forward_filled_factors(gaps: pl.DataFrame, known: pl.DataFrame) -> pl.DataFrame:
+    """The last known factor at or before each gap key; unmatched gaps are dropped.
 
     Forward-fill within each symbol never reads a later session, so a factor
     that changes when trading resumes stays on the resume session.
     """
 
-    if factors.is_empty() or "factor" not in joined.columns:
-        return joined
-    gaps = joined.filter(
-        pl.col("factor").is_null() & pl.col("volume").is_not_null() & (pl.col("volume") == 0)
+    if gaps.is_empty() or known.is_empty():
+        return pl.DataFrame(schema=_FACTOR_SCHEMA)
+    on_dtype = gaps.schema["trade_date"]
+    history = (
+        pl.concat(
+            [
+                known.select(
+                    "symbol", pl.col("trade_date").cast(on_dtype), pl.col("factor"), _gap=False
+                ),
+                gaps.with_columns(pl.lit(None, dtype=pl.Float64).alias("factor"), _gap=True),
+            ],
+            how="diagonal_relaxed",
+        )
+        .sort(["symbol", "trade_date"])
+        .with_columns(pl.col("factor").forward_fill().over("symbol"))
     )
-    if gaps.is_empty():
-        return joined
-    on_dtype = joined.schema["trade_date"]
-    gap_keys = (
-        gaps.select(["symbol", "trade_date"])
-        .unique(subset=["symbol", "trade_date"])
-        .with_columns(pl.col("trade_date").cast(on_dtype))
-    )
-    history = pl.concat(
-        [
-            factors.select(["symbol", "trade_date", "factor"]).with_columns(
-                pl.col("trade_date").cast(on_dtype),
-                pl.col("factor").cast(pl.Float64),
-            ),
-            gap_keys.with_columns(pl.lit(None, dtype=pl.Float64).alias("factor")),
-        ],
-        how="diagonal_relaxed",
-    ).sort(["symbol", "trade_date"])
-    history = history.with_columns(pl.col("factor").forward_fill().over("symbol")).unique(
-        subset=["symbol", "trade_date"], keep="last"
-    )
-    matched = (
-        gap_keys.join(history, on=["symbol", "trade_date"], how="left")
-        .filter(pl.col("factor").is_not_null())
-        .rename({"factor": "_carried_factor"})
-    )
-    if matched.is_empty():
-        return joined
-    out = joined.join(matched, on=["symbol", "trade_date"], how="left")
-    return out.with_columns(
-        pl.when(pl.col("factor").is_null() & pl.col("_carried_factor").is_not_null())
-        .then(pl.col("_carried_factor"))
-        .otherwise(pl.col("factor"))
-        .alias("factor")
-    ).drop("_carried_factor")
+    return history.filter(pl.col("_gap") & pl.col("factor").is_not_null()).drop("_gap")
 
 
-def _carry_suspended_hfq_factors(
-    joined: pl.DataFrame,
+def _with_carried_suspension_factors(
+    bars: pl.DataFrame,
     factors: pl.DataFrame,
     config: Config,
     start: date | None,
@@ -834,55 +812,64 @@ def _carry_suspended_hfq_factors(
     revision: RevisionRef | None,
     read_context: ReadContext | None,
 ) -> pl.DataFrame:
-    """Fill hfq factors for zero-volume sessions the derive left unpublished.
+    """Stored hfq factors plus the carried factor for unfactored suspended bars.
 
-    The adjustment task is supposed to carry the last factor onto a suspended
-    session. An incremental derive sometimes stops a few sessions after volume
-    goes to zero, and ``load(adjust='hfq')`` then marks those placeholder bars
-    inexact and substitutes factor 1.0. That is the wrong price, and a strict
-    consumer rejects the whole window because of a name that cannot be traded.
-    A row that actually traded and still has no factor is left untouched.
+    The derive carries the last factor onto every suspended session. A lake
+    derived before that was fixed can still lack rows for zero-volume
+    placeholders, and the next derive only refetches a bounded batch. Until
+    then those bars take the last published factor here, before qfq, hfq and
+    total_return diverge, so every mode prices the same row the same way. A
+    row that actually traded and still has no factor stays missing.
     """
 
-    if (
-        joined.is_empty()
-        or "volume" not in joined.columns
-        or "factor" not in joined.columns
-        or "bar_time" in joined.columns
-    ):
-        return joined
-    missing = pl.col("factor").is_null() & pl.col("volume").is_not_null() & (pl.col("volume") == 0)
-    if joined.filter(missing).is_empty():
-        return joined
     known = _positive_hfq_factors(factors)
-    filled = _asof_fill_missing_factor(joined, known)
-    still = filled.filter(missing)
-    if still.is_empty() or not isinstance(start, date):
-        return filled
-    lookback_end = start - timedelta(days=1)
-    lookback_start = start - timedelta(days=_SUSPENDED_FACTOR_LOOKBACK_DAYS)
-    if lookback_end < lookback_start:
-        return filled
-    symbols = sorted(still["symbol"].unique().to_list())
-    try:
-        earlier = _read_dataset(
-            config,
-            "adj_factors",
-            start=lookback_start,
-            end=lookback_end,
-            symbols=symbols,
-            revision=revision,
-            read_context=read_context,
-        )
-    except ReaderError:
-        return filled
-    if earlier.is_empty():
-        return filled
-    carried = _positive_hfq_factors(earlier)
+    if (
+        "volume" not in bars.columns
+        or "bar_time" in bars.columns
+        or not {"symbol", "trade_date"} <= set(bars.columns)
+    ):
+        return known
+    gaps = (
+        bars.filter(pl.col("volume").is_not_null() & (pl.col("volume") == 0))
+        .select("symbol", "trade_date")
+        .unique()
+    )
+    if gaps.is_empty():
+        return known
+    gaps = gaps.join(
+        known.select("symbol", pl.col("trade_date").cast(gaps.schema["trade_date"])),
+        on=["symbol", "trade_date"],
+        how="anti",
+    )
+    if gaps.is_empty():
+        return known
+    carried = _forward_filled_factors(gaps, known)
+    unmatched = gaps.join(carried, on=["symbol", "trade_date"], how="anti")
+    if not unmatched.is_empty() and isinstance(start, date):
+        try:
+            earlier = _read_dataset(
+                config,
+                "adj_factors",
+                start=start - timedelta(days=_SUSPENDED_FACTOR_LOOKBACK_DAYS),
+                end=start - timedelta(days=1),
+                symbols=sorted(unmatched["symbol"].unique().to_list()),
+                revision=revision,
+                read_context=read_context,
+            )
+        except ReaderError:
+            earlier = pl.DataFrame()
+        prior = _positive_hfq_factors(earlier)
+        if not prior.is_empty():
+            carried = pl.concat(
+                [carried, _forward_filled_factors(unmatched, pl.concat([prior, known]))],
+                how="diagonal_relaxed",
+            )
     if carried.is_empty():
-        return filled
-    combined = carried if known.is_empty() else pl.concat([known, carried], how="diagonal_relaxed")
-    return _asof_fill_missing_factor(filled, combined)
+        return known
+    return pl.concat(
+        [known, carried.with_columns(pl.col("trade_date").cast(known.schema["trade_date"]))],
+        how="diagonal_relaxed",
+    )
 
 
 def _apply_adjustment(
@@ -907,68 +894,49 @@ def _apply_adjustment(
         revision=revision,
         read_context=read_context,
     )
-    if factors.is_empty():
-        # The requested window can still sit entirely inside a suspension
-        # whose last factor was published earlier. Try that before declaring
-        # the factor table empty.
-        joined = bars.with_columns(pl.lit(None, dtype=pl.Float64).alias("factor"))
-        if adjust == "hfq":
-            joined = _carry_suspended_hfq_factors(
-                joined,
-                factors,
-                config,
-                start,
-                revision=revision,
-                read_context=read_context,
-            )
-        if joined.filter(pl.col("factor").is_not_null()).is_empty():
-            out = bars.with_columns(
-                *[pl.col(c).alias(f"adj_{c}") for c in PRICE_COLS if c in bars.columns],
-                pl.lit(False).alias("adj_is_exact"),
-            )
-            if strict_adj:
-                raise MissingAdjustmentError(
-                    "adj_factors dataset is empty; cannot compute exact adjusted prices"
-                )
-            logger.warning("adj_factors missing; adj_is_exact=False for all rows")
-            return out
-    else:
+    if not factors.is_empty():
         factors = factors.filter(pl.col("adjust_type") == STORED_ADJUST_TYPE)
         if factors.is_empty():
             raise ReaderError(
                 f"adj_factors has no {STORED_ADJUST_TYPE!r} rows; re-run derive (ADR-0004)"
             )
-
-        # Historical factor diagnostics are advisory and belong to the read
-        # receipt (load_with_receipt, MCP, serve), not to every adjusted load.
-        factors = factors.select(["symbol", "trade_date", "factor"])
-
-        if adjust == "qfq":
-            anchors = _hfq_anchor_factors(factors, bars, end)
-            factors = factors.join(anchors, on="symbol", how="left")
-            factors = factors.with_columns(
-                (pl.col("factor") / pl.col("hfq_anchor")).alias("factor")
-            ).drop("hfq_anchor")
-        elif adjust not in ("hfq", "total_return"):
-            raise ReaderError(f"unsupported adjust type {adjust!r}")
-
-        joined = bars.join(factors, on=["symbol", "trade_date"], how="left")
-        if adjust == "total_return":
-            joined = _with_distribution_multiplier(
-                joined, config, start, end, read_context=read_context
+    # Historical factor diagnostics are advisory and belong to the read
+    # receipt (load_with_receipt, MCP, serve), not to every adjusted load.
+    # The window can also sit entirely inside a suspension whose last factor
+    # was published earlier, so carry before declaring the table empty.
+    factors = _with_carried_suspension_factors(
+        bars, factors, config, start, revision=revision, read_context=read_context
+    )
+    if factors.is_empty():
+        out = bars.with_columns(
+            *[pl.col(c).alias(f"adj_{c}") for c in PRICE_COLS if c in bars.columns],
+            pl.lit(False).alias("adj_is_exact"),
+        )
+        if strict_adj:
+            raise MissingAdjustmentError(
+                "adj_factors dataset is empty; cannot compute exact adjusted prices"
             )
-        if adjust == "hfq":
-            # Do this before adj_is_exact is decided. A carried factor is a real
-            # published factor, so the row is exact and must not warn or fall
-            # back to 1.0. qfq and total_return keep their previous behaviour.
-            joined = _carry_suspended_hfq_factors(
-                joined,
-                factors,
-                config,
-                start,
-                revision=revision,
-                read_context=read_context,
-            )
+        logger.warning("adj_factors missing; adj_is_exact=False for all rows")
+        return out
+
+    if adjust == "qfq":
+        anchors = _hfq_anchor_factors(factors, bars, end)
+        factors = factors.join(anchors, on="symbol", how="left")
+        factors = factors.with_columns(
+            (pl.col("factor") / pl.col("hfq_anchor")).alias("factor")
+        ).drop("hfq_anchor")
+    elif adjust not in ("hfq", "total_return"):
+        raise ReaderError(f"unsupported adjust type {adjust!r}")
+
+    joined = bars.join(
+        factors.with_columns(pl.col("trade_date").cast(bars.schema["trade_date"])),
+        on=["symbol", "trade_date"],
+        how="left",
+    )
+    if adjust == "total_return":
+        joined = _with_distribution_multiplier(
+            joined, config, start, end, read_context=read_context
+        )
     joined = joined.with_columns(pl.col("factor").is_not_null().alias("adj_is_exact"))
     inexact = joined.filter(~pl.col("adj_is_exact")).height
     if inexact:
