@@ -3,7 +3,7 @@
   <h1>CNEquity · A local data foundation for China-market research</h1>
   <p><strong>Collect once, keep it current, and research from the same traceable data.</strong></p>
 
-CNEquity turns market prices, financial statements, corporate events and capital-flow data into a local Parquet lake. It handles incremental ingestion, resumable batches, quality checks and consistent queries for individual researchers, small teams and AI agents.
+CNEquity turns China A-share (AShare / AStock) stock prices, financial statements, futures, corporate events and capital-flow data into a local Parquet lake. It handles incremental ingestion, resumable batches, quality checks and consistent queries for individual researchers, small teams and AI agents.
 
 [![CI](https://github.com/rootSunc/CNEquity/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/rootSunc/CNEquity/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/cnequity?logo=pypi&logoColor=white)](https://pypi.org/project/cnequity/)

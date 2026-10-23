@@ -14,6 +14,9 @@ license-files = ["LICENSE*", "NOTICE"]
 authors = [{ name = "CNEquity Contributors" }]
 keywords = [
   "a-share",
+  "ashare",
+  "astock",
+  "china-stock",
   "china-stocks",
   "china-equity",
   "data-lake",
@@ -23,7 +26,12 @@ keywords = [
   "polars",
   "parquet",
   "quantitative-finance",
+  "quant",
+  "backtesting",
   "market-data",
+  "akshare",
+  "tushare",
+  "baostock",
 ]
 classifiers = [
   "Development Status :: 3 - Alpha",

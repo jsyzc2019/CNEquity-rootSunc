@@ -3,7 +3,7 @@
   <h1>CNEquity · 中国市场金融数据湖</h1>
   <p><strong>打破数据垄断，构建属于每个人的本地金融数据集</strong></p>
 
-CNEquity 将股票行情、期货合约、财报、公司事件和资金面等多源数据整理为本地 Parquet 数据湖，提供增量采集、失败续跑、质量审计与统一查询。适合反复回测、长期积累历史数据，为个人研究者和 AI Agent 提供一套完整的本地金融数据方案。
+CNEquity 将 A股股票行情、财务数据、期货合约、公司事件和资金面等多源数据整理为本地 Parquet 数据湖，提供增量采集、失败续跑、质量审计与统一查询。适合量化研究与反复回测、长期积累历史股票数据，为个人研究者和 AI Agent 提供一套完整的本地金融数据方案。
 
 [![CI](https://github.com/rootSunc/CNEquity/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/rootSunc/CNEquity/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/cnequity?logo=pypi&logoColor=white)](https://pypi.org/project/cnequity/)
