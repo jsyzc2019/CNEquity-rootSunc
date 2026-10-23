@@ -2885,6 +2885,20 @@ def _finish_daily_bars(
     probe = {str(symbol).strip().upper() for symbol in (probe_symbols or ()) if str(symbol).strip()}
     probe_settled: set[str] = set()
     if probe:
+        placeholders = _quarantine_probe_placeholders(config, run_id, probe, start, end)
+        if placeholders:
+            findings.append(
+                {
+                    "dataset": "daily_bars",
+                    "severity": "info",
+                    "check": "daily_bars_probe_placeholder",
+                    "message": (
+                        f"{len(placeholders)} undated code(s) returned only zero-volume "
+                        "rows; quarantined as pre-listing placeholders"
+                    ),
+                    "symbols": sorted(placeholders),
+                }
+            )
         staged_probe = _staged_daily_bar_symbols(config, run_id, end) & probe
         unanswered = set(failed_symbols) | fallback_failed_symbols
         not_listed = probe - staged_probe - unanswered
@@ -2917,7 +2931,9 @@ def _finish_daily_bars(
 
     # Symbols proven to have no data in this window, collected by the
     # certification below so the interior-session gate does not re-report them.
-    certified_no_data: set[str] = set()
+    # A settled probe is one already: owing its window would book sessions
+    # from before a listing that has not happened.
+    certified_no_data: set[str] = set(probe_settled)
     unresolved_tolerated: set[str] = set()
 
     if tip:
@@ -4712,6 +4728,75 @@ def _gapfill_multiday_via_kline(
 # early — 2026-07-22 arrived that way from a pre-open run. Below this share it is
 # suspensions; at or above it, it is a mis-timed capture.
 _PLACEHOLDER_SHARE_LIMIT = 0.5
+
+
+def _quarantine_probe_placeholders(
+    config: Config, run_id: str, probe: set[str], start: date, end: date
+) -> set[str]:
+    """Pull zero-volume rows of undated codes that never traded out of staging.
+
+    TDX answers a code between allotment and listing with a flat bar at the
+    issue price and no volume. 001381.SZ got one on 2026-10-19, four days
+    before its allotment results were even published; the probe read it as a
+    listing and the deep window then owed 10-12..10-16 as interior gaps. A row
+    nobody traded proves nothing about a listing, so a probed code with no
+    traded row in the window keeps none. Any traded row keeps them all.
+    """
+    from uuid import uuid4
+
+    from cnequity.storage.atomic import write_parquet_atomic
+    from cnequity.storage.parquet import StagingWriter
+
+    writer = StagingWriter(config.staging_root)
+    window = (
+        pl.col("symbol").is_in(sorted(probe))
+        & (pl.col("trade_date") >= start)
+        & (pl.col("trade_date") <= end)
+    )
+    files = [(path, pl.read_parquet(path)) for path in writer.list_run_files("daily_bars", run_id)]
+    staged = [frame.filter(window) for _path, frame in files if "volume" in frame.columns]
+    staged = [frame for frame in staged if not frame.is_empty()]
+    if not staged:
+        return set()
+    rows = pl.concat([frame.select("symbol", "volume") for frame in staged], how="vertical_relaxed")
+    traded = set(rows.filter(pl.col("volume") > 0).get_column("symbol").to_list())
+    placeholders = set(rows.get_column("symbol").to_list()) - traded
+    if not placeholders:
+        return set()
+
+    dropped = window & pl.col("symbol").is_in(sorted(placeholders))
+    safe_run = "".join(c if c.isalnum() or c in "-_" else "_" for c in run_id)
+    quarantine = (
+        config.staging_root.parent / "_quarantine" / f"daily_bars-{safe_run}-probe-{uuid4().hex}"
+    )
+    quarantine.mkdir(parents=True)
+    rejected = pl.concat(
+        [frame.filter(dropped) for _path, frame in files if "volume" in frame.columns],
+        how="diagonal_relaxed",
+    )
+    write_parquet_atomic(quarantine / "rejected.parquet", rejected, compression="zstd")
+    for path, frame in files:
+        if "volume" not in frame.columns:
+            continue
+        kept = frame.filter(~dropped)
+        if kept.height == frame.height:
+            continue
+        sealed = path.with_suffix(".sealed.json").exists()
+        path.with_suffix(".sealed.json").unlink(missing_ok=True)
+        if kept.is_empty():
+            path.unlink()
+            continue
+        write_parquet_atomic(path, kept, compression="zstd")
+        if sealed:
+            writer.seal_file(path, "daily_bars", run_id)
+    logger.info(
+        "daily_bars: %d undated code(s) returned only zero-volume rows; quarantined %d "
+        "pre-listing placeholder row(s) (e.g. %s)",
+        len(placeholders),
+        rejected.height,
+        ", ".join(sorted(placeholders)[:5]),
+    )
+    return placeholders
 
 
 def _reject_preopen_placeholder(config: Config, run_id: str, trade_date: date) -> None:

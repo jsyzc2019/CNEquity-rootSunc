@@ -3,13 +3,9 @@
 Its daily feed is EastMoney's current-state board, and the in-step fallback was
 this lake's own previous snapshot — the same opinion a day older, not a second
 one. The exchanges publish both facts the dataset needs in the board file the
-daily-bar route already reads: a halted security is listed with its
-open/high/low at zero beside a reference close, and ST is carried in 证券简称.
-
-Measured against the EastMoney rows for 2026-09-15 over 5,219 comparable
-symbols: ST agreed on 100.000%, halts on 99.923%, and all four disagreements
-were EastMoney calling a name halted while the exchange published a full
-session for it.
+daily-bar route already reads: a halted security is listed beside a reference
+close with zeroed open/high/low (Shanghai) or no volume (Shenzhen), and ST is
+carried in 证券简称.
 """
 
 from __future__ import annotations
@@ -38,6 +34,53 @@ def test_a_limit_locked_session_is_not_a_halt():
 
     assert row["is_trading"] is True
     assert row["status"] == STATUS_NORMAL
+
+
+def test_a_shenzhen_session_without_volume_is_a_halt():
+    """SZSE repeats the reference close in every price of a halted name.
+
+    2026-10-22: *ST康佳A at 2.46/2.46/2.46/2.46 with 0.00 万股, halted since
+    10-12 ahead of its 10-23 delisting; reading only zeroed prices published it
+    as trading.
+    """
+    row = mod._row("000016.SZ", "*ST康佳A", DAY, (2.46, 2.46, 2.46), 2.46, 0.0)
+
+    assert row["is_trading"] is False
+    assert row["status"] == STATUS_SUSPENDED
+    traded = mod._row("000016.SZ", "*ST康佳A", DAY, (2.46, 2.46, 2.46), 2.46, 0.01)
+    assert traded["status"] == STATUS_NORMAL, "one lot is a session, however still"
+
+
+def test_szse_board_halts_reach_the_status_rows(monkeypatch):
+    import pandas as pd
+
+    frame = pd.DataFrame(
+        [
+            {
+                "证券代码": "000016",
+                "证券简称": "*ST康佳A",
+                "开盘": "2.46",
+                "最高": "2.46",
+                "最低": "2.46",
+                "今收": "2.46",
+                "成交量(万股)": "0.00",
+            },
+            {
+                "证券代码": "000001",
+                "证券简称": "平安银行",
+                "开盘": "11",
+                "最高": "12",
+                "最低": "10",
+                "今收": "11.5",
+                "成交量(万股)": "1,024.50",
+            },
+        ]
+    )
+    monkeypatch.setattr(mod, "szse_report", lambda day, config=None, client_factory=None: frame)
+
+    rows = {row["symbol"]: row["status"] for row in mod._fetch_szse(DAY)}
+
+    assert rows == {"000016.SZ": STATUS_SUSPENDED, "000001.SZ": STATUS_NORMAL}
 
 
 def test_the_risk_warning_comes_from_the_name():

@@ -9,16 +9,20 @@ gate said so once the registry stopped mislabelling the primary.
 The exchanges publish what is needed already, and the daily-bar route reads it:
 a board file carries every listed security with its OHLC and its 证券简称.
 
-* A halted security is still listed, with open/high/low reported as ``0`` beside
-  a non-zero reference close. That is the exchange stating it did not trade.
+* A halted security is still listed beside a non-zero reference close. Shanghai
+  reports its open/high/low as ``0``; Shenzhen repeats the reference close in
+  all four prices and reports zero volume. Either is the exchange stating it
+  did not trade.
 * ST and *ST are carried in the name, which is where `exchange/st_lists.py`
   already reads them from.
 
 Measured against the EastMoney rows for 2026-09-15 over 5,219 comparable
-symbols: ST agreed on **100.000%**, halts on 99.923%. All four disagreements
-were EastMoney calling a name halted while the exchange published a full
-session for it — ``301139.SZ``, ``301390.SZ``, ``002731.SZ``, ``000016.SZ`` —
-so the exchange was right in every one.
+symbols: ST agreed on **100.000%**, halts on 99.923%. The rule then read only
+the zeroed open/high/low, so the four disagreements (``301139.SZ``,
+``301390.SZ``, ``002731.SZ``, ``000016.SZ``) were Shenzhen halts it could not
+see, not EastMoney errors. On 2026-10-13 and 10-15 every zero-volume Shenzhen
+row (8 and 6) matched an independent Baostock halt, none had zeroed prices,
+and no Baostock halt traded.
 
 Two requests for the market, 2.6s measured. Shanghai and Shenzhen only: the
 Beijing board is not here, and `covered` says so rather than letting a caller
@@ -54,7 +58,7 @@ logger = logging.getLogger(__name__)
 #: `name` is the addition over the daily-bar route; the rest is the same board.
 SSE_STATUS_SELECT = SSE_SELECT
 SSE_STATUS_URL = SSE_URL
-_SZSE_STATUS_COLUMNS = ("证券代码", "证券简称", "开盘", "最高", "最低", "今收")
+_SZSE_STATUS_COLUMNS = ("证券代码", "证券简称", "开盘", "最高", "最低", "今收", "成交量(万股)")
 
 
 @dataclass(frozen=True)
@@ -75,10 +79,19 @@ class ExchangeStatusResult:
         return self.rows.is_empty()
 
 
-def _row(symbol: str, name: str, trade_date: date, ohl: tuple[float, float, float], close: float):
-    # A limit-locked session is open == high == low == close, which is why the
-    # test is "all three at zero beside a positive close" rather than "no range".
-    halted = close > 0.0 and max(ohl) <= 0.0
+def _row(
+    symbol: str,
+    name: str,
+    trade_date: date,
+    ohl: tuple[float, float, float],
+    close: float,
+    volume: float | None = None,
+):
+    # A limit-locked session is open == high == low == close, which is why a
+    # flat range alone is not a halt: it takes zeroed prices (Shanghai) or no
+    # volume at all (Shenzhen, which repeats the reference close).
+    untraded = max(ohl) <= 0.0 or (volume is not None and volume <= 0.0)
+    halted = close > 0.0 and untraded
     return {
         "symbol": symbol,
         "trade_date": trade_date,
@@ -128,8 +141,8 @@ def _fetch_sse(trade_date: date, *, config=None) -> list[dict]:
         if len(code) != 6 or not code.isdigit() or not _keep_symbol(code, "SH"):
             continue
         name = str(item[1] or "")
-        o, h, low, close = (_float(v) for v in item[2:6])
-        rows.append(_row(format_symbol(code, "SH"), name, trade_date, (o, h, low), close))
+        o, h, low, close, volume = (_float(v) for v in item[2:7])
+        rows.append(_row(format_symbol(code, "SH"), name, trade_date, (o, h, low), close, volume))
     return rows
 
 
@@ -147,7 +160,16 @@ def _fetch_szse(trade_date: date, *, config=None) -> list[dict]:
         # The export pads short names with spaces (``万  科Ａ``).
         name = str(record["证券简称"]).replace(" ", "").replace("　", "")
         ohl = (_float(record["开盘"]), _float(record["最高"]), _float(record["最低"]))
-        rows.append(_row(format_symbol(code, "SZ"), name, trade_date, ohl, _float(record["今收"])))
+        rows.append(
+            _row(
+                format_symbol(code, "SZ"),
+                name,
+                trade_date,
+                ohl,
+                _float(record["今收"]),
+                _float(record["成交量(万股)"]),
+            )
+        )
     return rows
 
 
