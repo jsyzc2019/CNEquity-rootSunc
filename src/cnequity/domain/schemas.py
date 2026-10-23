@@ -1500,10 +1500,6 @@ def sanitize_dataset_rows(df: pl.DataFrame, dataset: str) -> pl.DataFrame:
     return df
 
 
-def utc_now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
-
-
 def with_provenance(
     df: pl.DataFrame,
     source: str,

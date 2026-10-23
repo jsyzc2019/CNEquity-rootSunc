@@ -442,21 +442,3 @@ def verify_lake(
         watermark = state.get_date(name) if spec.watermark else None
         out.extend(verify_dataset(config, spec, anchor=anchor, watermark=watermark))
     return out
-
-
-def repairable_gaps(
-    config: Config,
-    *,
-    anchor: date,
-    datasets: list[str] | None = None,
-    kinds: set[str] | None = None,
-) -> list[Gap]:
-    """Return only gaps with an honest registered repair path.
-
-    This is the programmatic counterpart used by scheduled ``daily`` and
-    ``stale-only`` repair modes. Snapshot-only datasets are excluded by
-    ``verify_dataset``'s contract gate, so a scheduler cannot accidentally
-    turn a live snapshot into historical data.
-    """
-    gaps = verify_lake(config, anchor=anchor, datasets=datasets)
-    return [gap for gap in gaps if gap.repairable and (kinds is None or gap.kind in kinds)]
