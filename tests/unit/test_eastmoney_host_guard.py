@@ -700,3 +700,36 @@ def test_a_direct_route_refusal_is_not_relabelled_as_a_proxy_problem(tmp_path, m
     with pytest.raises(host_guard.Push2BreakerOpenError):
         client.get(_CLIST)
     client.close()
+
+
+def test_a_dead_proxy_is_probed_once_per_window_and_cleared_by_a_response(tmp_path, monkeypatch):
+    from cnequity.adapters.eastmoney import em_auth
+
+    monkeypatch.setattr(host_guard, "_today", lambda: date(2026, 10, 20))
+    monkeypatch.setattr(em_auth, "get_nid", lambda *a, **k: "")
+    monkeypatch.setattr(em_auth, "_proxy_dead_until", {})
+    probes: list[str] = []
+
+    def _probe(proxy):
+        probes.append(proxy)
+        return False
+
+    monkeypatch.setattr(em_auth, "_proxy_accepts_connections", _probe)
+    proxy = f"http://127.0.0.1:{_closed_port()}"
+    cfg = _cfg(tmp_path, eastmoney_proxy=proxy)
+    outcomes = [httpx.ConnectError("[Errno 61] Connection refused")] * 3
+
+    def _send(_url):
+        if outcomes:
+            raise outcomes.pop()
+        return _ok(_url)
+
+    client, _ = _client(cfg, _send)
+    for _ in range(3):
+        with pytest.raises(host_guard.EastMoneyProxyUnreachableError):
+            client.get(_DATACENTER)
+    assert len(probes) == 1
+
+    client.get(_DATACENTER)
+    assert proxy not in em_auth._proxy_dead_until
+    client.close()

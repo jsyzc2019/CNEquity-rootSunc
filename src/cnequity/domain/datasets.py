@@ -450,6 +450,12 @@ class DatasetSpec:
     # must not count them as a fallback. That distinction is why this is its
     # own field rather than another `supplementary_sources` entry.
     repair_sources: tuple[str, ...] = ()
+    # ``(capture source, request-scope prefix, row label)``: a step may derive
+    # rows from one source's exact wire capture and stamp them with a weaker
+    # label so strict PIT excludes them (reconstructed original disclosures).
+    # The raw-archive publish check admits exactly these labels, and only for
+    # captures whose request scope starts with the prefix.
+    reconstructed_sources: tuple[tuple[str, str, str], ...] = ()
     # How far the freshest data may lag the last trading day before it is
     # flagged STALE. For session datasets this is a count of exchange sessions,
     # so a Friday watermark checked on Monday is one day, not three, and a
@@ -1104,6 +1110,8 @@ _SPECS = [
         # useful for exploratory reads but cannot be advertised as exact PIT.
         pit_quality="reconstructed",
         pit_grade="partial",
+        # Original-date rows rebuilt from a daily capture keep this label.
+        reconstructed_sources=(("eastmoney", "daily:", "eastmoney_backfill"),),
         # Daily ingestion is keyed by NOTICE_DATE while storage is keyed by
         # report period.  Re-read the recent disclosure window so late
         # filings/restatements are captured; the adapter's period backfill

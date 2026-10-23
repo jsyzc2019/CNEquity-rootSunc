@@ -544,9 +544,70 @@ def test_an_outage_day_gives_traded_funds_a_first_hand_row(tmp_path, monkeypatch
         ],
         how="diagonal_relaxed",
     )
-    assert asked == [["159000.SZ", "159915.SZ", "510300.SH"]]
+    # Once for the outage fallback, once for the daily exchange snapshot; the
+    # board payload is cached per session, so the second costs no request.
+    assert asked == [["159000.SZ", "159915.SZ", "510300.SH"]] * 2
     owners = dict(zip(staged["symbol"].to_list(), staged["source"].to_list(), strict=True))
     assert owners["510300.SH"] == "exchange"
     assert owners["159915.SZ"] == "exchange"
     # No turnover, no evidence, and no cache to carry: unknown, not suspended.
     assert "159000.SZ" not in owners
+
+
+def _status_result(*symbols, day):
+    from cnequity.adapters.exchange.trading_status import ExchangeStatusResult
+
+    rows = pl.DataFrame(
+        {
+            "symbol": list(symbols),
+            "trade_date": [day] * len(symbols),
+            "is_trading": [True] * len(symbols),
+            "status": ["normal"] * len(symbols),
+            "risk_warning": [False] * len(symbols),
+        },
+        schema={
+            "symbol": pl.Utf8,
+            "trade_date": pl.Date,
+            "is_trading": pl.Boolean,
+            "status": pl.Utf8,
+            "risk_warning": pl.Boolean,
+        },
+    )
+    return ExchangeStatusResult(rows=rows, covered=frozenset({"sse", "szse"}), failures={})
+
+
+@pytest.mark.parametrize("fund_board_up", [True, False])
+def test_the_daily_exchange_snapshot_records_traded_funds_too(tmp_path, monkeypatch, fund_board_up):
+    from cnequity.config import Config
+    from cnequity.quality import failover
+    from cnequity.storage.layout import init_data_layout
+    from cnequity.storage.source_snapshots import SnapshotStore
+
+    day = date(2026, 9, 18)
+    cfg = Config(data_root=tmp_path / "data", sources={"exchange": True})
+    init_data_layout(cfg)
+    asked: dict = {}
+
+    def fake_funds(symbols, trade_date, *, config=None):
+        asked["funds"] = sorted(symbols)
+        if not fund_board_up:
+            raise RuntimeError("fund board down")
+        return _status_result("510300.SH", day=day)
+
+    monkeypatch.setattr(
+        "cnequity.adapters.exchange.trading_status.fetch_fund_trading_status_exchange", fake_funds
+    )
+
+    written = failover.snapshot_trading_status_exchange(
+        cfg,
+        trade_date=day,
+        symbols=["600519.SH", "510300.SH", "159915.SZ"],
+        run_id="run-1",
+        prefetched=_status_result("600519.SH", day=day),
+    )
+
+    assert asked["funds"] == ["159915.SZ", "510300.SH"]
+    expected = ["510300.SH", "600519.SH"] if fund_board_up else ["600519.SH"]
+    assert written == len(expected)
+    snapshot = SnapshotStore(cfg.meta_root).read_latest("trading_status", source="exchange")
+    assert sorted(snapshot.get_column("symbol").to_list()) == expected

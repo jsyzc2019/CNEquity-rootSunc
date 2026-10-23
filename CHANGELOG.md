@@ -2,12 +2,20 @@
 
 这里记录面向用户的主要功能、修复与兼容性变化。历史版本中的命令名反映当时的接口；当前用法以 [CLI 参考](docs/zh/reference/cli.md)为准。升级前阅读[升级与兼容性](docs/zh/getting-started/installation.md#升级与兼容性)。
 
-## [0.18.1] — 未发布
+## [0.19.0] — 未发布
 
 - 恢复 0.18.0 误删的 `cnequity.domain.security_identifiers`（证券代码延续注册表）。它是下游直接导入的公开接口，0.18.0 删除后 EquityLab 无法导入；内容与 0.17.1 逐字节相同，见 [Python API](docs/zh/reference/python-api.md#证券代码延续)。
 - 东财走本地代理时，代理没启动（如 Clash 随登出退出）导致的连接被拒不再被当作东财拒绝本机 IP：push2 和 datacenter 的熔断器不会触发，报错直接写明代理地址。
 - 东财不可用的日更里，`trading_status` 现在用沪深交易所的基金行情板块给当日有成交的 ETF/LOF 补写 `normal` 行（`source=exchange`）。无成交的基金仍不写行，不会被记为停牌；此前东财不可用时约 2,000 只 ETF 没有状态行，健康检查因此持续报错。已缺失的历史日期仍可用 `cne repair status-traded` 补派生行。
 - 修复增量 `adj_factors` 派生在停牌期间断档：停牌第二个交易日起，当日只有零成交占位行，派生误判为从未交易而跳过，停牌期 hfq 因子从此缺失，自愈检查也看不到。现在会沿用上一个因子，自愈检查也覆盖停牌占位行；已有缺口在下次日更时自动重取补齐。在补齐之前，`load(adjust=...)` 对这些停牌行沿用最近一个因子，hfq、qfq、total_return 三种口径结果一致（此前 qfq 和 total_return 会按 1.0 回退为原价并标记为不精确）。
+- `cne audit` 对已落盘 Parquet 的行情检查改为与写入时同一套规则：新增覆盖 `minute_bars_15m/30m/60m`、`pre_close <= 0` 以及期货/期权 bar 的不变量。旧湖里此前漏检的坏行现在会报出，按提示重取对应分区即可。
+- 每日交易所状态快照（仅写入快照库，不改变 `trading_status` 的权威来源）现在也记录当日有成交的沪深 ETF/LOF；无成交的基金不写行。
+- 东财本地代理探测到未运行后，30 秒内不再逐个请求重复探测；代理恢复后第一次成功响应即解除。
+- MCP 的 stdio 与 HTTP 传输使用同一套批量请求规则：空数组 `[]` 返回 JSON-RPC Invalid Request 错误（此前 HTTP 返回 202、stdio 不回复），批量里的非法成员只让该成员报错。
+- 东财热门榜中被标成 `SZ920xxx` 的北交所股票按 BJ 代码保留，不再丢弃；榜单不足所需条数时按数据源载荷错误上报。东财 clist 翻页失败保留底层错误类别，运行结果里的失败原因不再统一显示为 execution_error。
+- 整数字段转换不再经过浮点，超过 2^53 的整数保持精度，越界值不会被舍入回 Int64 范围内。
+- CLI 遇到数据湖生命周期冲突（如 `cne clean` 时引用已变化）只打印原因，不再输出 traceback。
+- 移除若干无调用方的内部辅助函数（如 `sweep_stock_bars`、`fetch_adj_factor_series_baostock_many`、`finish_metrics`）。下游公开导入面由测试锁定，见 [Python API](docs/zh/reference/python-api.md#证券代码延续)。
 
 ## [0.18.0] — 2026-10-19
 

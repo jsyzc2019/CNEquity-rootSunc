@@ -223,6 +223,33 @@ def _proxy_accepts_connections(proxy: str) -> bool:
         return False
 
 
+# A proxy that refused a probe stays "dead" this long: every request through a
+# dead proxy would otherwise pay its own probe, and a proxy that comes back
+# mid-window must not have its first failures blamed on EastMoney.
+_PROXY_DEAD_TTL_SECONDS = 30.0
+_proxy_dead_until: dict[str, float] = {}
+_proxy_state_lock = threading.Lock()
+
+
+def _proxy_is_dead(proxy: str) -> bool:
+    """Whether *proxy* refused a probe now or within the last TTL window."""
+    with _proxy_state_lock:
+        if _proxy_dead_until.get(proxy, 0.0) > time.monotonic():
+            return True
+    if _proxy_accepts_connections(proxy):
+        return False
+    with _proxy_state_lock:
+        _proxy_dead_until[proxy] = time.monotonic() + _PROXY_DEAD_TTL_SECONDS
+    return True
+
+
+def _proxy_answered(proxy: str | None) -> None:
+    """A response came back through *proxy*: it is running again."""
+    if proxy is not None:
+        with _proxy_state_lock:
+            _proxy_dead_until.pop(proxy, None)
+
+
 def is_transport_fail_fast(exc: BaseException) -> bool:
     """True for failures that retrying the same request will not fix.
 
@@ -350,13 +377,14 @@ class EastMoneyClient:
         A proxy that is not running (Clash gone after a logout) raises a plain
         ``ConnectError``, which the breaker would read as EastMoney refusing
         this IP and close every host until midnight. The proxy is probed
-        directly so a genuine refusal from EastMoney is never relabelled.
+        directly so a genuine refusal from EastMoney is never relabelled; a
+        failed probe is remembered briefly (see ``_proxy_is_dead``).
         """
         if (
             self._proxy is None
             or not isinstance(exc, httpx.ConnectError)
             or isinstance(exc, host_guard.EastMoneyHostBlockedError)
-            or _proxy_accepts_connections(self._proxy)
+            or not _proxy_is_dead(self._proxy)
         ):
             return exc
         return host_guard.EastMoneyProxyUnreachableError(
@@ -449,6 +477,7 @@ class EastMoneyClient:
             self._note_outcome(url, exc=exc)
             raise
         self._note_outcome(url, status_code=response.status_code)
+        _proxy_answered(self._proxy)
         if response.status_code in _DIRECT_FALLBACK_STATUS_CODES and self._can_fallback_direct(url):
             self.last_route_outcome["proxy_failed"] = True
             self.last_route_outcome["primary_status_code"] = response.status_code
@@ -484,6 +513,7 @@ class EastMoneyClient:
                 raise
             raise failure from exc
         self._note_outcome(url, status_code=response.status_code)
+        _proxy_answered(self._proxy)
         return response
 
     def close(self) -> None:
