@@ -214,7 +214,13 @@ def owed(config) -> list[Migration]:
 
 
 def affected(report: Any) -> int:
-    """How many rows (or settled keys) a repair report says it touches."""
+    """How many rows (or settled keys) a repair report says it touches.
+
+    A report that separates what it read (``rows``) from what it rewrites
+    (``rows_changed``) is counted by the latter.
+    """
+    if isinstance(report, dict) and isinstance(report.get("rows_changed"), int):
+        return report["rows_changed"]
     if isinstance(report, dict):
         total = 0
         for key, value in report.items():

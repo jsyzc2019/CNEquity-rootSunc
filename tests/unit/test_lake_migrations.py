@@ -131,6 +131,8 @@ def test_affected_counts_nested_rows_and_settled_keys():
     assert affected({"datasets": {"a": {"rows": 2}, "b": {"rows": 3}}}) == 5
     assert affected({"resolved_sessions": ["d1"], "resolved_prelisting_keys": ["k1", "k2"]}) == 3
     assert affected({"note": "nothing to repair"}) == 0
+    # A report that read 100 rows and rewrites 3 counts 3.
+    assert affected({"rows": 100, "rows_changed": 3}) == 3
 
 
 def test_every_automatable_deprecated_repair_is_a_migration():
