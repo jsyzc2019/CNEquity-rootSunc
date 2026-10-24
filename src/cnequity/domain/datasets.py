@@ -799,13 +799,10 @@ _SPECS = [
         supplementary_sources=("derived", "bse"),
         # The independent daily second opinion, and the reason this dataset has
         # a backup at all: both exchanges publish every listed security with its
-        # OHLC and its 证券简称, which carries the halt (open/high/low at zero
-        # beside a reference close) and the ST designation. Measured against the
-        # EastMoney rows for 2026-09-15 over 5,219 symbols: ST agreed on
-        # 100.000%, halts on 99.923%, and every one of the four disagreements
-        # was EastMoney calling a name halted that the exchange had published a
-        # full session for. Shanghai and Shenzhen only — Beijing keeps the BSE
-        # route above.
+        # OHLC and its 证券简称, which carries the halt (Shanghai zeroes
+        # open/high/low beside a reference close; Shenzhen repeats the close
+        # with zero volume) and the ST designation. Shanghai and Shenzhen only —
+        # Beijing keeps the BSE route above.
         backup_source="exchange",
         tier="L0",
         partition_col="trade_date",
