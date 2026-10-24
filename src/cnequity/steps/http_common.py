@@ -296,7 +296,17 @@ def _validate_raw_archive_evidence(
             for value in df.get_column("source").drop_nulls().unique().to_list()
             if str(value).strip()
         }
-        if observed_sources and observed_sources != {str(source)}:
+        allowed_sources = {str(source)}
+        if (
+            dataset == "financial_statement_items"
+            and source == "eastmoney"
+            and evidence.request_scope.startswith("daily:")
+        ):
+            # Daily statement responses also produce explicitly reconstructed
+            # original-disclosure rows. They share the exact wire capture but
+            # must retain their backfill label so strict PIT excludes them.
+            allowed_sources.add("eastmoney_backfill")
+        if observed_sources - allowed_sources:
             raise RawArchiveError(
                 f"{dataset}: normalized rows contain source(s) {sorted(observed_sources)!r}, "
                 f"not the archived source {source!r}"
