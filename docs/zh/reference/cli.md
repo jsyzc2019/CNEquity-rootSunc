@@ -97,7 +97,7 @@ Error: `cne retry` 已改名，请改用 `cne run retry`。
 
 命令：`cne`（`cnequity.cli.main:cli`）
 
-支持配置的叶命令接受 `--config PATH`；解析顺序为显式参数 → `CNE_CONFIG` → 当前工作目录的 `configs/cnequity.toml`。例如 `cne status --config /abs/path/to/cnequity.toml`。
+支持配置的叶命令接受 `--config PATH`；解析顺序为显式 `--config` → `CNE_CONFIG` → 当前目录的 `configs/cnequity.toml` → 用户级 `~/.config/cnequity/config.toml`（遵循 `XDG_CONFIG_HOME`；Windows 为 `%APPDATA%\cnequity\config.toml`）；`cne config path` 显示实际选中的配置和原因。例如 `cne status --config /abs/path/to/cnequity.toml`。
 
 **命令名不区分大小写**：`cne STATUS`、`cne run DAILY`、`cne config CREATE` 与小写等价（Click 的 `token_normalize_func`）。`-h` 是 `--help` 的短写法。**不做前缀匹配**——`cne stat` 会被拒绝并提示 `stats` / `status`，而不是猜一个执行。
 
@@ -149,7 +149,7 @@ cne init --profile sample
 
 初始化数据湖并执行 init phases。quick/full 自动恢复配置市场与历史窗口内的已知退市日线，获取当前交易状态，并在日线发布后派生历史停牌。全市场历史 ST 扫描使用独立的 `cne backfill trading_status`，不作为 init 完成条件。
 
-默认配置 `configs/cnequity.toml` 不存在时，`cne init` 先按随包示例生成它（同 `cne config create`）；显式 `--config` 或 `CNE_CONFIG` 指向的缺失文件不会被生成。中断、部分覆盖或旧版未完成的 init，重跑同一条 `cne init` 即自动续跑，已抓取数据保留。
+找不到配置时，`cne init` 先按随包示例生成用户级配置（同 `cne config create`）；显式 `--config` 或 `CNE_CONFIG` 指向的缺失文件不会被生成。中断、部分覆盖或旧版未完成的 init，重跑同一条 `cne init` 即自动续跑，已抓取数据保留。
 
 | 选项 | 说明 |
 |------|------|
@@ -196,7 +196,7 @@ cne backfill daily_bars --start 2016-01-01 --end COVERAGE_START
 
 | 选项 | 说明 |
 |------|------|
-| `--config` | 输出路径（默认 `configs/cnequity.toml`） |
+| `--config` | 输出路径（默认：当前目录已有 `configs/cnequity.toml` 时用它，否则用户级 `~/.config/cnequity/config.toml`） |
 | `--data-root` | 写入 `[data].root` |
 | `--force` | 覆盖已存在文件 |
 
@@ -786,7 +786,7 @@ cne serve
 
 任务日志和回填预览统一使用 UTF-8，无需为 Windows 终端另外设置编码。Windows 取消会核对 PID 与进程创建时间；记录缺少身份信息（例如更新前已启动的任务）或无法核对时，页面拒绝发送终止信号，请通过系统任务管理器处理。强制取消后，可从关联 run 检查已发布数据并重试未完成的工作。
 
-默认配置 `configs/cnequity.toml` 还不存在、而且没有显式 `--config` / `CNE_CONFIG` 时，面板进入首次配置：填写数据目录、看 `cne doctor`、再启动 `cne init`。体检结束前不能开始初始化。页面先显示将执行的命令，确认后才启动。目录里已经有数据湖时，先说明会接管且不会清空。显式指向一个不存在的文件仍然报错，不会自动生成。湖里还没有 curated 数据时，日更和手动更新收在次要位置，主操作是初始化。没跑完、而且之后的运行还没成功做过所缺步骤的初始化，可以直接续跑。缺的步骤后来已经成功做过时，页面不再提示继续初始化。已到点但还没跑的定时日更会写明那个交易日。日更表单会说明今天是不是交易日、待跑会话，以及这次手跑算不算那次定时。初始化或日更结束后，页面给出总览或重试入口。
+找不到配置、而且没有显式 `--config` / `CNE_CONFIG` 时，面板进入首次配置：填写数据目录、看 `cne doctor`、再启动 `cne init`。体检结束前不能开始初始化。页面先显示将执行的命令，确认后才启动。目录里已经有数据湖时，先说明会接管且不会清空。显式指向一个不存在的文件仍然报错，不会自动生成。湖里还没有 curated 数据时，日更和手动更新收在次要位置，主操作是初始化。没跑完、而且之后的运行还没成功做过所缺步骤的初始化，可以直接续跑。缺的步骤后来已经成功做过时，页面不再提示继续初始化。已到点但还没跑的定时日更会写明那个交易日。日更表单会说明今天是不是交易日、待跑会话，以及这次手跑算不算那次定时。初始化或日更结束后，页面给出总览或重试入口。
 
 从别的机器打开（`--host` 不是回环地址）时，浏览和存储清理沿用 `--token`；操作页默认不能启动命令，需要同时给 `--allow-remote-ops`。首次配置始终只接受本机。
 
@@ -888,7 +888,7 @@ SQL 查询本地湖；`--dataset` 与 `--symbol` 成对使用，缓存缺失或 
 
 | 选项 | 说明 |
 |------|------|
-| `--config` | 配置文件路径，**建议绝对路径**（客户端从哪个目录拉起进程不确定） |
+| `--config` | 配置文件路径；省略时按统一顺序查找（客户端从哪个目录拉起进程不确定，用户级配置在任何目录都能找到）。写明时**建议绝对路径** |
 | `--live` | 湖里没有的，现拉现给、不落盘。只支持 `resolve_symbol` 与未复权日线，其余工具明确拒绝 |
 | `--http` | 改用 Streamable HTTP，在 `/mcp` 上监听。给只接远程网址的客户端（ChatGPT）配合隧道使用 |
 | `--host` / `--port` | `--http` 的监听地址与端口，默认 `127.0.0.1:8788`。非回环地址必须配 `--token` |

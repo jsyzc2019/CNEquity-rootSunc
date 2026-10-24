@@ -6,7 +6,7 @@
 
 | 参数 | 默认值 | 说明 |
 |---|---|---|
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 | `--run-id` | `—` | 运行 ID；可重复指定，合并运行证据并审计一次。 |
 | `--full` | `False` | 整个湖的健康快照（当前状态 + 新鲜度），而不是某一次 run 的文件。 |
 | `--research-start` | `—` | 严格校验从这一天开始的研究窗口（需要 --full）。 |
@@ -19,7 +19,7 @@
 | 参数 | 默认值 | 说明 |
 |---|---|---|
 | `dataset` | `—` | 必填；位置参数 |
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 | `--profile` | `default` | daily_bars 可选 delisted：只回填已确认退市名录，沿用独立发现证据。 |
 | `--shfe-annual-archive` | `—` | 仅期货/期权日线：从已核验格式的本地上期所年度 ZIP 离线导入。 |
 | `--archive-year` | `—` | 年度 ZIP 对应的交易年份。 |
@@ -56,7 +56,7 @@
 
 | 参数 | 默认值 | 说明 |
 |---|---|---|
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 | `--full` | `False` | 立即重跑全湖审计（读每个历史分区，大湖可能要数小时）；默认读最近一次的审计结果。 |
 | `--pack` | `—` | 按研究包给出窗口、缺口和下一步。可重复。指定后，缺数据或历史 ST 未覆盖会使退出码变差。 |
 
@@ -65,7 +65,7 @@
 | 参数 | 默认值 | 说明 |
 |---|---|---|
 | `action` | `—` | 必填；位置参数 |
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 | `--force` | `False` | action=create 时覆盖已存在的配置文件。 |
 | `--data-root` | `—` | action=create 时设置 [data].root（默认把 ./data/cnequity 解析成绝对路径）。 |
 | `--dry-run` | `False` | action=upgrade 时只列出要补的 step 和调度组，不写文件。 |
@@ -108,7 +108,7 @@
 | `--start` | `2016-01-01` | — |
 | `--end` | `—` | 默认今天；配置了 [research] holdout_start 时默认其前一天。 |
 | `--output-dir` | `—` | — |
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 
 ## `cne decision-data payment-gaps`
 
@@ -117,7 +117,7 @@
 | `--start` | `2016-01-01` | — |
 | `--end` | `—` | 默认今天；配置了 [research] holdout_start 时默认其前一天。 |
 | `--output-dir` | `—` | — |
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 
 ## `cne decision-data stock-terms`
 
@@ -126,13 +126,13 @@
 | `--start` | `2016-01-01` | — |
 | `--end` | `—` | 默认今天；配置了 [research] holdout_start 时默认其前一天。 |
 | `--output-dir` | `—` | — |
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 
 ## `cne delisted status`
 
 | 参数 | 默认值 | 说明 |
 |---|---|---|
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 | `--since` | `2016-01-01` | 湖窗口起点。 |
 | `--sample` | `15` | 打印多少行明细。 |
 
@@ -141,7 +141,7 @@
 | 参数 | 默认值 | 说明 |
 |---|---|---|
 | `name` | `adj_factors` | 位置参数 |
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 | `--full` | `False` | 重写 adj_factors / industry_index / option_greeks / minute_bars_15m\|30m\|60m 的全部分区（默认只补增量）。 |
 | `--start` | `—` | industry_index / trading_status / option_greeks / minute_bars_15m\|30m\|60m：只派生这个日期（YYYY-MM-DD）及之后的。 |
 | `--end` | `—` | industry_index / trading_status / option_greeks / minute_bars_15m\|30m\|60m：只派生这个日期（YYYY-MM-DD）及之前的。 |
@@ -151,14 +151,14 @@
 
 | 参数 | 默认值 | 说明 |
 |---|---|---|
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 | `--json` | `False` | 输出机器可读的 JSON。 |
 
 ## `cne init`
 
 | 参数 | 默认值 | 说明 |
 |---|---|---|
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 | `--profile` | `quick` | 建多大。demo = 用真实数据源抓几只票，sample = 同样的形状但离线且确定 —— 两者都不是一个市场。quick = 全市场标的、最近 3 年；full = 全市场标的、从 2016-01-01 起（通常需要更多分页）。以后可以用 `cne backfill daily_bars` 补深。 |
 | `--symbols` | `600519.SH,000001.SZ,000858.SZ,300750.SZ,601318.SH` | demo/sample：要抓的标的，逗号分隔（有意保持很少）。 |
 | `--days` | `30` | demo/sample：daily_bars 大致抓最近多少个交易日。 |
@@ -183,7 +183,7 @@
 
 | 参数 | 默认值 | 说明 |
 |---|---|---|
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 | `--live` | `False` | 湖里没有的数据就按需向源头取，并且不落盘。只支持标的查找和未复权日线；其它工具宁可拒绝，也不会在没有复权、universe 和 PIT 的情况下作答。 |
 | `--http` | `False` | 改用 Streamable HTTP，在 /mcp 上监听。给只接远程 URL 的客户端（如 ChatGPT）配合隧道使用。 |
 | `--host` | `127.0.0.1` | --http 的监听地址。非回环地址必须配 --token。 |
@@ -207,7 +207,7 @@
 
 | 参数 | 默认值 | 说明 |
 |---|---|---|
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 | `--sql` | `SELECT COUNT(*) AS n FROM daily_bars` | 只读 DuckDB SQL；每个数据集是一个视图，名称同 `cne status --datasets`。 |
 | `--dataset` | `—` | 按需抓取的数据集名 |
 | `--symbol` | `—` | 按需抓取的标的代码 |
@@ -217,7 +217,7 @@
 
 | 参数 | 默认值 | 说明 |
 |---|---|---|
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 | `--apply` | `False` | 应用可确定的因子修正并保留旧版本；未解决项只作提示。 |
 | `--refresh-sources` | `False` | 联网补取独立因子证据；默认仅使用本地缓存。 |
 | `--symbols` | `—` | 逗号分隔的证券代码；默认分批检查历史问题。 |
@@ -230,28 +230,28 @@
 
 | 参数 | 默认值 | 说明 |
 |---|---|---|
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 | `--apply` | `False` | 向 Baostock 补取并发布新版本；默认只离线输出计划。 |
 
 ## `cne repair daily-bar-coverage`
 
 | 参数 | 默认值 | 说明 |
 |---|---|---|
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 | `--apply` | `False` | 按已提交数据结清北交所整日欠账和已证明的上市前欠账；默认只预览。 |
 
 ## `cne repair financial-announcements`
 
 | 参数 | 默认值 | 说明 |
 |---|---|---|
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 | `--apply` | `False` | 追加明确标记的原始公告日重建版本；默认只预览。 |
 
 ## `cne repair financial-originals`
 
 | 参数 | 默认值 | 说明 |
 |---|---|---|
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 | `--symbols` | `—` | 股票代码，逗号分隔。 |
 | `--all-stocks` | `False` | 使用湖中股票目录；与 --symbols 二选一。 |
 | `--after` | `—` | 接续上一批 next_cursor（YEAR:SYMBOL）；失败项可不带游标重试。 |
@@ -267,21 +267,21 @@
 
 | 参数 | 默认值 | 说明 |
 |---|---|---|
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 | `--apply` | `False` | 按已记录的拆分、转增条款发布修正因子，保留旧版本；默认只预览。 |
 
 ## `cne repair fund-listing-dates`
 
 | 参数 | 默认值 | 说明 |
 |---|---|---|
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 | `--apply` | `False` | 归档交易所目录并发布缺失的基金上市日期；默认只预览。 |
 
 ## `cne repair fund-no-print`
 
 | 参数 | 默认值 | 说明 |
 |---|---|---|
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 | `--apply` | `False` | 保存基金竞价日线覆盖证据并结清对应欠账；不生成日线或停牌行。 |
 | `--refresh-sources` | `False` | 向沪深交易所取历史基金报表；默认离线回放已留存报表。 |
 | `--max-sessions` | `32` | 每批最多核对的欠账交易日。 |
@@ -290,7 +290,7 @@
 
 | 参数 | 默认值 | 说明 |
 |---|---|---|
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 | `--apply` | `False` | 核验后替换整行并发布新版本，保留旧版。 |
 | `--refresh-sources` | `False` | 归档官方历史 K 线及必要的独立金额证据；默认离线回放。 |
 | `--max-symbols` | `16` | — |
@@ -299,7 +299,7 @@
 
 | 参数 | 默认值 | 说明 |
 |---|---|---|
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 | `--index-symbol` | `399001.SZ` | 选择已核验的历史成分目录。 |
 | `--apply` | `False` | 替换已核验区间的完整成分历史，保留官方带日期权重及旧版本。 |
 | `--refresh-sources` | `False` | 补采目录中未归档的官方历史附件；默认离线回放。 |
@@ -308,7 +308,7 @@
 
 | 参数 | 默认值 | 说明 |
 |---|---|---|
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 | `--indices` | `—` | 指数代码，逗号分隔；默认沪深300、科创50、深证成指、创业板指。 |
 | `--apply` | `False` | 按文件实际日期替换完整指数快照，保留旧版本。 |
 | `--refresh-sources` | `False` | 取官方成分和权重文件；默认离线回放。 |
@@ -318,14 +318,14 @@
 | 参数 | 默认值 | 说明 |
 |---|---|---|
 | `dataset` | `—` | 必填；位置参数 |
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 | `--apply` | `False` | 写入并发布新版本；默认只输出计划。 |
 
 ## `cne repair misdated-valuation`
 
 | 参数 | 默认值 | 说明 |
 |---|---|---|
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 | `--apply` | `False` | 向东财 datacenter 取数并发布新版本；默认只离线输出计划。 |
 
 ## `cne repair missing-values`
@@ -333,35 +333,35 @@
 | 参数 | 默认值 | 说明 |
 |---|---|---|
 | `dataset` | `—` | 必填；位置参数 |
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 | `--apply` | `False` | 将缺失值占位零改为空值并发布新版本；默认只预览。 |
 
 ## `cne repair orphan-symbols`
 
 | 参数 | 默认值 | 说明 |
 |---|---|---|
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 | `--apply` | `False` | 核验后发布新版本；默认只输出计划。 |
 
 ## `cne repair stale-suspensions`
 
 | 参数 | 默认值 | 说明 |
 |---|---|---|
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 | `--apply` | `False` | 核验后发布新版本；默认只输出计划。 |
 
 ## `cne repair status-listing-window`
 
 | 参数 | 默认值 | 说明 |
 |---|---|---|
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 | `--apply` | `False` | 核验后发布新版本；默认只输出计划。 |
 
 ## `cne repair status-outages`
 
 | 参数 | 默认值 | 说明 |
 |---|---|---|
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 | `--start` | `—` | 必填；窗口起点（YYYY-MM-DD）。 |
 | `--end` | `—` | 必填；窗口终点（YYYY-MM-DD）。 |
 | `--apply` | `False` | 核验后发布新版本；默认只输出计划。 |
@@ -370,7 +370,7 @@
 
 | 参数 | 默认值 | 说明 |
 |---|---|---|
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 | `--start` | `—` | 必填；成交状态补缺起点（YYYY-MM-DD）。 |
 | `--end` | `—` | 必填；成交状态补缺终点（YYYY-MM-DD）。 |
 | `--apply` | `False` | 核验后发布新版本；默认只输出计划。 |
@@ -379,7 +379,7 @@
 
 | 参数 | 默认值 | 说明 |
 |---|---|---|
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 | `--apply` | `False` | 发布官方 IPO 日历证实的股票上市日期；保留旧版本。 |
 | `--refresh-sources` | `False` | 联网取巨潮 IPO 日历；默认回放已归档来源。 |
 | `--max-sessions` | `32` | — |
@@ -389,14 +389,14 @@
 
 | 参数 | 默认值 | 说明 |
 |---|---|---|
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 | `--apply` | `False` | 写入并发布新版本；默认只输出计划。 |
 
 ## `cne run clean`
 
 | 参数 | 默认值 | 说明 |
 |---|---|---|
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 | `--dry-run` | `False` | 兼容选项；现在所有清理均只预览。 |
 | `--orphan-retention-days` | `7` | 预览超过这么多天、且 manifest 里没有记录的孤儿 staging。 |
 | `--snapshot-retention-days` | `14` | 预览超过这么多天的 meta/source_snapshots run_id 目录（每个数据集 / 源的最新一份始终保留）。 |
@@ -410,14 +410,14 @@
 
 | 参数 | 默认值 | 说明 |
 |---|---|---|
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 | `--run-id` | `—` | 只发布这一次 run；默认处理所有待发布的 run。 |
 
 ## `cne run daily`
 
 | 参数 | 默认值 | 说明 |
 |---|---|---|
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 | `--groups` | `—` | 把 --stale-only 限定在这些 daily 调度组内（逗号或空格分隔）。 |
 | `--group` | `—` | 调度组：core、capital、signals、fundamentals、macro_risk、research、intraday、ticks |
 | `--all-groups` | `False` | 只跑全部调度组，不含事件流。给已经单独调度 `cne run events` 的旧定时任务保留；不带参数的 `cne run daily` 已经包含全部调度组和事件流。 |
@@ -435,7 +435,7 @@
 
 | 参数 | 默认值 | 说明 |
 |---|---|---|
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 | `--group` | `—` | [job.events.groups] 里的某一个组（默认按顺序跑全部）。 |
 | `--trade-date` | `—` | as-of 自然日 YYYY-MM-DD（默认今天），含周末与节假日。 |
 | `--quiet` | `False` | 只留 warning 及以上，不打逐步进度。 |
@@ -444,7 +444,7 @@
 
 | 参数 | 默认值 | 说明 |
 |---|---|---|
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 | `--run-id` | `—` | 重试指定的一次 run。 |
 | `--failed-groups` | `False` | 重试每个 daily 调度组最近一次失败的 run。 |
 
@@ -452,7 +452,7 @@
 
 | 参数 | 默认值 | 说明 |
 |---|---|---|
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 | `--host` | `127.0.0.1` | 回环地址会同时监听 127.0.0.1 和 localhost。非回环地址必须配 --token。 |
 | `--port` | `8787` | — |
 | `--token` | `—` | 要求这个 bearer token（或 ?token=）。--host 不是回环地址时必须设置。 |
@@ -466,7 +466,7 @@
 | `name` | `—` | 必填；位置参数 |
 | `--research` | `False` | 包含价格、因子、身份、状态、日历及研究覆盖证据；缺少依赖时报错。 |
 | `--dataset` | `—` | 必填；要包含的数据集（可重复）。快照永远是显式指定的，不会是整个湖。 |
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 | `--snapshot-root` | `—` | 快照放在哪；默认是数据根目录下的 meta/snapshots。 |
 
 ## `cne snapshot delta apply`
@@ -476,7 +476,7 @@
 | `name` | `—` | 必填；位置参数 |
 | `target` | `—` | 必填；位置参数 |
 | `--dry-run` | `False` | 只校验前置条件，不改动 TARGET。 |
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 | `--snapshot-root` | `—` | 增量包放在哪；默认是数据根目录下的 meta/snapshots。 |
 
 ## `cne snapshot delta create`
@@ -488,7 +488,7 @@
 | `--to` | `—` | 目标湖根目录；默认取配置里当前生效的根目录。 |
 | `--from-revision` | `—` | 用目标里已提交的 revision 作为基线前置条件。 |
 | `--dataset` | `—` | 要包含的数据集（可重复）。不给则自动发现两个根目录里都有的数据集。 |
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 | `--snapshot-root` | `—` | 增量包放在哪；默认是数据根目录下的 meta/snapshots。 |
 
 ## `cne snapshot delta verify`
@@ -496,7 +496,7 @@
 | 参数 | 默认值 | 说明 |
 |---|---|---|
 | `name` | `—` | 必填；位置参数 |
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 | `--snapshot-root` | `—` | 增量包放在哪；默认是数据根目录下的 meta/snapshots。 |
 
 ## `cne snapshot export`
@@ -506,7 +506,7 @@
 | `name` | `—` | 必填；位置参数 |
 | `destination` | `—` | 位置参数 |
 | `--compression` | `auto` | 归档编码；auto 优先 tar.zst，不行则退回 tar.gz。 |
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 | `--snapshot-root` | `—` | 快照放在哪；默认是数据根目录下的 meta/snapshots。 |
 
 ## `cne snapshot import`
@@ -516,7 +516,7 @@
 | `archive` | `—` | 必填；位置参数 |
 | `--name` | `—` | 导入后的快照名；默认取归档文件名。 |
 | `--overwrite` | `False` | 仅在归档校验通过之后，才替换已存在的同名快照。 |
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 | `--snapshot-root` | `—` | 快照放在哪；默认是数据根目录下的 meta/snapshots。 |
 
 ## `cne snapshot restore`
@@ -525,7 +525,7 @@
 |---|---|---|
 | `name` | `—` | 必填；位置参数 |
 | `target` | `—` | 必填；位置参数 |
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 | `--snapshot-root` | `—` | 快照放在哪；默认是数据根目录下的 meta/snapshots。 |
 
 ## `cne snapshot verify`
@@ -533,14 +533,14 @@
 | 参数 | 默认值 | 说明 |
 |---|---|---|
 | `name` | `—` | 必填；位置参数 |
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 | `--snapshot-root` | `—` | 快照放在哪；默认是数据根目录下的 meta/snapshots。 |
 
 ## `cne sources limits`
 
 | 参数 | 默认值 | 说明 |
 |---|---|---|
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 
 ## `cne sources policy`
 
@@ -554,7 +554,7 @@
 
 | 参数 | 默认值 | 说明 |
 |---|---|---|
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 | `--vantage` | `local` | 这次探测是从哪儿跑的 —— 'cn'、'overseas'，或你自己用的任何标签。有几个源拒绝非大陆出口，所以没有这个标签的结果没法解读。 |
 | `--only` | `—` | 要探测的 key，逗号分隔；高成本/已受挑战的端点仅在显式列出时探测。 |
 | `--stale-only` | `False` | 复用 12 小时内已校验的采集证据，只主动探测缺少新证据的端点。 |
@@ -565,7 +565,7 @@
 
 | 参数 | 默认值 | 说明 |
 |---|---|---|
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 | `--out` | `—` | — |
 | `--enforce` | `False` | 核心数据集没有独立备份时退出 1。 |
 | `--with-availability` | `False` | 把实测的探测可用率接到每个故障域上（会读湖）。 |
@@ -575,7 +575,7 @@
 
 | 参数 | 默认值 | 说明 |
 |---|---|---|
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 | `--window-days` | `30` | — |
 | `--minimum-observations` | `10` | — |
 | `--enforce` | `False` | 关键源的 SLO 未达标时退出 1。 |
@@ -584,7 +584,7 @@
 
 | 参数 | 默认值 | 说明 |
 |---|---|---|
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 | `--vantage` | `local` | 读哪个出口位置（vantage）的报告。 |
 | `--probe, --no-probe` | `False` | 现在实测，而不是读已存的报告。请求和 `sources probe` 相同。 |
 | `--json` | `False` | 输出机器可读的 JSON。 |
@@ -593,7 +593,7 @@
 
 | 参数 | 默认值 | 说明 |
 |---|---|---|
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 | `--dataset` | `—` | 只重算这些数据集（可重复）。其它数据集的行保持不变。 |
 | `--if-stale` | `False` | 除非统计建好之后又跑过采集，否则什么都不做。可以安全地挂定时器。 |
 | `--json` | `False` | 以 JSON 打印结果。 |
@@ -602,7 +602,7 @@
 
 | 参数 | 默认值 | 说明 |
 |---|---|---|
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 | `--dataset` | `—` | 某一个数据集的逐分区明细。 |
 | `--by-source` | `False` | 改为按 source / data_version 分组。 |
 | `--json` | `False` | 输出机器可读的 JSON。 |
@@ -611,7 +611,7 @@
 
 | 参数 | 默认值 | 说明 |
 |---|---|---|
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 | `--run` | `—` | 要看的 run id，或 'latest'（默认）。包含各数据集 stage 的结果。 |
 | `--datasets` | `False` | 逐数据集的新鲜度：覆盖区间、水位，以及相对最后交易日是否陈旧。 |
 | `--all-columns` | `False` | 配合 --datasets：打印数据集清单的全部列，而不只是新鲜度。 |
@@ -624,7 +624,7 @@
 
 | 参数 | 默认值 | 说明 |
 |---|---|---|
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 | `plan_id` | `—` | 必填；位置参数 |
 | `--phase` | `mark` | mark 原地标记；purge 已禁用，请转到 serve 存储运维页。 |
 | `--maintenance-window` | `False` | 兼容选项；不能绕过网页删除确认。 |
@@ -633,14 +633,14 @@
 
 | 参数 | 默认值 | 说明 |
 |---|---|---|
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 | `object_id` | `—` | 必填；位置参数 |
 
 ## `cne storage hold`
 
 | 参数 | 默认值 | 说明 |
 |---|---|---|
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 | `object_id` | `—` | 必填；位置参数 |
 | `--reason` | `—` | 必填 |
 
@@ -648,21 +648,21 @@
 
 | 参数 | 默认值 | 说明 |
 |---|---|---|
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 | `--manifest` | `—` | 必填 |
 
 ## `cne storage inspect`
 
 | 参数 | 默认值 | 说明 |
 |---|---|---|
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 | `--keep` | `5` | — |
 
 ## `cne storage plan`
 
 | 参数 | 默认值 | 说明 |
 |---|---|---|
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 | `--keep` | `5` | — |
 | `--phase` | `mark` | — |
 
@@ -670,7 +670,7 @@
 
 | 参数 | 默认值 | 说明 |
 |---|---|---|
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 | `--dataset` | `—` | 必填 |
 | `--source` | `—` | 必填 |
 | `--root` | `—` | 必填 |
@@ -680,7 +680,7 @@
 
 | 参数 | 默认值 | 说明 |
 |---|---|---|
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 | `--start` | `2016-01-01` | 起始报告期。 |
 | `--end` | `2024-12-31` | 结束报告期。 |
 | `--chunk-size` | `200` | 每个 staging 批次放多少只证券。 |
@@ -691,7 +691,7 @@
 
 | 参数 | 默认值 | 说明 |
 |---|---|---|
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 | `--what` | `all` | 抓取哪一种对端快照。 |
 | `--days` | `45` | K 线窗口，按自然日算。 |
 | `--sample` | `400` | K 线抽样多少只证券。 |
@@ -700,7 +700,7 @@
 
 | 参数 | 默认值 | 说明 |
 |---|---|---|
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 | `--start` | `2005-01-01` | — |
 | `--end` | `2015-12-31` | — |
 | `--apply` | `False` | 真正写入。不加它只报告差异，不改任何东西。 |
@@ -712,7 +712,7 @@
 
 | 参数 | 默认值 | 说明 |
 |---|---|---|
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 | `--start` | `2022-01-04` | 服务起点。 |
 | `--end` | `—` | 默认今天。 |
 | `--apply` | `False` | 真正写入。不加它只抓取并报告，不改任何东西。 |
@@ -722,7 +722,7 @@
 
 | 参数 | 默认值 | 说明 |
 |---|---|---|
-| `--config` | `configs/cnequity.toml` | 配置文件路径。 |
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 | `--derivatives` | `False` | 只读验收衍生品研究窗口；需 --dataset、--start、--end。 |
 | `--bars` | `False` | 改为检查「证券 × 交易日」，含窗口内一行都没有的证券。需要 --start。 |
 | `--runs` | `False` | 改为检查连续交易日的运行证据，不补任何缺口。 |

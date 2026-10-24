@@ -616,8 +616,11 @@ class Config:
         return self.data_root / "meta"
 
 
-def _expand(path_str: str, data_root: Path) -> Path:
-    return Path(path_str.replace("{data.root}", str(data_root))).expanduser().resolve()
+def _expand(path_str: str, data_root: Path, base: Path | None = None) -> Path:
+    path = Path(path_str.replace("{data.root}", str(data_root))).expanduser()
+    if base is not None and not path.is_absolute():
+        path = base / path
+    return path.resolve()
 
 
 def _absolute(path: Path) -> Path:
@@ -659,8 +662,49 @@ def push2_paused_by_env() -> bool:
     return os.environ.get("CNE_PUSH2_PAUSED", "").strip().lower() in {"1", "true", "yes", "on"}
 
 
-def _data_root(raw: dict) -> Path:
-    return _absolute(Path(raw.get("data", {}).get("root", "./data/cnequity")).expanduser())
+_WARNED_LEGACY_ROOTS: set[Path] = set()
+
+
+def _data_root(raw: dict, base: Path | None = None) -> Path:
+    """``[data].root``, a relative value read against *base* (the config's directory).
+
+    Relative roots used to resolve against the working directory, so the same
+    file named a different lake depending on where the command ran — a cron
+    line without its ``cd`` built a second, empty lake. Anchoring them to the
+    file is what every other config format does. A root written under the old
+    rule keeps working while only its working-directory reading exists, with
+    a warning until ``cne config upgrade`` pins it.
+    """
+    value = Path(raw.get("data", {}).get("root", "./data/cnequity")).expanduser()
+    if value.is_absolute() or base is None:
+        return _absolute(value)
+    anchored = _absolute(base / value)
+    legacy = legacy_relative_root(value, base)
+    if legacy is not None:
+        if legacy not in _WARNED_LEGACY_ROOTS:
+            # Once per process: `cne serve` re-reads the root on every poll.
+            _WARNED_LEGACY_ROOTS.add(legacy)
+            logger.warning(
+                "[data].root = %r is relative and now resolves against the config file's "
+                "directory (%s), which does not exist; using %s, where it resolved before. "
+                "Run `cne config upgrade` to write the absolute path.",
+                value.as_posix(),
+                anchored,
+                legacy,
+            )
+        return legacy
+    return anchored
+
+
+def legacy_relative_root(value: Path, base: Path) -> Path | None:
+    """The working-directory reading of a relative root, when only that one exists."""
+    if value.is_absolute():
+        return None
+    anchored = _absolute(base / value)
+    legacy = _absolute(value)
+    if anchored != legacy and not anchored.exists() and legacy.exists():
+        return legacy
+    return None
 
 
 def configured_data_root(path: str | Path) -> Path:
@@ -669,8 +713,9 @@ def configured_data_root(path: str | Path) -> Path:
     A long-running process holds the lake it started on; this lets it notice
     the file has since been pointed somewhere else without loading the rest.
     """
-    with open(Path(path).expanduser().resolve(), "rb") as f:
-        return _data_root(tomllib.load(f))
+    config_path = Path(path).expanduser().resolve()
+    with open(config_path, "rb") as f:
+        return _data_root(tomllib.load(f), config_path.parent)
 
 
 def load_config(path: str | Path) -> Config:
@@ -678,7 +723,7 @@ def load_config(path: str | Path) -> Config:
     with open(config_path, "rb") as f:
         raw = tomllib.load(f)
 
-    data_root = _data_root(raw)
+    data_root = _data_root(raw, config_path.parent)
     lake_profile = raw.get("data", {}).get("profile") or None
     orch = raw.get("orchestrator", {})
     tdx = raw.get("tdx_protocol", {})
@@ -883,7 +928,7 @@ def load_config(path: str | Path) -> Config:
     duckdb_raw = raw.get("duckdb", {})
     duckdb_path_str = duckdb_raw.get("path")
     duckdb_path = (
-        _expand(duckdb_path_str, data_root)
+        _expand(duckdb_path_str, data_root, config_path.parent)
         if duckdb_path_str
         else data_root / "duckdb" / "cnequity.duckdb"
     )

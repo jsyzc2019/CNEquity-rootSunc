@@ -3,12 +3,13 @@
 Config file format: TOML. The template ships with the package in `cnequity.config.templates`; the repository copy is `configs/cnequity.example.toml`.
 
 ```bash
-cne config create                              # Recommended: writes configs/cnequity.toml
+cne config create                              # Recommended: writes the per-user ~/.config/cnequity/config.toml
  # Optional on first creation: cne config create --data-root /data/cnequity
-cne config validate --config configs/cnequity.toml
+cne config path                                # Shows the config in effect, why it was chosen, and its data root
+cne config validate
 ```
 
-Loading and validation: `cnequity.config.loader`. Personal files are not part of the open-source default config; see [Upgrades and feedback](installation.md#upgrades-and-compatibility). `--config` takes precedence over the environment variable `CNE_CONFIG`; otherwise `configs/cnequity.toml` in the current directory is used. `cne config create` writes an absolute `data.root` by default; a hand-written relative path is still resolved against the process working directory.
+Loading and validation: `cnequity.config.loader`. Personal files are not part of the open-source default config; see [Upgrades and feedback](installation.md#upgrades-and-compatibility). Config lookup order: explicit `--config` → `CNE_CONFIG` → `configs/cnequity.toml` in the current directory → the per-user `~/.config/cnequity/config.toml` (honours `XDG_CONFIG_HOME`; `%APPDATA%\cnequity\config.toml` on Windows). The CLI, `load()`, MCP and the scheduled tasks share this rule, so a command run from any directory reaches the same lake. `cne config create` writes an absolute `data.root` by default; a hand-written relative path (`data.root`, `duckdb.path`) resolves against **the config file's directory**. A relative path written for the old working-directory rule keeps working, with a warning, while only its old location exists; `cne config upgrade` pins it to the absolute path.
 
 This page is organized by config section. For first use, you usually only need to confirm `[data].root`, then enable minute bars, trade ticks or [derivatives](../recipes/derivatives.md) as needed. Defaults in the tables refer to the bundled template; constructing `Config()` directly and the platform generator may give different results, so `cne config diff` and the actual config are authoritative.
 
@@ -18,7 +19,7 @@ When multiple processes/data lakes share one egress, use `CNE_RATE_LIMIT_ROOT` t
 
 | Key | Type | Default | Description |
 |----|------|------|------|
-| `root` | string | `./data/cnequity` | Data lake root directory; **an absolute path is recommended in production** |
+| `root` | string | `./data/cnequity` | Data lake root directory; a relative path resolves against the config file's directory; **an absolute path is recommended in production** |
 
 Derived paths (computed automatically in code, no config needed):
 

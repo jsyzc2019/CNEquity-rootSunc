@@ -744,7 +744,7 @@ def run_daily(
         # whole registry it fetched market-wide snapshots into a 2-symbol lake.
         raise click.ClickException(
             _(
-                "{config_path} belongs to a {profile} lake, which has no daily schedule: a few symbols are not worth updating. Build a lake `cne run daily` can keep current with `cne init`, which writes configs/cnequity.toml."
+                "{config_path} belongs to a {profile} lake, which has no daily schedule: a few symbols are not worth updating. Build a lake `cne run daily` can keep current with `cne init`, which writes the per-user config."
             ).format(config_path=config_path, profile=cfg.lake_profile)
         )
     if snapshots_only and not stale_only:

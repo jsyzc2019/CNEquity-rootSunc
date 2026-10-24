@@ -4,6 +4,8 @@
 
 ## [0.19.0] — 未发布
 
+- 配置查找统一：未给 `--config` 时依次找 `CNE_CONFIG`、当前目录的 `configs/cnequity.toml`、用户级 `~/.config/cnequity/config.toml`（Windows 为 `%APPDATA%\cnequity\config.toml`）。CLI、`load()`、MCP 用同一套规则，在任何目录运行都指向同一个湖。首次 `cne init` / `cne config create` 在当前目录没有项目配置时写用户级配置；新增 `cne config path` 显示实际生效的配置、选中原因和数据目录。
+- 配置里的相对路径（`data.root`、`duckdb.path`）改为按配置文件所在目录解析，不再随工作目录变化。旧配置按工作目录写的相对 `data.root` 在新位置不存在时继续沿用并警告；运行 `cne config upgrade` 会把它固定为原来的绝对路径，湖不会移动。
 - 恢复 0.18.0 误删的 `cnequity.domain.security_identifiers`（证券代码延续注册表）。它是下游直接导入的公开接口，0.18.0 删除后 EquityLab 无法导入；内容与 0.17.1 逐字节相同，见 [Python API](docs/zh/reference/python-api.md#证券代码延续)。
 - 东财走本地代理时，代理没启动（如 Clash 随登出退出）导致的连接被拒不再被当作东财拒绝本机 IP：push2 和 datacenter 的熔断器不会触发，报错直接写明代理地址。
 - 东财不可用的日更里，`trading_status` 现在用沪深交易所的基金行情板块给当日有成交的 ETF/LOF 补写 `normal` 行（`source=exchange`）。无成交的基金仍不写行，不会被记为停牌；此前东财不可用时约 2,000 只 ETF 没有状态行，健康检查因此持续报错。已缺失的历史日期仍可用 `cne repair status-traded` 补派生行。

@@ -11,7 +11,7 @@ pip install cnequity
 cne init
 ```
 
-The first run generates `configs/cnequity.toml` and writes data to `data/cnequity/` under the current directory (the config records the absolute path); an existing config is reused as is, and there is no need to run `cne config create` first. It then builds the core of the last 3 years for the whole Shanghai, Shenzhen and Beijing market: securities, calendar, corporate actions, stock and index daily bars, adjustment factors and industry indices. It automatically recovers daily bars for known delisted stocks within the window, fetches the current trading status and derives historical suspensions, then audits and publishes.
+The first run generates the per-user config `~/.config/cnequity/config.toml` and writes data to `data/cnequity/` under the current directory (the config records the absolute path); an existing config is reused as is, and there is no need to run `cne config create` first. It then builds the core of the last 3 years for the whole Shanghai, Shenzhen and Beijing market: securities, calendar, corporate actions, stock and index daily bars, adjustment factors and industry indices. It automatically recovers daily bars for known delisted stocks within the window, fetches the current trading status and derives historical suspensions, then audits and publishes.
 
 Full-market initialization can take several hours and has no fixed completion time; the terminal prints batch progress and an ETA in real time. Once a batch of daily bars is sealed, you do not have to wait for the full market to finish: `load("daily_bars", symbols=["600519.SH"])` can read that stock's unadjusted daily bars. Queries without `symbols` still see only published data; adjustment factors are published only at the end of initialization.
 
@@ -33,7 +33,7 @@ cne query --sql "SELECT symbol, trade_date, close, source FROM daily_bars ORDER 
 cne check
 ```
 
-`cne check` gives a verdict on freshness and coverage, data quality and size in one command. `load` and the `cne` commands read `configs/cnequity.toml` in the current directory by default. `fresh` only means the dates already written to disk are recent enough; it does not mean the history is complete.
+`cne check` gives a verdict on freshness and coverage, data quality and size in one command. `load` and the `cne` commands find this config from any directory (a `configs/cnequity.toml` in the current directory takes precedence); `cne config path` shows which one is in use. `fresh` only means the dates already written to disk are recent enough; it does not mean the history is complete.
 
 ## 3. Check in the browser {#browser}
 

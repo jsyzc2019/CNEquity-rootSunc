@@ -45,7 +45,7 @@ def render_example_toml(
             return f"{match.group(1)}{escaped}{match.group(2)}"
 
         replaced = re.sub(
-            r'(?m)^(\[data\]\s*\nroot\s*=\s*")[^"]*(")',
+            r'(?m)^(\[data\]\s*\n(?:#[^\n]*\n)*root\s*=\s*")[^"]*(")',
             _patch_root,
             text,
             count=1,

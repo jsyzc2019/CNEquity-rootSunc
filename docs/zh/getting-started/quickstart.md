@@ -11,7 +11,7 @@ pip install cnequity
 cne init
 ```
 
-第一次运行会生成 `configs/cnequity.toml`，数据写入当前目录的 `data/cnequity/`（配置里记绝对路径）；已有配置直接沿用，不需要先跑 `cne config create`。随后建立沪深京全市场最近 3 年的主干：证券、日历、公司行为、个股与指数日线、复权因子和行业指数；自动恢复窗口内已知退市股票的日线，获取当前交易状态并派生历史停牌，审计后发布。
+第一次运行会生成用户级配置 `~/.config/cnequity/config.toml`，数据写入当前目录的 `data/cnequity/`（配置里记绝对路径）；已有配置直接沿用，不需要先跑 `cne config create`。随后建立沪深京全市场最近 3 年的主干：证券、日历、公司行为、个股与指数日线、复权因子和行业指数；自动恢复窗口内已知退市股票的日线，获取当前交易状态并派生历史停牌，审计后发布。
 
 全市场初始化可能需要数小时，没有固定完成时间；终端实时打印批次进度和 ETA。某一批日线封存后，不必等全市场结束：`load("daily_bars", symbols=["600519.SH"])` 可以读到这只股票的未复权日线。不指定 `symbols` 的查询仍只看已经发布的数据；复权因子在初始化收尾才发布。
 
@@ -33,7 +33,7 @@ cne query --sql "SELECT symbol, trade_date, close, source FROM daily_bars ORDER 
 cne check
 ```
 
-`cne check` 一条命令给出新鲜度与覆盖、数据质量和规模的结论。`load` 和 `cne` 命令默认读取当前目录的 `configs/cnequity.toml`。`fresh` 只表示已落盘的日期够新，不等于历史完整。
+`cne check` 一条命令给出新鲜度与覆盖、数据质量和规模的结论。`load` 和 `cne` 命令在任何目录都会找到这份配置（当前目录有 `configs/cnequity.toml` 时优先用它），`cne config path` 显示实际用的是哪份。`fresh` 只表示已落盘的日期够新，不等于历史完整。
 
 <a id="browser"></a>
 

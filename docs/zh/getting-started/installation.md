@@ -79,7 +79,7 @@ pip install -e . --group dev
 cne config create
 ```
 
-默认输出 `configs/cnequity.toml`，`data.root` 转为绝对路径；macOS / Windows 使用保守的 `workers=1`。也可首次创建时加 `--data-root /abs/path/to/lake`。
+默认输出用户级配置 `~/.config/cnequity/config.toml`（当前目录已有 `configs/cnequity.toml` 时写那里），`data.root` 转为绝对路径；macOS / Windows 使用保守的 `workers=1`。也可首次创建时加 `--data-root /abs/path/to/lake`。
 
 直接复制模板不会执行路径解析和平台调整，因此优先使用生成命令。已有配置升级时用 `cne config upgrade` 自动补上新的调度 step。个人配置、凭证与数据目录不应提交到仓库。
 

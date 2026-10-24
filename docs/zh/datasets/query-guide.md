@@ -32,7 +32,7 @@ meta = list_datasets()  # 或 list_datasets(config=cfg)
 # snapshot_only → 无诚实历史；coverage_start 为盘上分区起点
 ```
 
-配置解析顺序：`config=` → `data_root=` → `configs/cnequity.toml`
+配置解析顺序：`config=` → `data_root=` → `CNE_CONFIG` → 当前目录的 `configs/cnequity.toml` → 用户级 `~/.config/cnequity/config.toml`
 
 境内股票指数 ETF 使用单独的 `etf_profiles` 当前快照。按研究日筛掉之后的快照，
 再选每只基金当时最新的记录；只有 `eligibility_status="eligible"` 可进入该范围。

@@ -49,7 +49,7 @@ def load(
 | `all_vintages` | When True, returns **all** versions before `as_of` (for studying financial statement revisions); do not enable it for cross-sectional stock selection, as it counts the same fact more than once |
 | `pit_mode` | PIT evidence mode: omitted or `None` defaults to `best_effort`, keeping historical backfills collected after `as_of` and returning `pit_is_exact=False`; announcement and known availability/publication dates still obey the cutoff. `strict` excludes reconstructed backfills and returns only evidence the lake held by the cutoff |
 | `include_otc` | Defaults to False: `daily_bars` and `adj_factors` exclude Beijing securities' quotes before exchange trading began. True retains those OTC quotes. The exchange start is the later of the listing date and 2020-07-27 |
-| `config` / `data_root` | Lake location; reads `configs/cnequity.toml` by default |
+| `config` / `data_root` | Lake location; when omitted, looked up as `CNE_CONFIG` → `configs/cnequity.toml` in the current directory → the per-user config |
 | `profile` / `universe_profile` | Versioned universe policy; the two are aliases. Official research profiles enable strict evidence checks automatically |
 | `revision` | Pins the primary dataset by revision number or ID; a per-dataset mapping is also supported. A single number does not pin factor or universe dependencies |
 | `revision_map` | Pins the retained revision of each dependency dataset; an explicitly requested missing version raises `RevisionConsistencyError` instead of falling back to latest |

@@ -99,7 +99,7 @@ The top-level mapping is defined by `MOVED` in `cnequity/cli/_root.py`; old name
 
 Command: `cne` (`cnequity.cli.main:cli`)
 
-Leaf commands that support configuration accept `--config PATH`; resolution order is explicit option → `CNE_CONFIG` → `configs/cnequity.toml` in the current working directory. For example, `cne status --config /abs/path/to/cnequity.toml`.
+Leaf commands that support configuration accept `--config PATH`; resolution order is explicit `--config` → `CNE_CONFIG` → `configs/cnequity.toml` in the current directory → the per-user `~/.config/cnequity/config.toml` (honours `XDG_CONFIG_HOME`; `%APPDATA%\cnequity\config.toml` on Windows); `cne config path` shows the config chosen and why. For example, `cne status --config /abs/path/to/cnequity.toml`.
 
 **Command names are case-insensitive**: `cne STATUS`, `cne run DAILY` and `cne config CREATE` are equivalent to their lowercase forms (Click's `token_normalize_func`). `-h` is short for `--help`. **There is no prefix matching**: `cne stat` is rejected with a hint pointing to `stats` / `status`, rather than guessing one and running it.
 
@@ -151,7 +151,7 @@ Synthetic rows are prominently marked `source=mock`, and the quality audit does 
 
 Initialize the data lake and run the init phases. quick/full automatically recover known delisted daily bars within the configured market and history window, fetch the current trading status, and derive historical suspensions once the daily bars are published. The whole-market historical ST scan uses the separate `cne backfill trading_status` and is not a completion condition for init.
 
-When the default configuration `configs/cnequity.toml` does not exist, `cne init` first generates it from the example shipped with the package (same as `cne config create`); a missing file named by an explicit `--config` or by `CNE_CONFIG` is not generated. For an interrupted, partially covered, or old-version unfinished init, rerunning the same `cne init` resumes automatically, and data already fetched is kept.
+When no configuration is found, `cne init` first generates the per-user configuration from the example shipped with the package (same as `cne config create`); a missing file named by an explicit `--config` or by `CNE_CONFIG` is not generated. For an interrupted, partially covered, or old-version unfinished init, rerunning the same `cne init` resumes automatically, and data already fetched is kept.
 
 | Option | Description |
 |------|------|
@@ -198,7 +198,7 @@ Write the user configuration from the template inside the package (no repository
 
 | Option | Description |
 |------|------|
-| `--config` | Output path (default `configs/cnequity.toml`) |
+| `--config` | Output path (default: `configs/cnequity.toml` when the current directory has one, otherwise the per-user `~/.config/cnequity/config.toml`) |
 | `--data-root` | Written into `[data].root` |
 | `--force` | Overwrite an existing file |
 
@@ -789,7 +789,7 @@ Changing the time only changes `[job.daily] run_at` and `[job.stale] run_at` in 
 
 Job logs and backfill previews use UTF-8 throughout, with no need to set an encoding separately for the Windows terminal. On Windows, cancel checks the PID and the process creation time; when the record lacks identity information (for example a job started before an update) or cannot be checked, the page refuses to send the termination signal; handle it through the system Task Manager. After a forced cancel, you can check the published data from the associated run and retry the unfinished work.
 
-When the default configuration `configs/cnequity.toml` does not yet exist and there is no explicit `--config` / `CNE_CONFIG`, the dashboard enters first-time setup: fill in the data directory, review `cne doctor`, then start `cne init`. Initialization cannot start before the checkup finishes. The page shows the command to be run first and starts it only after confirmation. When the directory already contains a data lake, it first explains that it will take over the lake and not wipe it. Explicitly pointing at a file that does not exist still raises an error and is not generated automatically. When the lake has no curated data yet, daily and manual updates are tucked into a secondary position, and the primary action is initialization. An initialization that has not finished, whose missing steps no later run has completed successfully, can be resumed directly. When the missing steps were later completed successfully, the page no longer prompts to continue initialization. A scheduled daily update that is due but has not run names that trading day. The daily-update form explains whether today is a trading day, which session is pending, and whether this manual run counts as that scheduled one. After initialization or a daily update ends, the page offers the overview or a retry entry point.
+When no configuration is found and there is no explicit `--config` / `CNE_CONFIG`, the dashboard enters first-time setup: fill in the data directory, review `cne doctor`, then start `cne init`. Initialization cannot start before the checkup finishes. The page shows the command to be run first and starts it only after confirmation. When the directory already contains a data lake, it first explains that it will take over the lake and not wipe it. Explicitly pointing at a file that does not exist still raises an error and is not generated automatically. When the lake has no curated data yet, daily and manual updates are tucked into a secondary position, and the primary action is initialization. An initialization that has not finished, whose missing steps no later run has completed successfully, can be resumed directly. When the missing steps were later completed successfully, the page no longer prompts to continue initialization. A scheduled daily update that is due but has not run names that trading day. The daily-update form explains whether today is a trading day, which session is pending, and whether this manual run counts as that scheduled one. After initialization or a daily update ends, the page offers the overview or a retry entry point.
 
 When opened from another machine (`--host` is not a loopback address), browsing and storage cleanup use `--token`; the operations page cannot start commands by default, and `--allow-remote-ops` must be given as well. First-time setup always accepts only the local machine.
 
@@ -891,7 +891,7 @@ Connect this lake to AI agents (MCP, stdio by default, `--http` switches to Stre
 
 | Option | Description |
 |------|------|
-| `--config` | Configuration file path, **an absolute path is recommended** (which directory the client launches the process from is unpredictable) |
+| `--config` | Configuration file path; when omitted, the shared lookup order applies (the client launches the process from an unpredictable directory, and the per-user config is found from any of them). When given, **an absolute path is recommended** |
 | `--live` | Fetch on the fly what is not in the lake, without writing it to disk. Supports only `resolve_symbol` and unadjusted daily bars; other tools refuse explicitly |
 | `--http` | Switch to Streamable HTTP, listening on `/mcp`. For clients that only accept a remote URL (ChatGPT), used together with a tunnel |
 | `--host` / `--port` | Listen address and port for `--http`, default `127.0.0.1:8788`. A non-loopback address must be paired with `--token` |

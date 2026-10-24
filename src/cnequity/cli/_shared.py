@@ -15,9 +15,10 @@ from pathlib import Path
 import click
 
 from cnequity.config import load_config
+from cnequity.config.locate import PROJECT_CONFIG, default_config_path, user_config_path
 from cnequity.i18n import N_, _
 
-USER_CONFIG = "configs/cnequity.toml"
+USER_CONFIG = PROJECT_CONFIG.as_posix()
 EXAMPLE_CONFIG = "configs/cnequity.example.toml"
 DEMO_CONFIG = "configs/cnequity.demo.toml"
 DEMO_DATA_ROOT = "data/cnequity-demo"
@@ -44,22 +45,40 @@ def config_option(func):
     return click.option(
         "--config",
         "config_path",
-        default=DEFAULT_CONFIG,
-        show_default=True,
+        # Resolved in the callback, not here: the default depends on which
+        # files exist when the command runs (see `cnequity.config.locate`).
+        # The parameter source stays DEFAULT, which is what lets `cne init`
+        # tell an implicit config it may create from a mistyped explicit one.
+        default=None,
+        callback=_implicit_config,
+        # Static on purpose: the generated CLI reference must not carry the
+        # path of whichever machine rendered it. Windows uses %APPDATA%.
+        show_default=f"{USER_CONFIG}, else ~/.config/cnequity/config.toml",
         help=N_("Path to the config file."),
-        # The default is relative, so every command had to be run from the
-        # directory holding `configs/`. The shell pipelines already read
-        # `CNE_CONFIG` and passed it through as `--config`; the CLI itself did
-        # not, so a cron line that forgot its `cd` failed with "Config not
-        # found" instead of using the config the environment already named.
+        # The shell pipelines already read `CNE_CONFIG` and passed it through
+        # as `--config`; the CLI itself did not, so a cron line that forgot its
+        # `cd` failed with "Config not found" instead of using the config the
+        # environment already named.
         envvar="CNE_CONFIG",
         show_envvar=True,
     )(func)
 
 
+def _implicit_config(ctx: click.Context, param: click.Parameter, value: str | None) -> str:
+    return str(default_config_path()) if value is None else value
+
+
+def config_is_implicit() -> bool:
+    """Whether the running command got its config from neither --config nor CNE_CONFIG."""
+    ctx = click.get_current_context(silent=True)
+    return ctx is not None and (
+        ctx.get_parameter_source("config_path") is click.core.ParameterSource.DEFAULT
+    )
+
+
 def resolve_config_path(config_path: str):
     path = Path(config_path).expanduser()
-    if config_path == USER_CONFIG and not path.exists():
+    if config_is_implicit() and not path.exists():
         # `cne init --profile demo` writes the demo config, not the user one, so every
         # command it points at afterwards ("if this fails, run `cne sources
         # probe ...`") used to die here on a second, unrelated error — at
@@ -76,8 +95,8 @@ def resolve_config_path(config_path: str):
                 break
         raise click.ClickException(
             _(
-                "No config found at {USER_CONFIG}. On first use, just run `cne init`: it writes this config and starts initializing. To only write the config, use `cne config create` (with a repository checkout you can also copy {EXAMPLE_CONFIG}).{hint}"
-            ).format(USER_CONFIG=USER_CONFIG, EXAMPLE_CONFIG=EXAMPLE_CONFIG, hint=hint)
+                "No config found: looked for {project} in the current directory and {user}. On first use, just run `cne init`: it writes {user} and starts initializing. To only write the config, use `cne config create`. A config elsewhere is named with --config or CNE_CONFIG.{hint}"
+            ).format(project=USER_CONFIG, user=user_config_path(), hint=hint)
         )
     if not path.exists():
         raise click.ClickException(_("Config not found: {path}").format(path=path))

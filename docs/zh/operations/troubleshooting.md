@@ -75,7 +75,7 @@ cne status --datasets
 | 数据仍在 staging | `ls staging/*/run_id=*` | `cne run compact` 发布所有已结束未发布的 run，或 `cne run retry`；**先 compact 再** `cne run clean`（勿 `--force`，否则 demote 后只能重抓） |
 | 分组 run 未 compact | 组 steps 是否含 `compact` | 配置修正后重跑组 |
 | compact 被 gate 跳过 | `cne status` 看 failed batch | `cne run retry --run-id <id>` |
-| 路径错误 | `config.data_root` | 核对 `configs/cnequity.toml` |
+| 路径错误 | `config.data_root` | `cne config path` 查看实际生效的配置和数据目录 |
 | 初始化还在跑，不带 `symbols` 的 `load("daily_bars")` 为空 | 未发布的全市场扫描不会被当成已发布数据 | 指定已经封存的代码，例如 `load("daily_bars", symbols=["600519.SH"])`；复权因子要等 `adj_factors` 发布 |
 
 ## 症状：daily_bars「interior symbol×session key(s) remain absent; refusing to checkpoint」

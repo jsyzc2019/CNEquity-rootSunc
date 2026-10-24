@@ -1919,7 +1919,7 @@ msgstr "执行完成。"
 msgid "Config check passed"
 msgstr "配置检查通过"
 
-#: cnequity/cli/_shared.py
+#: cnequity/cli/_shared.py cnequity/cli/setup_cmds.py
 #, python-brace-format
 msgid "Config not found: {path}"
 msgstr "找不到配置：{path}"
@@ -1928,6 +1928,11 @@ msgstr "找不到配置：{path}"
 #, python-brace-format
 msgid "Config output path is not a regular file: {path}"
 msgstr "配置输出路径不是普通文件：{path}"
+
+#: cnequity/cli/setup_cmds.py
+#, python-brace-format
+msgid "Config: {path} ({why})"
+msgstr "配置：{path}（{why}）"
 
 #: cnequity/cli/init_summary.py
 msgid "Connect an AI (read-only MCP, Claude Code as the example):"
@@ -2111,6 +2116,11 @@ msgstr ""
 "数据备份：{value}\n"
 "目标：{value2}\n"
 "复制所选已发布数据、状态、契约与血缘；不请求数据源。这不是系统镜像，不包含原配置、凭据或完整运行数据库。"
+
+#: cnequity/cli/setup_cmds.py
+#, python-brace-format
+msgid "Data root: {root}"
+msgstr "数据目录：{root}"
 
 #: cnequity/diagnostics/health_page.py
 msgid "Data source"
@@ -3019,7 +3029,8 @@ msgid ""
 "\n"
 "or go full from the start: `--profile full`.\n"
 "\n"
-"On the first run, when the default configs/cnequity.toml does not exist, it is generated from the bundled example\n"
+"On the first run, when no config is found (configs/cnequity.toml here, or the per-user ~/.config/cnequity/config.toml),\n"
+"the per-user one is generated from the bundled example\n"
 "(the same as `cne config create`). After an interruption or partial coverage,\n"
 "re-running the same `cne init` resumes it, and batches that succeeded are not fetched again.\n"
 "\n"
@@ -3051,8 +3062,8 @@ msgstr ""
 "\n"
 "或者一开始就全量：`--profile full`。\n"
 "\n"
-"第一次运行且默认的 configs/cnequity.toml 不存在时，会先按随包示例生成它\n"
-"（等同 `cne config create`）。中断或部分覆盖后，\n"
+"第一次运行且找不到配置时（当前目录的 configs/cnequity.toml 或用户级的 ~/.config/cnequity/config.toml），\n"
+"会按随包示例生成用户级配置（等同 `cne config create`）。中断或部分覆盖后，\n"
 "重跑同一条 `cne init` 即可续跑，已成功的批次不会重拉。\n"
 "\n"
 "quick/full 都扫描配置的 universe，并自动恢复窗口内退市日线。\n"
@@ -3220,6 +3231,10 @@ msgstr "日志写到 {path}"
 msgid "Login, query and logout each cost a request; it has blacklisted IPs before, so by default only passive ingest evidence is used."
 msgstr "登录、查询、退出均占请求；曾遇到 IP 黑名单，默认只使用被动采集证据。"
 
+#: cnequity/cli/setup_cmds.py
+msgid "Lookup order without --config: CNE_CONFIG, then:"
+msgstr "未给 --config 时的查找顺序：CNE_CONFIG，然后："
+
 #: cnequity/cli/run_cmds.py
 msgid "Lost for good if a day is missed: "
 msgstr "漏一天就补不回："
@@ -3338,8 +3353,8 @@ msgstr "还没有配置文件 {config_file}，面板进入首次配置。"
 
 #: cnequity/cli/_shared.py
 #, python-brace-format
-msgid "No config found at {USER_CONFIG}. On first use, just run `cne init`: it writes this config and starts initializing. To only write the config, use `cne config create` (with a repository checkout you can also copy {EXAMPLE_CONFIG}).{hint}"
-msgstr "找不到配置：{USER_CONFIG}。首次使用直接跑 `cne init`，它会生成这份配置并开始初始化；只想生成配置用 `cne config create`（有仓库 checkout 也可以直接复制 {EXAMPLE_CONFIG}）。{hint}"
+msgid "No config found: looked for {project} in the current directory and {user}. On first use, just run `cne init`: it writes {user} and starts initializing. To only write the config, use `cne config create`. A config elsewhere is named with --config or CNE_CONFIG.{hint}"
+msgstr "找不到配置：已查找当前目录的 {project} 和 {user}。首次使用直接跑 `cne init`，它会写入 {user} 并开始初始化；只想生成配置用 `cne config create`。其他位置的配置用 --config 或 CNE_CONFIG 指定。{hint}"
 
 #: cnequity/cli/setup_cmds.py
 #, python-brace-format
@@ -3443,6 +3458,10 @@ msgstr "尚未配置"
 #: cnequity/serve/app.py cnequity/serve/ops/catalog.py
 msgid "Not configured yet."
 msgstr "尚未配置。"
+
+#: cnequity/cli/setup_cmds.py
+msgid "Not created yet; `cne init` or `cne config create` writes it here."
+msgstr "尚未创建；`cne init` 或 `cne config create` 会写到这里。"
 
 #: cnequity/diagnostics/source_health.py
 msgid "Not probed this time (disabled in the config, excluded by --only, or a costly endpoint that must be selected explicitly)."
@@ -3748,6 +3767,11 @@ msgstr "某一个数据集的逐分区明细。"
 #: cnequity/cli/storage_cmds.py
 msgid "Physical deletion must be reviewed and confirmed on the storage operations page of cne serve; the CLI only allows previewing and marking."
 msgstr "物理删除必须在 cne serve 的存储运维网页中检查并确认；CLI 只允许预览和标记。"
+
+#: cnequity/cli/setup_cmds.py
+#, python-brace-format
+msgid "Pin [data].root: {written} → {absolute} (a relative root is now read against the config's directory)"
+msgstr "固定 [data].root：{written} → {absolute}（相对路径现在按配置文件所在目录解析）"
 
 #: cnequity/cli/consume_cmds.py
 msgid "Port for --http."
@@ -5785,6 +5809,7 @@ msgid ""
 "`cne config init`, one word away from `cne init`, which builds the whole lake and costs far more when run by mistake.\n"
 "On macOS it also forces `orchestrator.workers = 1`.\n"
 "`cne config validate` validates an existing config.\n"
+"`cne config path` shows which config a command would use, why, and the lake it points to.\n"
 "`cne config diff` reports what the example config has and this config lacks; above all the steps new versions add\n"
 "to schedule groups, which a config written once and never updated will never run.\n"
 "`cne config upgrade` adds those steps and the missing schedule groups straight into the config (backing up the original first),\n"
@@ -5797,6 +5822,7 @@ msgstr ""
 "`cne config init`，和会建整个湖的 `cne init` 只差一个词，而后者误跑的代价大得多。\n"
 "在 macOS 上它还会强制 `orchestrator.workers = 1`。\n"
 "`cne config validate` 校验一份已有的配置。\n"
+"`cne config path` 显示命令会用哪份配置、为什么选中它，以及它指向的湖。\n"
 "`cne config diff` 报告示例配置里有、而这份配置没有的东西 —— 最要紧的是新版本往调度组里\n"
 "加的 step：一份写完就再没更新过的配置永远不会跑到它们。\n"
 "`cne config upgrade` 把这些 step 和缺少的调度组直接补进配置（先备份原文件），\n"
@@ -6357,6 +6383,10 @@ msgstr "按日期回补缺口"
 msgid "first-time setup"
 msgstr "首次配置"
 
+#: cnequity/cli/setup_cmds.py
+msgid "found in the current directory"
+msgstr "在当前目录找到"
+
 #: cnequity/cli/quality_cmds.py
 msgid "freshness cannot be proven"
 msgstr "新鲜度证明不了"
@@ -6380,6 +6410,10 @@ msgstr "futures_minute_bars 只能采集近期窗口，不能按 --start / --end
 #: cnequity/cli/quality_cmds.py
 msgid "gaps inside the range"
 msgstr "区间内缺口"
+
+#: cnequity/cli/setup_cmds.py
+msgid "given with --config"
+msgstr "由 --config 指定"
 
 #: cnequity/diagnostics/substitutes.py
 msgid "has an independent substitute"
@@ -6468,6 +6502,10 @@ msgstr "minute_bars 失败：{result}"
 #: cnequity/cli/demo.py
 msgid "minute_bars returned no rows inside the demo window"
 msgstr "minute_bars 在 demo 窗口内没有返回任何行"
+
+#: cnequity/cli/setup_cmds.py
+msgid "named by CNE_CONFIG"
+msgstr "由 CNE_CONFIG 指定"
 
 #: cnequity/cli/quality_cmds.py
 msgid "no audit records, quality cannot be proven (add --full to audit now)"
@@ -6648,6 +6686,10 @@ msgstr "默认的数据集覆盖模式"
 msgid "the latest audit has {value} errors"
 msgstr "最近一次审计有 {value} 条 error"
 
+#: cnequity/cli/setup_cmds.py
+msgid "the per-user config"
+msgstr "用户级配置"
+
 #: cnequity/cli/quality_cmds.py
 msgid "the source's shape, cannot be backfilled"
 msgstr "源的形态，无法回填"
@@ -6722,8 +6764,8 @@ msgstr "{action!r} 不是 {value} 之一"
 
 #: cnequity/cli/run_cmds.py
 #, python-brace-format
-msgid "{config_path} belongs to a {profile} lake, which has no daily schedule: a few symbols are not worth updating. Build a lake `cne run daily` can keep current with `cne init`, which writes configs/cnequity.toml."
-msgstr "{config_path} 是 {profile} 湖的配置，没有日更计划（几只股票不值得更新）。要得到能用 `cne run daily` 保持最新的湖，请运行 `cne init`，它会写入 configs/cnequity.toml。"
+msgid "{config_path} belongs to a {profile} lake, which has no daily schedule: a few symbols are not worth updating. Build a lake `cne run daily` can keep current with `cne init`, which writes the per-user config."
+msgstr "{config_path} 是 {profile} 湖的配置，没有日更计划（几只股票不值得更新）。要得到能用 `cne run daily` 保持最新的湖，请运行 `cne init`，它会写入用户级配置。"
 
 #: cnequity/cli/run_cmds.py
 #, python-brace-format

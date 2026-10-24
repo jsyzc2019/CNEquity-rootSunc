@@ -3,12 +3,13 @@
 配置文件格式：TOML。模板随包装在 `cnequity.config.templates`；仓库内副本为 `configs/cnequity.example.toml`。
 
 ```bash
-cne config create                              # 推荐：写出 configs/cnequity.toml
+cne config create                              # 推荐：写出用户级配置 ~/.config/cnequity/config.toml
  # 首次创建时也可选：cne config create --data-root /data/cnequity
-cne config validate --config configs/cnequity.toml
+cne config path                                # 显示当前生效的配置、选中原因和数据目录
+cne config validate
 ```
 
-加载与校验：`cnequity.config.loader`。个人文件不参与开源默认配置；参见[升级与反馈](installation.md#升级与兼容性)。`--config` 优先于环境变量 `CNE_CONFIG`，否则使用当前目录下 `configs/cnequity.toml`。`cne config create` 默认写绝对 `data.root`；手写相对路径仍按进程工作目录解析。
+加载与校验：`cnequity.config.loader`。个人文件不参与开源默认配置；参见[升级与反馈](installation.md#升级与兼容性)。配置查找顺序：显式 `--config` → `CNE_CONFIG` → 当前目录的 `configs/cnequity.toml` → 用户级 `~/.config/cnequity/config.toml`（遵循 `XDG_CONFIG_HOME`；Windows 为 `%APPDATA%\cnequity\config.toml`）。CLI、`load()`、MCP 和定时任务用同一套规则，所以在任何目录运行都指向同一个湖。`cne config create` 默认写绝对 `data.root`；手写的相对路径（`data.root`、`duckdb.path`）按**配置文件所在目录**解析。旧版按工作目录解析的相对路径，在新位置不存在而旧位置存在时继续沿用并给出警告，运行 `cne config upgrade` 会把它固定为绝对路径。
 
 本页按配置段查阅。首次使用通常只需确认 `[data].root`，再按需求启用分钟线、分笔或[衍生品](../recipes/derivatives.md)。表中默认值指随包模板；直接构造 `Config()` 与平台生成器的结果可能不同，以 `cne config diff` 和实际配置为准。
 
@@ -18,7 +19,7 @@ cne config validate --config configs/cnequity.toml
 
 | 键 | 类型 | 默认 | 说明 |
 |----|------|------|------|
-| `root` | string | `./data/cnequity` | 数据湖根目录；**生产建议绝对路径** |
+| `root` | string | `./data/cnequity` | 数据湖根目录；相对路径按配置文件所在目录解析，**生产建议绝对路径** |
 
 派生路径（代码内自动计算，无需配置）：
 

@@ -75,7 +75,7 @@ Long tasks (baostock backfill) are kept alive by a **batch heartbeat** and are n
 | Data is still in staging | `ls staging/*/run_id=*` | `cne run compact` publishes all finished but unpublished runs, or use `cne run retry`; **compact first, then** `cne run clean` (no `--force`, otherwise after demotion the data can only be refetched) |
 | Group run was not compacted | Do the group's steps include `compact`? | Fix the configuration and rerun the group |
 | compact was skipped by a gate | Check failed batches in `cne status` | `cne run retry --run-id <id>` |
-| Wrong path | `config.data_root` | Check `configs/cnequity.toml` |
+| Wrong path | `config.data_root` | `cne config path` shows the config in effect and its data root |
 | Initialization is still running, and `load("daily_bars")` without `symbols` is empty | An unpublished full-market scan is not treated as published data | Specify symbols that are already sealed, e.g. `load("daily_bars", symbols=["600519.SH"])`; adjustment factors require `adj_factors` to be published |
 
 ## Symptom: daily_bars "interior symbol×session key(s) remain absent; refusing to checkpoint"

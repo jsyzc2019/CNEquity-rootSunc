@@ -32,7 +32,7 @@ meta = list_datasets()  # or list_datasets(config=cfg)
 # snapshot_only → no honest history; coverage_start is the start of the on-disk partitions
 ```
 
-Config resolution order: `config=` → `data_root=` → `configs/cnequity.toml`
+Config resolution order: `config=` → `data_root=` → `CNE_CONFIG` → `configs/cnequity.toml` in the current directory → the per-user `~/.config/cnequity/config.toml`
 
 Domestic equity index ETFs use a separate current snapshot, `etf_profiles`. Filter out snapshots later than the research date,
 then pick each fund's latest record as of that date; only `eligibility_status="eligible"` may enter this scope.

@@ -49,7 +49,7 @@ def load(
 | `all_vintages` | True 时返回 `as_of` 前的**全部**版本（研究财报修订用）；截面选股勿开，会重复计同一事实 |
 | `pit_mode` | PIT 证据模式：省略或传 `None` 默认为 `best_effort`，保留在 `as_of` 之后采集的历史回填，并返回 `pit_is_exact=False`；公告及已知可用/发布时间仍受截止日约束。`strict` 排除 reconstructed 回填，只返回湖在截止日已有的证据 |
 | `include_otc` | 默认 False：`daily_bars`、`adj_factors` 排除北交所证券进入交易所市场之前的场外报价；设为 True 保留这些报价。交易所起点取上市日和 2020-07-27 中的较晚者 |
-| `config` / `data_root` | 湖位置；默认读 `configs/cnequity.toml` |
+| `config` / `data_root` | 湖位置；省略时按 `CNE_CONFIG` → 当前目录的 `configs/cnequity.toml` → 用户级配置查找 |
 | `profile` / `universe_profile` | 版本化股票池策略，二者为别名；官方研究画像自动启用严格证据校验 |
 | `revision` | revision 数字或 ID 固定主数据集；也支持按数据集映射。单个数字不固定因子或股票池依赖 |
 | `revision_map` | 固定各依赖数据集的 retained revision；显式缺失版本抛 `RevisionConsistencyError`，不退回 latest |

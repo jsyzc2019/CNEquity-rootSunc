@@ -4,7 +4,9 @@
 # Keep both identical — `cne config create` ships the packaged file.
 
 [data]
-root = "./data/cnequity"
+# A relative root is read against this file's directory. `cne init` and
+# `cne config create` write an absolute path here.
+root = "../data/cnequity"
 
 [orchestrator]
 # `workers` remains the legacy/global process budget.  The TDX and HTTP pools

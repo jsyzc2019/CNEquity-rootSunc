@@ -79,7 +79,7 @@ Node/npm is needed only to modify the dashboard source; the published package al
 cne config create
 ```
 
-It writes `configs/cnequity.toml` by default and converts `data.root` to an absolute path; macOS / Windows use a conservative `workers=1`. You can also add `--data-root /abs/path/to/lake` when creating it for the first time.
+It writes the per-user `~/.config/cnequity/config.toml` by default (or `configs/cnequity.toml` when the current directory already has one) and converts `data.root` to an absolute path; macOS / Windows use a conservative `workers=1`. You can also add `--data-root /abs/path/to/lake` when creating it for the first time.
 
 Copying the template directly skips path resolution and platform adjustments, so prefer the generator command. When upgrading an existing config, use `cne config upgrade` to add new schedule steps automatically. Personal configs, credentials and data directories should not be committed to the repository.
 

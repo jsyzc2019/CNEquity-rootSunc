@@ -24,6 +24,7 @@ from cnequity.cli._shared import (
     attach_log_file,
     comma_option,
     comma_values,
+    config_is_implicit,
     config_option,
     ingest_scope_label,
     parse_date_option,
@@ -355,7 +356,8 @@ def init(
 
     or go full from the start: `--profile full`.
 
-    On the first run, when the default configs/cnequity.toml does not exist, it is generated from the bundled example
+    On the first run, when no config is found (configs/cnequity.toml here, or the per-user ~/.config/cnequity/config.toml),
+    the per-user one is generated from the bundled example
     (the same as `cne config create`). After an interruption or partial coverage,
     re-running the same `cne init` resumes it, and batches that succeeded are not fetched again.
 
@@ -597,7 +599,7 @@ def _install_pack_schedule(cfg, packs: tuple[str, ...]) -> str:
 #: What `cne config` does, and the spellings that used to mean one of them.
 #: `cnequity.cli._root.MOVED` answers a moved *command*; an argument is not a
 #: command, so it needs its own map — and this is the one people hit first.
-CONFIG_ACTIONS: tuple[str, ...] = ("validate", "create", "diff", "upgrade")
+CONFIG_ACTIONS: tuple[str, ...] = ("validate", "create", "diff", "upgrade", "path")
 CONFIG_ACTIONS_MOVED: dict[str, str] = {"init": "cne config create"}
 
 
@@ -638,6 +640,7 @@ def config_cmd(
     `cne config init`, one word away from `cne init`, which builds the whole lake and costs far more when run by mistake.
     On macOS it also forces `orchestrator.workers = 1`.
     `cne config validate` validates an existing config.
+    `cne config path` shows which config a command would use, why, and the lake it points to.
     `cne config diff` reports what the example config has and this config lacks; above all the steps new versions add
     to schedule groups, which a config written once and never updated will never run.
     `cne config upgrade` adds those steps and the missing schedule groups straight into the config (backing up the original first),
@@ -695,6 +698,10 @@ def config_cmd(
             raise SystemExit(1)
         return
 
+    if action == "path":
+        _config_path_report(config_path)
+        return
+
     if action == "create":
         out = Path(config_path).expanduser()
         try:
@@ -712,6 +719,34 @@ def config_cmd(
             click.echo(f"ERROR: {e}", err=True)
         raise SystemExit(1)
     click.echo(_("Config check passed"))
+
+
+def _config_path_report(config_path: str) -> None:
+    """`cne config path`: the config in effect, how it was chosen, and its lake."""
+    from cnequity.config.locate import config_candidates, describe_source
+
+    ctx = click.get_current_context()
+    source = ctx.get_parameter_source("config_path")
+    path = Path(config_path).expanduser()
+    if source is click.core.ParameterSource.COMMANDLINE:
+        why = _("given with --config")
+    elif source is click.core.ParameterSource.ENVIRONMENT:
+        why = _("named by CNE_CONFIG")
+    elif describe_source(path) == "project":
+        why = _("found in the current directory")
+    else:
+        why = _("the per-user config")
+    click.echo(_("Config: {path} ({why})").format(path=path.absolute(), why=why))
+    if path.is_file():
+        click.echo(_("Data root: {root}").format(root=_cfg(config_path).data_root))
+    elif config_is_implicit():
+        click.echo(_("Not created yet; `cne init` or `cne config create` writes it here."))
+    else:
+        raise click.ClickException(_("Config not found: {path}").format(path=path))
+    click.echo(_("Lookup order without --config: CNE_CONFIG, then:"))
+    for candidate in config_candidates():
+        mark = "*" if candidate == path else " "
+        click.echo(f"  {mark} {candidate}")
 
 
 def _config_upgrade(path: Path, *, dry_run: bool) -> None:
@@ -739,6 +774,12 @@ def _config_upgrade(path: Path, *, dry_run: bool) -> None:
         click.echo(_("Add steps: {label} += {value}").format(label=label, value=", ".join(steps)))
     for table in plan.added_groups:
         click.echo(_("Add schedule group: [{table}]").format(table=table))
+    if plan.pinned_root is not None:
+        click.echo(
+            _(
+                "Pin [data].root: {written} → {absolute} (a relative root is now read against the config's directory)"
+            ).format(written=plan.pinned_root[0], absolute=plan.pinned_root[1])
+        )
     if plan.manual_steps:
         click.echo(
             _(

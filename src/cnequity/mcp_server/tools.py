@@ -146,10 +146,10 @@ def _read(
     config: Config, dataset: str, *, receipt_sink: dict | None = None, **kwargs: Any
 ) -> pl.DataFrame:
     # config is threaded through explicitly rather than left to load()'s
-    # auto-detection: the fallback resolves ./configs/cnequity.toml from the
-    # working directory, and an MCP server is started by a client from whatever
-    # directory it happens to be in. Getting that wrong reads a different lake
-    # and answers confidently from it.
+    # auto-detection: the server already resolved its lake once at start-up,
+    # and re-resolving per call could pick a different one if the working
+    # directory or CNE_CONFIG differs. Getting that wrong reads a different
+    # lake and answers confidently from it.
     try:
         if receipt_sink is not None:
             from cnequity.query import load_with_receipt

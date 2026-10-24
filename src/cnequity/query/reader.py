@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import warnings
 from collections.abc import Mapping
 from datetime import date, timedelta
@@ -265,11 +266,19 @@ def resolve_config(
         return config
     if data_root is not None:
         return Config(data_root=Path(data_root).expanduser().resolve())
-    path = Path("configs/cnequity.toml")
-    if path.exists():
+    # The same lookup as the CLI, so `load()` in a notebook opened from any
+    # directory reads the lake `cne` commands update.
+    from cnequity.config.locate import PROJECT_CONFIG, find_config, user_config_path
+
+    env = os.environ.get("CNE_CONFIG")
+    if env:
+        return load_config(Path(env).expanduser())
+    path = find_config()
+    if path is not None:
         return load_config(path)
     raise ReaderError(
-        "No config found: pass config= or data_root=, or create configs/cnequity.toml"
+        "No config found: pass config= or data_root=, set CNE_CONFIG, or create "
+        f"{PROJECT_CONFIG.as_posix()} or {user_config_path()} (`cne init` writes the latter)"
     )
 
 
@@ -1091,7 +1100,8 @@ def load(
         for the requested scope. Use it for research reads; the default remains
         permissive for exploratory queries.
     config, data_root:
-        Lake location; auto-detects ``configs/cnequity.toml`` when omitted.
+        Lake location; when omitted, ``CNE_CONFIG``, then ``configs/cnequity.toml``
+        under the working directory, then the per-user config.
         Raises ``ReaderError`` if config or dataset parquet files are missing.
     revision:
         Committed revision number/id for the primary dataset, or a mapping
