@@ -31,6 +31,7 @@ The sections are defined by `SECTIONS` in `cnequity/cli/_root.py`; leaving any c
 | [`cne storage`](#cne-storage) | Version-retention register, cleanup plans and in-place pending-deletion marks |
 | [`cne backfill`](#cne-backfill-dataset) | Backfill one dataset |
 | [`cne derive`](#cne-derive-name) | Compute derived datasets |
+| [`cne import shfe-archive`](#cne-import-shfe-archive) | Import an official SHFE annual package offline |
 | [`cne migrate`](#cne-migrate) | Preview or run the one-off migrations this lake still owes, and record the results |
 | [`cne repair`](#cne-repair) | Offline repair of stored data layout or field semantics; previews by default, `--apply` publishes a new version |
 
@@ -423,73 +424,82 @@ The result JSON also has `adj_factors_sync` / `trading_status_derive` fields. Se
 
 | Option | Description |
 |------|------|
-| `--start` / `--end` | Requested window; the part beyond the source's historical boundary is reported as insufficient coverage, and the available range is still fetched |
-| `--profile delisted` | `daily_bars` only: uses the confirmed delisting list as the universe; `--start` corresponds to the old command's `--since`; `--plan` is offline. Cannot be mixed with ordinary repair or range options |
-| `--shfe-annual-archive ZIP --archive-year YYYY --accept-partial-fields` | `futures_bars` / `option_bars` only: explicit offline import of an SHFE annual package, keeping missing-field markers and skipping daily-bar primary keys that already exist; `--archive-url` / `--archive-downloaded-at` can attach evidence of the original source. Default backfill still uses complete daily files; see the [derivatives guide](../recipes/derivatives.md#official-annual-packages) for details |
-| `--symbols` | Ad hoc symbol scope for intraday, `daily_bars`, `trading_status`, `corporate_actions` and `share_structure` (`share_structure` fetches all share-capital changes per security in one go, for the share-capital lag the audit hints at); other datasets still use the configured scope |
-| `--baostock-repair` | `corporate_actions` only: explicitly fetch Baostock dividend and ex-rights data for delisted SH/SZ symbols; best combined with `--symbols` |
-| `--ths-repair` | `corporate_actions` only: explicitly fetch THS historical dividend and ex-rights data for delisted BJ symbols; best combined with `--symbols` |
-| `--eastmoney-bj-repair` | **Deprecated.** `corporate_actions` only, for lakes that still store old BSE codes: fetch historical dividend and ex-rights data from EastMoney in a targeted way, using the BSE old-code → new 920-code mapping; best combined with `--symbols` |
-| `--issuer-notice-repair` | `corporate_actions` only: use only issuer implementation announcements (reviewed list, CNINFO, BSE) to fill cash payment dates and apply reviewed bonus/conversion terms; stored payment dates earlier than the ex-date are treated as unknown and cleared if nothing is found. No Baostock requests. Requires `--symbols`/`--start`/`--end` |
-| `--payment-date-repair` | As above, then after issuer announcements also match remaining events with Baostock `dividPayDate`; the two cannot be used together |
-| `--outstanding` | Precisely repair the debt keys recorded by tolerated gaps: scope and window come from the ledger, not from `--symbols`/`--start`/`--end`. Keys that are filled are written off immediately; those still missing stay outstanding |
-| `--bj-amount-repair` | **Deprecated**; use `--tdx-amount-repair` instead: fill from TDX the BJ turnover Sina never published, never touching stored prices or volumes. Requires `--start`/`--end` |
-| `--tdx-amount-repair` | `daily_bars` only: Shanghai, Shenzhen and Beijing historical rows filled from Sina are checked against TDX, and turnover is filled only when open/high/low/close agree and the volume difference is less than one lot; codes TDX does not have keep the Sina row. Requires `--start`/`--end` |
-| `--turnover-repair` | `daily_bars` only: Shanghai/Shenzhen stock rows whose turnover is missing, 0, or has mismatched volume/turnover units are replaced as whole rows by Baostock's same-day row; open/high/low/close must agree within half a cent, and rows that disagree or are not provided keep the original values and are counted. Requires `--start`/`--end` |
-| `--turnover-peer-review` | With `--turnover-repair`, first confirm BaoStock prices using SSE historical K-lines or explicitly dated SZSE reports, then review remaining conflicts with TDX and EastMoney. Replacements are whole bars with agreeing prices and usable turnover; exchange-wide turnover is never spliced into auction bars. Unresolved conflicts and unavailable sources remain reported. |
-| `--tdx-volume-repair` | **Deprecated.** `daily_bars` only: reread TDX and rewrite only the volume of stored TDX rows (and turnover inflated below 64.5 yuan), fixing decoding errors before 2026-09-17; prices must agree, no rows are added, and it bypasses the internal gap gate. Requires `--symbols` and `--start`/`--end` |
-| `--bse-tip-repair` | `daily_bars` only: read the OHLCV of existing current-period sessions and request only turnover from BSE, with strict checks; the same `--start/--end` and `--symbols` must be given together |
+| `--start` / `--end` | Request window; the part beyond a source's historical depth is reported as a coverage gap, and the available range is still fetched |
+| `--symbols` | A temporary symbol scope for intraday, `daily_bars`, `trading_status`, `corporate_actions` and `share_structure` (`share_structure` fetches every share change of a security at once, for the share lag the audit reports); other datasets keep the configured scope |
+| `--outstanding` | Repair exactly the keys tolerated gaps left owed: scope and window come from the ledger, not from `--symbols`/`--start`/`--end`. Filled keys are cleared at once; keys still missing stay owed |
+| `--refetch` | Ignore completion receipts and checkpoints and fetch the whole range again (`sector_bars`, `futures_bars`, `option_bars`); circuit breakers still apply. Without it a backfill resumes |
+| `--source` | Source to use this time, without editing the config; currently for `margin_trading` (`exchange` / `eastmoney`) |
+| `--workers` | `margin_trading` only: concurrency of the date walk; each request still goes through the shared rate limiter |
+| `--exchange` | Derivatives: restrict to a publisher; repeatable |
+| `--profile delisted` | `daily_bars` only: the confirmed delisting catalog as the universe; `--start` maps to the old command's `--since`; `--plan` is offline |
+| `--plan` | Read-only plan; no network, no writes |
 
-`--eastmoney-bj-repair`, `--bj-amount-repair` and `--tdx-volume-repair` are deprecated and will be removed in 0.20.0: they only fix data written by 0.17 or earlier (use `--tdx-amount-repair` instead of `--bj-amount-repair`), and print a deprecation warning on stderr. `--ths-repair` fills corporate actions of delisted BSE securities, and `--bse-tip-repair` fills the latest session's turnover after the quote board was unavailable during the daily update; both stay. Daily updates never use these switches; new data is guaranteed by rules applied at write time:
+**Dataset-specific repairs and imports have moved out of `backfill`.** They run on the same backfill machinery (window, scope, downstream derive follow-up, plan output) but follow the repair convention: a preview by default, `--apply` to run. The old flags still work and point to the new command on stderr when typed:
 
-| Problem previously handled by a repair switch | Current handling |
+| Old form | New command |
 |---|---|
-| Missing current BJ turnover | Daily updates use the BSE quote board as the current primary source; rows missing turnover at the exchange stage raise a warning before merging |
-| A batch of BJ securities missing on some trading day | The completeness rule before merging records that day in the gap ledger and refetches it on the next run |
-| Out-of-limit price moves with no event | Quarantined, keeping the committed values, and recorded as pending refetch |
-| BJ adjustment steps Sina missed | Factors are computed from corporate actions, `pre_close` checks the steps, and Sina is only a cross-reference |
+| `backfill corporate_actions --payment-date-repair` / `--issuer-notice-repair` | [`cne repair payment-dates`](#cne-repair) (`--issuer-notices-only`) |
+| `backfill corporate_actions --baostock-repair` / `--ths-repair` | `cne repair delisted-actions --source baostock\|ths` |
+| `backfill corporate_actions --eastmoney-date-repair --ex-dates ...` | `cne repair ex-dates --ex-dates ...` |
+| `backfill daily_bars --tdx-amount-repair` | `cne repair bar-amounts` |
+| `backfill daily_bars --turnover-repair [--turnover-peer-review]` | `cne repair bar-turnover [--peer-review]` |
+| `backfill daily_bars --bse-tip-repair --start D --end D` | `cne repair bse-tip-turnover --date D` |
+| `backfill valuation_metrics --fill-em-outage` | `cne repair valuation-outage` |
+| `backfill futures_bars --shfe-annual-archive ZIP --archive-year Y ...` | [`cne import shfe-archive ZIP --dataset futures_bars --year Y ...`](#cne-import-shfe-archive) |
+| `--refresh` (derivatives) / `--force` (`sector_bars`) | `--refetch` |
+| `--retry-failed` (`sector_bars`) | No longer needed: a backfill resumes by default |
+| `--margin-source` | `--source` |
+
+`--eastmoney-bj-repair`, `--bj-amount-repair` and `--tdx-volume-repair` are deprecated and removed in 0.20.0: they only fix data written by 0.17 or earlier (use `cne repair bar-amounts` instead of `--bj-amount-repair`). The daily update never needs these repairs; rules at write time keep new data right:
+
+| Problem once handled by a repair flag | How it is handled now |
+|---|---|
+| Missing BJ current-period turnover | The daily update uses the BSE quote board as the current-period primary source; rows missing turnover at the exchange stage raise a warning before merge |
+| A batch of BJ securities missing on a session | The completeness rule before merge records the session in the gap ledger, and the next run refetches it |
+| Out-of-limit moves with no event | Quarantined; the committed value is kept and marked for refetch |
+| BJ adjustment steps Sina missed | Factors are computed from corporate actions, `pre_close` checks the steps, and Sina is only a cross-check |
 
 ```bash
 cne backfill minute_bars_5m --start 2026-05-01 --end 2026-07-31 \
   --symbols 600519.SH,000001.SZ
 
-# For existing BJ daily bars, fill only turnover in the current partition, without refetching Sina history
-cne backfill daily_bars --start 2026-08-21 --end 2026-08-21 \
-  --symbols 920000.BJ,920001.BJ --bse-tip-repair
+# Fill only current-partition turnover for existing BJ daily bars, without refetching Sina history (preview first, then --apply)
+cne repair bse-tip-turnover --date 2026-08-21 --symbols 920000.BJ,920001.BJ --apply
 ```
 
 ### Derivatives backfill
 
 | Option | Description |
 |------|------|
-| `--plan` | Read-only plan: sources, dates, cold-cache request estimate, rate limits and next steps; no network, no lake writes |
-| `--exchange` | Restrict publishers, repeatable; INE is routed under SHF, and 2018 futures additionally fetch the energy center's daily files |
-| `--refresh` | futures_bars / option_bars ignore receipts and old caches and refetch, still honoring circuit breakers |
-| `--symbols` | Explicit contract list for futures_minute_bars, such as CU2611.SHF; daily bars do not support per-contract file fetches |
+| `--plan` | Read-only plan: sources, dates, cold-cache request estimate, rate limits and follow-up steps; no network, no writes |
+| `--exchange` | Restrict to a publisher, repeatable; INE is routed via SHF, and 2018 futures also fetch the energy-center daily files |
+| `--refetch` | futures_bars / option_bars ignore receipts and the old cache and refetch; circuit breakers still apply |
+| `--symbols` | Explicit contract list for futures_minute_bars, e.g. CU2611.SHF; daily bars do not support per-contract files |
 
-Daily-bar backfill automatically updates the corresponding contract tables and derivations and outputs `followup`; minute bars only have a rolling window and reject date ranges. `--force` / `--retry-failed` raise errors for derivatives. Continuous futures are fully recomputed and reject `derive --start/--end`. For the full flow, source-side constraints and acceptance, see the [derivatives guide](../recipes/derivatives.md).
+A daily-bar backfill updates the matching contract table and derivations automatically and outputs `followup`; minute bars have only a rolling window and refuse date ranges. Continuous futures are recomputed in full and refuse `derive --start/--end`. SHFE annual packages are imported offline with [`cne import shfe-archive`](#cne-import-shfe-archive). The full workflow, source constraints and acceptance are in the [derivatives guide](../recipes/derivatives.md).
 
-For historical reference replay and request upper bounds of derivatives contract backfill, see the [derivatives research guide](../recipes/derivatives.md). For contract tables, `--start/--end` limit the reference file dates and do not trim the final contract universe.
+Historical reference replay and request bounds of derivatives contract backfills are in the [derivatives research guide](../recipes/derivatives.md). `--start/--end` of a contract table limit the reference file dates and do not trim the final contract set.
 
 ### sector_bars
 
-| Option | Description |
-|------|------|
-| `--retry-failed` | Skip sectors already completed in the checkpoint and retry only failures |
-| `--force` | Clear the checkpoint and refetch everything (mutually exclusive with `--retry-failed`) |
+It resumes from the checkpoint by default, skipping finished boards; `--refetch` clears the checkpoint and refetches everything. Checkpoint: `meta/state/sector_bars_backfill.json`. When more than 50% fail the step status is `warning`, but the successful part is still written.
 
-Checkpoint: `meta/state/sector_bars_backfill.json`. When more than 50% fail, the step status is `warning`, but the successful part is still written.
-
-**Network**: goes to THS `d.10jqka.com.cn` (daily updates and history share a source), rate-limited under `[sources.ths]`.
-It has nothing to do with EastMoney, and `[sources.eastmoney] proxy` does not apply to it.
+**Network**: goes through THS `d.10jqka.com.cn` (the same source for daily and history), rate-limited under `[sources.ths]`.
+It has nothing to do with EastMoney; `[sources.eastmoney] proxy` does not apply to it.
 
 ```bash
-# Full fetch, first time or after switching sources
-cne backfill sector_bars --config configs/cnequity.toml --force
-
-# Resume failed sectors
-cne backfill sector_bars --config configs/cnequity.toml --retry-failed
+cne backfill sector_bars              # resume
+cne backfill sector_bars --refetch    # full refetch, first time or after a source change
 ```
+
+## cne import shfe-archive
+
+```bash
+cne import shfe-archive ZIP --dataset futures_bars --year 2018 --accept-partial-fields           # preview
+cne import shfe-archive ZIP --dataset futures_bars --year 2018 --accept-partial-fields --apply   # import
+```
+
+Imports an official SHFE annual package offline: it checks the format, keeps the missing-field marks, skips daily-bar keys already present, and never overwrites complete daily-file data. `--accept-partial-fields` is required and accepts that the annual package lacks fields only the daily files have; `--url` / `--downloaded-at` attach the original source evidence; `--start` / `--end` stay within `--year`. The default backfill still uses complete daily files; see the [derivatives guide](../recipes/derivatives.md) for details.
 
 ## cne run compact
 
@@ -577,6 +587,13 @@ Before publishing, `--apply` compares offline quality checks between the committ
 | Subcommand | Description |
 |------|------|
 | `layout DATASET` | Merge files in a partitioned dataset's root directory or in wrongly keyed directories into the registered partitions. Multiple observations of the same primary key fill each other's blanks only when their non-null values agree exactly; for conflicting keys one whole row is kept by the canonical rule. All original observations of duplicate keys are written to `_quarantine`. When publishing a new version detects such a layout, it suggests running this command |
+| `payment-dates` | `corporate_actions` cash payment dates: reviewed issuer announcements first, then Baostock; `--issuer-notices-only` uses issuer announcements only and applies reviewed bonus/transfer terms. Needs `--symbols`/`--start`/`--end` |
+| `delisted-actions --source baostock\|ths` | Fill historical dividends and ex-rights of delisted securities: `baostock` for Shanghai/Shenzhen, `ths` for Beijing |
+| `ex-dates --ex-dates ...` | Request historical ex-rights rows from EastMoney day by day for the given ex-dates; the only way to reach rows before 2015-09-29 |
+| `bar-amounts` | Cross-check Sina-filled historical daily bars against TDX and fill turnover when OHLC match and volume differs by under one lot; prices and volumes untouched |
+| `bar-turnover [--peer-review]` | Replace Shanghai/Shenzhen stock daily bars whose turnover is missing, zero or misaligned with the whole same-day Baostock row; `--peer-review` reviews conflicts against exchange history, TDX and EastMoney |
+| `bse-tip-turnover --date D` | Fill Beijing turnover for the latest session from the BSE quote board, without refetching Sina |
+| `valuation-outage` | Fill the `--start`/`--end` window of an EastMoney snapshot outage from the datacenter valuation report; writes only when the whole market is retrieved |
 | `corporate-action-gaps` | Fill ex-rights events where both the Sina and Baostock factors have a step but the lake has no record, based on the evidence of the most recent `cne derive adj_factor_source`. A record dated within 10 days nearby is moved to the step date if its terms explain the step; for the rest, dividends are fetched from Baostock by security and year, matched by effective trading day, and only rows whose terms explain the step are accepted; for those Baostock cannot explain either, CNINFO is searched for the issuer's restructuring capital-conversion announcement, and the event is recorded as `reorg_transfer` only if the ex-rights reference price stated in the announcement explains the step. This command previews offline, and only `--apply` requests Baostock and CNINFO |
 | `orphan-symbols` | **Deprecated.** Delete rows in `adj_factors` and `corporate_actions` for securities that never appear in `daily_bars`: price data for OTC funds (519xxx) that slipped in early on as NAV series has been cleaned up, but their factors and dividends were left behind; listed funds whose prices are not collected are also among them. These rows have no prices to adjust and would only be reported as factor vs. corporate-action contradictions. Publishes one new version per dataset |
 | `stale-suspensions` | **Deprecated.** Delete inferred suspensions (`derived_bar_gap`) in `trading_status` that are contradicted by daily bars with actual trades: when a run missed fetching prices, the gap was once wrongly recorded as a suspension; once the prices are filled, a daily bar with trades on the same day proves the row wrong. Suspensions from independent sources are unaffected |

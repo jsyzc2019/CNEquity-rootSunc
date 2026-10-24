@@ -17,6 +17,7 @@ Checked against the Click command registry by `scripts/dev/sync_docs.py`. “Whe
 | `cne delisted status` | none | Reads delisting status |
 | `cne derive` | conditional | Writes derived data; modes such as adj_factors may access sources |
 | `cne doctor` | none | Checks config and environment offline |
+| `cne import shfe-archive` | none | Read-only preview by default; --apply verifies a local SHFE annual package and writes its partial-field daily rows without overwriting existing keys, keeping the package as evidence |
 | `cne init` | conditional | sample is offline; demo/quick/full fetch data; layout-only creates directories |
 | `cne mcp` | conditional | Reads the lake by default; --live may fetch source data; --http listens on a local port |
 | `cne migrate` | conditional | Read-only preview by default; --apply runs the owed migrations in order, publishes through the repair gate keeping the old version, and writes the results to meta/state/lake.json; fund-listing-dates reads the exchanges' fund lists, misdated-valuation reads the EastMoney datacenter when it has rows to replace |
@@ -24,8 +25,13 @@ Checked against the Click command registry by `scripts/dev/sync_docs.py`. “Whe
 | `cne profile show` | none | Shows a built-in scope |
 | `cne query` | conditional | SQL reads the lake; fetches data on an on-demand cache miss or refresh |
 | `cne repair adj-factors` | --refresh-sources only | Offline preview with a saved plan by default; --apply publishes supported corrections, retains old revisions and unresolved diagnostics, and saves bounded historical progress |
+| `cne repair bar-amounts` | only with --apply | Read-only preview by default; --apply requests TDX to cross-check Sina-filled daily bars and fills turnover only, never prices or volumes |
+| `cne repair bar-turnover` | only with --apply | Read-only preview by default; --apply requests Baostock (with --peer-review also exchange history, TDX and EastMoney) and replaces whole Shanghai/Shenzhen stock bars with bad turnover |
+| `cne repair bse-tip-turnover` | only with --apply | Read-only preview by default; --apply requests the BSE quote board and fills turnover for the latest session only |
 | `cne repair corporate-action-gaps` | with --apply | Offline preview by default; --apply queries Baostock and CNINFO per gap, publishes a new version after verification and keeps the old one |
 | `cne repair daily-bar-coverage` | none | Read-only preview by default; --apply retires BSE session debts and proven pre-listing debts using committed data and refreshes coverage watermarks, retaining evidence receipts without changing bars |
+| `cne repair delisted-actions` | only with --apply | Read-only preview by default; --apply fills delisted securities' historical dividends and ex-rights from Baostock (Shanghai/Shenzhen) or THS (Beijing) and writes the lake |
+| `cne repair ex-dates` | only with --apply | Read-only preview by default; --apply requests historical ex-rights rows from EastMoney day by day for the given ex-dates and writes the lake |
 | `cne repair financial-announcements` | none | Read-only preview by default; --apply appends financial reconstructions with LICO original-disclosure evidence, publishes through the repair gate and retains existing vintages |
 | `cne repair financial-originals` | --refresh-sources only | Replays original periodic reports offline by default; --apply appends identifiable current-period consolidated figures, publishes through the repair gate and retains existing vintages and honest observation times |
 | `cne repair fund-factors` | none | Read-only preview by default; --apply overlays recorded fund splits and transfers on the original vendor series, publishes through the repair gate and retains the old revision |
@@ -38,12 +44,14 @@ Checked against the Click command registry by `scripts/dev/sync_docs.py`. “Whe
 | `cne repair misdated-valuation` | with --apply | Offline preview by default; --apply fetches valuation for the replaced sessions from the EastMoney datacenter, publishes a new version after verification and keeps the old one |
 | `cne repair missing-values` | none | Read-only preview by default; --apply replaces valuation zero placeholders and unavailable EastMoney/CNI weights with nulls, publishes through the repair gate and retains the old revision |
 | `cne repair orphan-symbols` | none | Preview by default, may register an old-lake baseline version; --apply removes factor and corporate-action rows of securities without daily bars, publishes a new version and keeps the old one |
+| `cne repair payment-dates` | only with --apply | Read-only preview by default; --apply repairs cash payment dates from reviewed issuer announcements (CNINFO, BSE) and Baostock, published through the backfill gate |
 | `cne repair stale-suspensions` | none | Preview by default, may register an old-lake baseline version; --apply removes inferred suspensions contradicted by traded daily bars, publishes a new version and keeps the old one |
 | `cne repair status-listing-window` | none | Preview by default, may register an old-lake baseline version; --apply deletes status rows before a security's listing date or without a delisting on record, publishes a new version and keeps the old one |
 | `cne repair status-outages` | none | Preview by default, may register an old-lake baseline version; --apply rebuilds the EastMoney-outage carried rows in the window under the current rule, publishes a new version and keeps the old one |
 | `cne repair status-traded` | none | Read-only preview by default; --apply fills missing status keys from committed positive-volume bars, leaves ST unknown, publishes a new version and keeps the old one |
 | `cne repair stock-listing-dates` | --refresh-sources only | Replays IPO calendars offline by default; --apply fills stock listing dates confirmed by official listed events, publishes through the repair gate and retains old revisions |
 | `cne repair valuation-basis` | none | Preview only by default; --apply publishes a new version and keeps the old one |
+| `cne repair valuation-outage` | only with --apply | Read-only preview by default; --apply requests the EastMoney datacenter valuation report for the outage window and writes only when the whole market is retrieved |
 | `cne run clean` | none | Only previews expired files; an explicit --reconcile-runs may modify run state |
 | `cne run compact` | none | Publishes finished, unpublished staging data to the lake |
 | `cne run daily` | when run | Fetches incrementally and writes the lake; includes all schedule groups and event streams by default |

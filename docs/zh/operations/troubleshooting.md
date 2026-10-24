@@ -162,15 +162,15 @@ EOF
 - **现象**：日志 `THS sweep: BKxxxx (板块名) failed: ...`；`failed_sectors` 数量偏高。
 - **原因**：**这是同花顺的源,不是东财**——`[sources.eastmoney] proxy` 对它不生效。
   `d.10jqka.com.cn` 对密集请求会限速甚至封禁。
-- **处理**：冷却后提高 `[sources.ths] min_interval_seconds`（默认 1.0，不是安全阈值保证），再 `cne backfill sector_bars --retry-failed`；
-  全量换源后用 `--force`。Checkpoint：`meta/state/sector_bars_backfill.json`。
+- **处理**：冷却后提高 `[sources.ths] min_interval_seconds`（默认 1.0，不是安全阈值保证），再 `cne backfill sector_bars`；
+  默认从断点续跑；换源后全量重拉用 `--refetch`。Checkpoint：`meta/state/sector_bars_backfill.json`。
   失败率超过 50% 时 step 状态为 `warning`，已成功的板块仍会写入。
 
 ### 在另一台机器部署
 
 先按安装指南配置独立环境和个人配置，再通过 `sources probe --only <key>` 小范围确认可用性。HTTP 代理不一定能承载 Baostock/TDX 的 TCP 协议；不要根据地域猜测源是否可用。
 
-需要历史回填时直接使用 `cne backfill sector_bars --retry-failed` 或 `cne backfill trading_status --symbols <代码>`，保留原 checkpoint，不自动强制整湖重抓。数据转移使用经过审查的快照流程，不把带个人凭证、日志和数据的整个工作目录当安装包复制。
+需要历史回填时直接使用 `cne backfill sector_bars` 或 `cne backfill trading_status --symbols <代码>`，保留原 checkpoint，不自动强制整湖重抓。数据转移使用经过审查的快照流程，不把带个人凭证、日志和数据的整个工作目录当安装包复制。
 
 ## 症状：audit --full UNHEALTHY
 

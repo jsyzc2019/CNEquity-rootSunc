@@ -1087,7 +1087,7 @@ def adj_factor_reconciliation_findings(
         repair_hint = (
             " Explicit Baostock repair can cover "
             f"{baostock_repairable} delisted SH/SZ symbol(s); run "
-            "`cne backfill corporate_actions --baostock-repair --symbols ...` "
+            "`cne repair delisted-actions --source baostock --symbols ... --apply` "
             "for a scoped repair."
             if baostock_repairable
             else ""
@@ -2388,8 +2388,8 @@ def adj_factor_arbitration_findings(config: Config) -> list[dict]:
         remediation = (
             f" Missing actions span {len(reachable)} distinct ex-date(s) before the EastMoney backfill "
             f"floor {EASTMONEY_BACKFILL_FLOOR.isoformat()}, which the sweep cannot reach; ask "
-            "the report for them by exact date with `cne backfill corporate_actions "
-            f"--eastmoney-date-repair --ex-dates {shown}`{more}. It answers one date at a time "
+            "the report for them by exact date with `cne repair ex-dates "
+            f"--ex-dates {shown} --apply`{more}. It answers one date at a time "
             "and does not carry every older event, so a date it has nothing for stays open."
         )
     against_factors = silent_yes + baseless_no

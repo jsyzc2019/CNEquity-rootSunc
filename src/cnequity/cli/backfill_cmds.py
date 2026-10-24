@@ -32,6 +32,41 @@ from cnequity.domain.market_time import shanghai_today
 from cnequity.i18n import N_, _
 from cnequity.orchestrator.engine import JobEngine
 
+#: Options that left `cne backfill --help`, and what replaces them. They still work
+#: (scripts keep running) but say where they went when typed.
+_MOVED_OPTIONS = {
+    "shfe_annual_archive": "cne import shfe-archive",
+    "refresh": "--refetch",
+    "force": "--refetch",
+    "retry_failed": N_("nothing (a backfill resumes by default)"),
+    "margin_source": "--source",
+    "payment_date_repair": "cne repair payment-dates",
+    "issuer_notice_repair": "cne repair payment-dates --issuer-notices-only",
+    "baostock_repair": "cne repair delisted-actions --source baostock",
+    "ths_repair": "cne repair delisted-actions --source ths",
+    "eastmoney_date_repair": "cne repair ex-dates",
+    "bse_tip_repair": "cne repair bse-tip-turnover",
+    "tdx_amount_repair": "cne repair bar-amounts",
+    "turnover_repair": "cne repair bar-turnover",
+    "fill_em_outage": "cne repair valuation-outage",
+}
+
+
+def _warn_moved_options() -> None:
+    """Point a typed legacy option at its replacement; `repair`/`import` pass them silently."""
+    ctx = click.get_current_context(silent=True)
+    if ctx is None:
+        return
+    for name, replacement in _MOVED_OPTIONS.items():
+        if ctx.get_parameter_source(name) is click.core.ParameterSource.COMMANDLINE:
+            flag = "--" + name.replace("_", "-")
+            click.echo(
+                _("Warning: `cne backfill {flag}` has moved; use {replacement}.").format(
+                    flag=flag, replacement=_(replacement)
+                ),
+                err=True,
+            )
+
 
 @cli.command()
 @click.argument("dataset")
@@ -47,6 +82,7 @@ from cnequity.orchestrator.engine import JobEngine
 )
 @click.option(
     "--shfe-annual-archive",
+    hidden=True,
     type=click.Path(exists=True, dir_okay=False, path_type=Path),
     help=N_(
         "Futures/options daily bars only: import offline from a local SHFE annual ZIP in a verified format."
@@ -54,11 +90,13 @@ from cnequity.orchestrator.engine import JobEngine
 )
 @click.option(
     "--archive-year",
+    hidden=True,
     type=click.IntRange(2000, 2100),
     help=N_("Trading year covered by the annual ZIP."),
 )
 @click.option(
     "--accept-partial-fields",
+    hidden=True,
     is_flag=True,
     help=N_(
         "Explicitly accept that the annual package lacks fields found only in the daily files; existing complete daily bars are not overwritten."
@@ -66,12 +104,14 @@ from cnequity.orchestrator.engine import JobEngine
 )
 @click.option(
     "--archive-url",
+    hidden=True,
     help=N_(
         "Optional: the original HTTPS URL of this ZIP on the SHFE website; written to evidence only."
     ),
 )
 @click.option(
     "--archive-downloaded-at",
+    hidden=True,
     help=N_("Optional: known original download time, ISO 8601 with time zone."),
 )
 @click.option(
@@ -92,6 +132,7 @@ from cnequity.orchestrator.engine import JobEngine
 )
 @click.option(
     "--refresh",
+    hidden=True,
     is_flag=True,
     help=N_(
         "Derivatives daily bars only: ignore completion receipts and the response cache and re-check the given range; does not bypass circuit breakers."
@@ -99,13 +140,31 @@ from cnequity.orchestrator.engine import JobEngine
 )
 @click.option(
     "--retry-failed",
+    hidden=True,
     is_flag=True,
     help=N_("Resume the sector_bars backfill (skip sectors already written in the checkpoint)."),
 )
 @click.option(
     "--force",
+    hidden=True,
     is_flag=True,
     help=N_("Clear the sector_bars backfill checkpoint and refetch all sectors."),
+)
+@click.option(
+    "--source",
+    default=None,
+    help=N_(
+        "Source to use for this backfill instead of the configured one, without editing the config. "
+        "Supported for margin_trading (exchange or eastmoney)."
+    ),
+)
+@click.option(
+    "--refetch",
+    is_flag=True,
+    help=N_(
+        "Ignore completion receipts and checkpoints and fetch the range again (sector_bars, "
+        "futures_bars, option_bars); circuit breakers still apply. Without it a backfill resumes."
+    ),
 )
 @click.option(
     "--start",
@@ -156,6 +215,7 @@ from cnequity.orchestrator.engine import JobEngine
 )
 @click.option(
     "--margin-source",
+    hidden=True,
     type=click.Choice(["exchange", "eastmoney"]),
     default=None,
     help=N_(
@@ -164,6 +224,7 @@ from cnequity.orchestrator.engine import JobEngine
 )
 @click.option(
     "--payment-date-repair",
+    hidden=True,
     is_flag=True,
     help=(
         N_(
@@ -173,6 +234,7 @@ from cnequity.orchestrator.engine import JobEngine
 )
 @click.option(
     "--issuer-notice-repair",
+    hidden=True,
     is_flag=True,
     help=(
         N_(
@@ -182,6 +244,7 @@ from cnequity.orchestrator.engine import JobEngine
 )
 @click.option(
     "--baostock-repair",
+    hidden=True,
     is_flag=True,
     help=N_(
         "corporate_actions only: explicitly repair delisted Shanghai and Shenzhen symbols with Baostock."
@@ -189,6 +252,7 @@ from cnequity.orchestrator.engine import JobEngine
 )
 @click.option(
     "--ths-repair",
+    hidden=True,
     is_flag=True,
     help=N_(
         "corporate_actions only: explicitly repair delisted Beijing symbols with THS historical dividends and ex-rights."
@@ -196,6 +260,7 @@ from cnequity.orchestrator.engine import JobEngine
 )
 @click.option(
     "--eastmoney-bj-repair",
+    hidden=True,
     is_flag=True,
     help=N_(
         "Deprecated, removed in 0.20.0: corporate_actions only, for lakes that still store old BSE codes: fill their historical dividends and ex-rights via the current 920xxx EastMoney codes."
@@ -203,6 +268,7 @@ from cnequity.orchestrator.engine import JobEngine
 )
 @click.option(
     "--eastmoney-date-repair",
+    hidden=True,
     is_flag=True,
     help=(
         N_(
@@ -213,11 +279,13 @@ from cnequity.orchestrator.engine import JobEngine
 @click.option(
     "--ex-dates",
     "ex_dates_str",
+    hidden=True,
     default=None,
     help=N_("With --eastmoney-date-repair: comma-separated ex-dates, YYYY-MM-DD."),
 )
 @click.option(
     "--bse-tip-repair",
+    hidden=True,
     is_flag=True,
     help=(
         N_(
@@ -227,6 +295,7 @@ from cnequity.orchestrator.engine import JobEngine
 )
 @click.option(
     "--bj-amount-repair",
+    hidden=True,
     is_flag=True,
     help=(
         N_(
@@ -236,6 +305,7 @@ from cnequity.orchestrator.engine import JobEngine
 )
 @click.option(
     "--tdx-amount-repair",
+    hidden=True,
     is_flag=True,
     help=(
         N_(
@@ -245,6 +315,7 @@ from cnequity.orchestrator.engine import JobEngine
 )
 @click.option(
     "--tdx-volume-repair",
+    hidden=True,
     is_flag=True,
     help=(
         N_(
@@ -254,6 +325,7 @@ from cnequity.orchestrator.engine import JobEngine
 )
 @click.option(
     "--turnover-repair",
+    hidden=True,
     is_flag=True,
     help=(
         N_(
@@ -263,6 +335,7 @@ from cnequity.orchestrator.engine import JobEngine
 )
 @click.option(
     "--turnover-peer-review",
+    hidden=True,
     is_flag=True,
     help=N_(
         "With --turnover-repair: review price conflicts using historical exchange prices, TDX and EastMoney; replace whole bars only with agreeing evidence, never splice exchange-wide turnover."
@@ -270,6 +343,7 @@ from cnequity.orchestrator.engine import JobEngine
 )
 @click.option(
     "--fill-em-outage",
+    hidden=True,
     is_flag=True,
     help=(
         N_(
@@ -311,6 +385,8 @@ def backfill(
     turnover_repair: bool,
     turnover_peer_review: bool,
     fill_em_outage: bool,
+    source: str | None = None,
+    refetch: bool = False,
 ):
     """Backfill a dataset.
 
@@ -321,6 +397,24 @@ def backfill(
 
     """
     dataset = _require_known_dataset(dataset)
+    _warn_moved_options()
+    if source is not None:
+        if dataset != "margin_trading":
+            raise click.ClickException(_("--source is only supported for margin_trading for now"))
+        if source not in {"exchange", "eastmoney"}:
+            raise click.BadParameter(
+                _("margin_trading sources are exchange and eastmoney"), param_hint="--source"
+            )
+        margin_source = source
+    if refetch:
+        if dataset == "sector_bars":
+            force = True
+        elif dataset in {"futures_bars", "option_bars"}:
+            refresh = True
+        else:
+            raise click.ClickException(
+                _("--refetch applies to sector_bars, futures_bars and option_bars")
+            )
     if turnover_peer_review and not turnover_repair:
         raise click.ClickException(_("--turnover-peer-review needs --turnover-repair"))
     if profile == "delisted":
@@ -2081,3 +2175,278 @@ def _backfill_chunked(cfg, dataset: str, start: date, end: date, chunk_days: int
         else "unchanged",
         "resume_from": slices[-1]["start"] if status == "failed" and slices else None,
     }
+
+
+# --- Repairs and imports that run on the backfill machinery -------------------
+#
+# Each of these used to be a mode flag on `cne backfill`, valid for one dataset,
+# which made its help a list of exceptions. They keep the same machinery — the
+# window, scope, lineage follow-up and `--plan` output — but follow the repair
+# convention: a preview by default, `--apply` to run.
+
+
+def _repair_group():
+    from cnequity.cli.repair_cmds import repair
+
+    return repair
+
+
+def _run_on_backfill(dataset: str, config_path: str, apply: bool, **flags) -> None:
+    ctx = click.get_current_context()
+    ctx.invoke(backfill, dataset=dataset, config_path=config_path, plan=not apply, **flags)
+    if not apply:
+        click.echo(_("Preview only; add --apply to run it."), err=True)
+
+
+_apply_option = click.option(
+    "--apply", is_flag=True, help=N_("Run it; without this only the plan is printed.")
+)
+_window_options = (
+    click.option("--start", "start_str", required=True, help=N_("Window start (YYYY-MM-DD).")),
+    click.option("--end", "end_str", required=True, help=N_("Window end (YYYY-MM-DD).")),
+)
+
+
+def _with(*decorators):
+    def wrap(func):
+        for decorator in reversed(decorators):
+            func = decorator(func)
+        return func
+
+    return wrap
+
+
+@_repair_group().command("payment-dates")
+@config_option
+@comma_option("--symbols", "symbols_str", required=True, help=N_("Comma-separated symbols."))
+@_with(*_window_options)
+@click.option(
+    "--issuer-notices-only",
+    is_flag=True,
+    help=N_(
+        "Use issuer implementation announcements only (reviewed list, CNINFO, BSE); unmatched "
+        "events stay gaps and Baostock is not queried."
+    ),
+)
+@_apply_option
+def repair_payment_dates(config_path, symbols_str, start_str, end_str, issuer_notices_only, apply):
+    """Repair corporate_actions payment dates: reviewed issuer announcements first, then Baostock.
+
+    A payment date earlier than the ex-date is treated as unknown. With --issuer-notices-only,
+    reviewed bonus/transfer share terms are repaired too and Baostock is not queried.
+    """
+    _run_on_backfill(
+        "corporate_actions",
+        config_path,
+        apply,
+        symbols_str=symbols_str,
+        start_str=start_str,
+        end_str=end_str,
+        payment_date_repair=not issuer_notices_only,
+        issuer_notice_repair=issuer_notices_only,
+    )
+
+
+@_repair_group().command("delisted-actions")
+@config_option
+@click.option(
+    "--source",
+    type=click.Choice(["baostock", "ths"]),
+    required=True,
+    help=N_("baostock for delisted Shanghai/Shenzhen symbols; ths for delisted Beijing symbols."),
+)
+@comma_option("--symbols", "symbols_str", help=N_("Comma-separated symbols."))
+@click.option("--start", "start_str", default=None, help=N_("Window start (YYYY-MM-DD)."))
+@click.option("--end", "end_str", default=None, help=N_("Window end (YYYY-MM-DD)."))
+@_apply_option
+def repair_delisted_actions(config_path, source, symbols_str, start_str, end_str, apply):
+    """Fill historical dividends and ex-rights of delisted symbols from Baostock or THS."""
+    _run_on_backfill(
+        "corporate_actions",
+        config_path,
+        apply,
+        symbols_str=symbols_str,
+        start_str=start_str,
+        end_str=end_str,
+        baostock_repair=source == "baostock",
+        ths_repair=source == "ths",
+    )
+
+
+@_repair_group().command("ex-dates")
+@config_option
+@click.option(
+    "--ex-dates", "ex_dates_str", required=True, help=N_("Comma-separated ex-dates, YYYY-MM-DD.")
+)
+@comma_option("--symbols", "symbols_str", help=N_("Comma-separated symbols."))
+@_apply_option
+def repair_ex_dates(config_path, ex_dates_str, symbols_str, apply):
+    """Request historical ex-rights rows from EastMoney for the given ex-dates, day by day.
+
+    The backfill path's primary source is TDX; only EastMoney's per-day filter reaches rows
+    before 2015-09-29.
+    """
+    _run_on_backfill(
+        "corporate_actions",
+        config_path,
+        apply,
+        symbols_str=symbols_str,
+        eastmoney_date_repair=True,
+        ex_dates_str=ex_dates_str,
+    )
+
+
+@_repair_group().command("bar-amounts")
+@config_option
+@_with(*_window_options)
+@comma_option("--symbols", "symbols_str", help=N_("Comma-separated symbols."))
+@_apply_option
+def repair_bar_amounts(config_path, start_str, end_str, symbols_str, apply):
+    """Fill daily_bars turnover of Sina-filled rows from TDX, after checking OHLC and volume.
+
+    Turnover is filled only when open/high/low/close match and volume differs by under one lot;
+    codes TDX lacks keep their Sina rows. Stored prices and volumes are never touched.
+    """
+    _run_on_backfill(
+        "daily_bars",
+        config_path,
+        apply,
+        start_str=start_str,
+        end_str=end_str,
+        symbols_str=symbols_str,
+        tdx_amount_repair=True,
+    )
+
+
+@_repair_group().command("bar-turnover")
+@config_option
+@_with(*_window_options)
+@comma_option("--symbols", "symbols_str", help=N_("Comma-separated symbols."))
+@click.option(
+    "--peer-review",
+    is_flag=True,
+    help=N_(
+        "Review price conflicts against historical exchange prices, TDX and EastMoney; replace "
+        "whole bars only with agreeing evidence."
+    ),
+)
+@_apply_option
+def repair_bar_turnover(config_path, start_str, end_str, symbols_str, peer_review, apply):
+    """Replace Shanghai/Shenzhen daily_bars rows whose turnover is missing, zero or misaligned.
+
+    The whole same-day Baostock row replaces it when OHLC agree within half a cent; otherwise,
+    or when Baostock has no row, the original values stay.
+    """
+    _run_on_backfill(
+        "daily_bars",
+        config_path,
+        apply,
+        start_str=start_str,
+        end_str=end_str,
+        symbols_str=symbols_str,
+        turnover_repair=True,
+        turnover_peer_review=peer_review,
+    )
+
+
+@_repair_group().command("bse-tip-turnover")
+@config_option
+@comma_option("--symbols", "symbols_str", required=True, help=N_("Comma-separated symbols."))
+@click.option("--date", "day", required=True, help=N_("The session (YYYY-MM-DD)."))
+@_apply_option
+def repair_bse_tip_turnover(config_path, symbols_str, day, apply):
+    """Fill Beijing daily_bars turnover for the latest session from the BSE quote board.
+
+    For when the board was unavailable during the daily update. The board is a current
+    snapshot, so only the latest session qualifies; Sina is not refetched.
+    """
+    _run_on_backfill(
+        "daily_bars",
+        config_path,
+        apply,
+        symbols_str=symbols_str,
+        start_str=day,
+        end_str=day,
+        bse_tip_repair=True,
+    )
+
+
+@_repair_group().command("valuation-outage")
+@config_option
+@_with(*_window_options)
+@_apply_option
+def repair_valuation_outage(config_path, start_str, end_str, apply):
+    """Fill valuation_metrics for an EastMoney snapshot outage from the datacenter report.
+
+    Covers the window after EastMoney's last complete day and before today; writes only when the
+    whole market is retrieved.
+    """
+    _run_on_backfill(
+        "valuation_metrics",
+        config_path,
+        apply,
+        start_str=start_str,
+        end_str=end_str,
+        fill_em_outage=True,
+    )
+
+
+@cli.group("import")
+def import_group():
+    """Import data from local files into the lake (offline)."""
+
+
+@import_group.command("shfe-archive")
+@click.argument("archive", type=click.Path(exists=True, dir_okay=False, path_type=Path))
+@config_option
+@click.option(
+    "--dataset",
+    type=click.Choice(["futures_bars", "option_bars"]),
+    required=True,
+    help=N_("Which daily bars the annual package holds."),
+)
+@click.option(
+    "--year", type=click.IntRange(2000, 2100), required=True, help=N_("Trading year it covers.")
+)
+@click.option(
+    "--accept-partial-fields",
+    is_flag=True,
+    help=N_(
+        "Accept that the annual package lacks fields only the daily files have; existing complete "
+        "daily bars are not overwritten. Required."
+    ),
+)
+@click.option("--url", default=None, help=N_("Optional: its original HTTPS URL on the SHFE site."))
+@click.option(
+    "--downloaded-at",
+    default=None,
+    help=N_("Optional: when it was downloaded, ISO 8601 with zone."),
+)
+@click.option("--start", "start_str", default=None, help=N_("Within --year: first day to import."))
+@click.option("--end", "end_str", default=None, help=N_("Within --year: last day to import."))
+@_apply_option
+def import_shfe_archive(
+    archive,
+    config_path,
+    dataset,
+    year,
+    accept_partial_fields,
+    url,
+    downloaded_at,
+    start_str,
+    end_str,
+    apply,
+):
+    """Import a Shanghai Futures Exchange annual ZIP of daily bars, offline and verified."""
+    _run_on_backfill(
+        dataset,
+        config_path,
+        apply,
+        shfe_annual_archive=archive,
+        archive_year=year,
+        accept_partial_fields=accept_partial_fields,
+        archive_url=url,
+        archive_downloaded_at=downloaded_at,
+        start_str=start_str,
+        end_str=end_str,
+    )

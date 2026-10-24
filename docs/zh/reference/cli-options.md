@@ -31,6 +31,8 @@
 | `--refresh` | `False` | 仅衍生品日线：忽略完成收据与响应缓存，重新核对指定区间；不绕过熔断。 |
 | `--retry-failed` | `False` | 续跑 sector_bars 回填（跳过 checkpoint 里已写过的板块）。 |
 | `--force` | `False` | 清掉 sector_bars 回填 checkpoint，重抓全部板块。 |
+| `--source` | `—` | 本次回填改用的来源，不修改配置。支持 margin_trading（exchange 或 eastmoney）。 |
+| `--refetch` | `False` | 忽略完成收据和 checkpoint，重新获取整个范围（sector_bars、futures_bars、option_bars）；熔断仍然生效。不加时回填从断点续跑。 |
 | `--start` | `—` | 回填区间起点（YYYY-MM-DD），包括 daily_bars、minute_bars、衍生品日线、日期/报告期推进及 sector_bars。sector_bars 默认往前 400 天；超过来源历史深度的范围保留为缺口，可取范围照常交付并提供补数指引。 |
 | `--end` | `—` | 回填区间终点（YYYY-MM-DD，默认今天），与 --start 配合限定历史窗口。 |
 | `--outstanding` | `False` | 只修复被容忍缺口欠下的那些 key，范围和窗口都取自欠账台账，不看 --symbols/--start/--end。补上的 key 会销账，仍然缺的继续欠着。 |
@@ -156,6 +158,21 @@
 | `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 | `--json` | `False` | 输出机器可读的 JSON。 |
 
+## `cne import shfe-archive`
+
+| 参数 | 默认值 | 说明 |
+|---|---|---|
+| `archive` | `—` | 必填；位置参数 |
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
+| `--dataset` | `—` | 必填；年度包包含哪类日线。 |
+| `--year` | `—` | 必填；它覆盖的交易年份。 |
+| `--accept-partial-fields` | `False` | 接受年度包缺少只有日文件才有的字段；已有的完整日线不会被覆盖。必填。 |
+| `--url` | `—` | 可选：它在上期所网站的原始 HTTPS 地址。 |
+| `--downloaded-at` | `—` | 可选：下载时间，带时区的 ISO 8601。 |
+| `--start` | `—` | 在 --year 之内：导入的第一天。 |
+| `--end` | `—` | 在 --year 之内：导入的最后一天。 |
+| `--apply` | `False` | 运行；不加只打印计划。 |
+
 ## `cne init`
 
 | 参数 | 默认值 | 说明 |
@@ -237,6 +254,36 @@
 | `--max-symbols` | `100` | 每批最多检查的证券数；应用后保存历史进度。 |
 | `--plan` | `—` | 应用指定预览的计划标识；输入变化时要求重新预览。 |
 
+## `cne repair bar-amounts`
+
+| 参数 | 默认值 | 说明 |
+|---|---|---|
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
+| `--start` | `—` | 必填；窗口起点（YYYY-MM-DD）。 |
+| `--end` | `—` | 必填；窗口终点（YYYY-MM-DD）。 |
+| `--symbols` | `—` | 逗号分隔的证券代码。 |
+| `--apply` | `False` | 运行；不加只打印计划。 |
+
+## `cne repair bar-turnover`
+
+| 参数 | 默认值 | 说明 |
+|---|---|---|
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
+| `--start` | `—` | 必填；窗口起点（YYYY-MM-DD）。 |
+| `--end` | `—` | 必填；窗口终点（YYYY-MM-DD）。 |
+| `--symbols` | `—` | 逗号分隔的证券代码。 |
+| `--peer-review` | `False` | 用交易所历史价格、通达信和东财复查价格冲突；只有证据一致时才整行替换。 |
+| `--apply` | `False` | 运行；不加只打印计划。 |
+
+## `cne repair bse-tip-turnover`
+
+| 参数 | 默认值 | 说明 |
+|---|---|---|
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
+| `--symbols` | `—` | 必填；逗号分隔的证券代码。 |
+| `--date` | `—` | 必填；交易日（YYYY-MM-DD）。 |
+| `--apply` | `False` | 运行；不加只打印计划。 |
+
 ## `cne repair corporate-action-gaps`
 
 | 参数 | 默认值 | 说明 |
@@ -250,6 +297,26 @@
 |---|---|---|
 | `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 | `--apply` | `False` | 按已提交数据结清北交所整日欠账和已证明的上市前欠账；默认只预览。 |
+
+## `cne repair delisted-actions`
+
+| 参数 | 默认值 | 说明 |
+|---|---|---|
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
+| `--source` | `—` | 必填；baostock 用于已退市的沪深证券；ths 用于已退市的北交所证券。 |
+| `--symbols` | `—` | 逗号分隔的证券代码。 |
+| `--start` | `—` | 窗口起点（YYYY-MM-DD）。 |
+| `--end` | `—` | 窗口终点（YYYY-MM-DD）。 |
+| `--apply` | `False` | 运行；不加只打印计划。 |
+
+## `cne repair ex-dates`
+
+| 参数 | 默认值 | 说明 |
+|---|---|---|
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
+| `--ex-dates` | `—` | 必填；逗号分隔的除权日，YYYY-MM-DD。 |
+| `--symbols` | `—` | 逗号分隔的证券代码。 |
+| `--apply` | `False` | 运行；不加只打印计划。 |
 
 ## `cne repair financial-announcements`
 
@@ -354,6 +421,17 @@
 | `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 | `--apply` | `False` | 核验后发布新版本；默认只输出计划。 |
 
+## `cne repair payment-dates`
+
+| 参数 | 默认值 | 说明 |
+|---|---|---|
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
+| `--symbols` | `—` | 必填；逗号分隔的证券代码。 |
+| `--start` | `—` | 必填；窗口起点（YYYY-MM-DD）。 |
+| `--end` | `—` | 必填；窗口终点（YYYY-MM-DD）。 |
+| `--issuer-notices-only` | `False` | 只用发行人实施公告（已审清单、巨潮、北交所）；匹配不到的事件保留为缺口，不请求 Baostock。 |
+| `--apply` | `False` | 运行；不加只打印计划。 |
+
 ## `cne repair stale-suspensions`
 
 | 参数 | 默认值 | 说明 |
@@ -402,6 +480,15 @@
 |---|---|---|
 | `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 | `--apply` | `False` | 写入并发布新版本；默认只输出计划。 |
+
+## `cne repair valuation-outage`
+
+| 参数 | 默认值 | 说明 |
+|---|---|---|
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
+| `--start` | `—` | 必填；窗口起点（YYYY-MM-DD）。 |
+| `--end` | `—` | 必填；窗口终点（YYYY-MM-DD）。 |
+| `--apply` | `False` | 运行；不加只打印计划。 |
 
 ## `cne run clean`
 

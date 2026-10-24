@@ -302,7 +302,7 @@ EM 响应若已包含尚未生效的调样行，会拒绝整份快照：删除�
 | flash_news_wire | publish_date | wire_id, wire_source | 兼容读取 | ✓ | eastmoney | 由 `news_headlines` 事实表投影，兼容旧 revision 的实体文件；不再重复写入 |
 | economic_calendar | event_date（按年） | event_id | snapshot | ✓ | —（源已下线） | EM `RPT_ECONOMICCALENDAR` 已退役（code 9501），保留 schema 等替代源；`required=false`，空表不判 UNHEALTHY |
 
-`sector_bars` 使用同花顺板块行情；历史通过 `cne backfill sector_bars` 分窗口补入。先用 `--plan` 检查范围，失败后用 `--retry-failed` 续跑，避免无故 `--force` 重抓。网络可达性以当前出口的小范围探测为准。
+`sector_bars` 使用同花顺板块行情；历史通过 `cne backfill sector_bars` 分窗口补入。先用 `--plan` 检查范围；失败后重跑同一命令即从断点续跑，避免无故 `--refetch` 全量重抓。网络可达性以当前出口的小范围探测为准。
 
 ## L8 风险合规
 

@@ -31,6 +31,7 @@
 | [`cne storage`](#cne-storage) | 版本保留登记、清理计划与原地待删除标记 |
 | [`cne backfill`](#cne-backfill-dataset) | 回填一个数据集 |
 | [`cne derive`](#cne-derive-name) | 派生计算数据集 |
+| [`cne import shfe-archive`](#cne-import-shfe-archive) | 离线导入上期所官方年度包 |
 | [`cne migrate`](#cne-migrate) | 预览或运行这个湖还欠的一次性迁移，并记录结果 |
 | [`cne repair`](#cne-repair) | 离线修复已存数据的布局或字段口径；默认只预览，`--apply` 发布新版本 |
 
@@ -421,23 +422,32 @@ diff 会把删列、改类型、改主键、单位/PIT/历史语义变化识别�
 | 选项 | 说明 |
 |------|------|
 | `--start` / `--end` | 请求窗口；超出来源历史边界的部分报告覆盖不足，可用范围仍会获取 |
-| `--profile delisted` | 仅 `daily_bars`：以已确认退市名录为 universe，`--start` 对应旧命令的 `--since`；`--plan` 离线。不能与普通修复或范围选项混用 |
-| `--shfe-annual-archive ZIP --archive-year YYYY --accept-partial-fields` | 仅 `futures_bars` / `option_bars`：显式离线导入上期所年度包，保留缺失字段标记，跳过已有日线主键；`--archive-url` / `--archive-downloaded-at` 可附原始来源证据。默认回填仍用完整日文件，细节见[衍生品指南](../recipes/derivatives.md#官方年度包已验证格式与使用限制) |
 | `--symbols` | 日内、`daily_bars`、`trading_status`、`corporate_actions`、`share_structure` 的临时标的范围（`share_structure` 按证券一次取回全部股本变动，用于审计提示的股本滞后）；其他数据集仍使用配置中的范围 |
-| `--baostock-repair` | 仅 `corporate_actions`：显式补抓已退市 SH/SZ 标的的 Baostock 分红除权数据；建议与 `--symbols` 配合 |
-| `--ths-repair` | 仅 `corporate_actions`：显式补抓已退市 BJ 标的的同花顺历史分红除权数据；建议与 `--symbols` 配合 |
-| `--eastmoney-bj-repair` | **已弃用。** 仅 `corporate_actions`，只用于仍以北交所旧码存储的湖：按北交所旧码→920 新码映射向 EastMoney 定向补抓历史分红除权数据；建议与 `--symbols` 配合 |
-| `--issuer-notice-repair` | 仅 `corporate_actions`：只用发行人实施公告（已审清单、巨潮、北交所）补现金到账日并应用已审送转条款；早于除权日的已存到账日当作未知，找不到就清空。不请求 Baostock。需要 `--symbols`/`--start`/`--end` |
-| `--payment-date-repair` | 同上，发行人公告之后再用 Baostock `dividPayDate` 匹配余下事件；两者不能同时使用 |
 | `--outstanding` | 精确修复被容忍缺口记下的欠账键：作用域与窗口取自 ledger，而不是 `--symbols`/`--start`/`--end`。补上的键即刻销账，仍缺的继续欠着 |
-| `--bj-amount-repair` | **已弃用**，请改用 `--tdx-amount-repair`：从 TDX 补 Sina 从未发布的 BJ 成交额，已存的价格与成交量一律不动。需要 `--start`/`--end` |
-| `--tdx-amount-repair` | 仅 `daily_bars`：新浪补上的沪深北历史行与通达信一起核对，只在开高低收一致且成交量差小于一手时补成交额；通达信没有的代码保留新浪行。需要 `--start`/`--end` |
-| `--turnover-repair` | 仅 `daily_bars`：成交额缺失、为 0 或量额单位错位的沪深股票行，用 Baostock 同日行整行替换；开高低收须在半分钱内一致，不一致或未提供的保留原值并计数。需要 `--start`/`--end` |
-| `--turnover-peer-review` | 与 `--turnover-repair` 同用，先用上交所历史日 K 或深交所实际日期报表核对 Baostock 价格，再用通达信和东财复查其余冲突。整行替换须有一致价格和可用量额；交易所汇总成交量、成交额不能拼接进竞价日线，仍有冲突或来源不可用的保留并计数。 |
-| `--tdx-volume-repair` | **已弃用。** 仅 `daily_bars`：重读 TDX，只改写已存 TDX 行的成交量（及 64.5 元以下被放大的成交额），修 2026-09-17 前的解码错误；价格须一致，不新增行，不经内部缺口门禁。需要 `--symbols` 和 `--start`/`--end` |
-| `--bse-tip-repair` | 仅 `daily_bars`：读取已有当期 session 的 OHLCV，仅向 BSE 请求成交额并严格核对；必须同时指定相同的 `--start/--end` 与 `--symbols` |
+| `--refetch` | 忽略完成收据和 checkpoint，重取整个范围（`sector_bars`、`futures_bars`、`option_bars`），仍遵守熔断。不加时回填从断点续跑 |
+| `--source` | 本次改用的来源，不改配置；目前用于 `margin_trading`（`exchange` / `eastmoney`） |
+| `--workers` | 仅 `margin_trading`：按日期推进的并发数，每个请求仍走共享限速 |
+| `--exchange` | 衍生品：限定发布者，可重复 |
+| `--profile delisted` | 仅 `daily_bars`：以已确认退市名录为 universe，`--start` 对应旧命令的 `--since`；`--plan` 离线 |
+| `--plan` | 只读计划，不联网、不写湖 |
 
-`--eastmoney-bj-repair`、`--bj-amount-repair` 和 `--tdx-volume-repair` 已弃用，将在 0.20.0 移除：它们只修 0.17 及更早版本写入的数据（`--bj-amount-repair` 请改用 `--tdx-amount-repair`），使用时在 stderr 打印弃用警告。`--ths-repair` 补已退市北交所标的的公司行为，`--bse-tip-repair` 在日更时行情板不可用后补最近一个交易日的成交额，两者仍然保留。日更不会用到这些开关，新数据由写入时的规则保证：
+**数据集专属的修复和导入已移出 `backfill`。** 它们用同一套回填机制（窗口、范围、下游派生跟进、计划输出），但遵循修复命令的约定：默认只预览，`--apply` 才运行。旧开关仍可用，输入时在 stderr 提示新命令：
+
+| 旧写法 | 新命令 |
+|---|---|
+| `backfill corporate_actions --payment-date-repair` / `--issuer-notice-repair` | [`cne repair payment-dates`](#cne-repair)（`--issuer-notices-only`） |
+| `backfill corporate_actions --baostock-repair` / `--ths-repair` | `cne repair delisted-actions --source baostock\|ths` |
+| `backfill corporate_actions --eastmoney-date-repair --ex-dates ...` | `cne repair ex-dates --ex-dates ...` |
+| `backfill daily_bars --tdx-amount-repair` | `cne repair bar-amounts` |
+| `backfill daily_bars --turnover-repair [--turnover-peer-review]` | `cne repair bar-turnover [--peer-review]` |
+| `backfill daily_bars --bse-tip-repair --start D --end D` | `cne repair bse-tip-turnover --date D` |
+| `backfill valuation_metrics --fill-em-outage` | `cne repair valuation-outage` |
+| `backfill futures_bars --shfe-annual-archive ZIP --archive-year Y ...` | [`cne import shfe-archive ZIP --dataset futures_bars --year Y ...`](#cne-import-shfe-archive) |
+| `--refresh`（衍生品）/ `--force`（`sector_bars`） | `--refetch` |
+| `--retry-failed`（`sector_bars`） | 不再需要：回填默认续跑 |
+| `--margin-source` | `--source` |
+
+`--eastmoney-bj-repair`、`--bj-amount-repair` 和 `--tdx-volume-repair` 已弃用，将在 0.20.0 移除：它们只修 0.17 及更早版本写入的数据（`--bj-amount-repair` 请改用 `cne repair bar-amounts`）。日更不会用到这些修复，新数据由写入时的规则保证：
 
 | 以前靠修复开关处理的问题 | 现在的处理 |
 |---|---|
@@ -450,9 +460,8 @@ diff 会把删列、改类型、改主键、单位/PIT/历史语义变化识别�
 cne backfill minute_bars_5m --start 2026-05-01 --end 2026-07-31 \
   --symbols 600519.SH,000001.SZ
 
-# 已有 BJ 日线只补当前分区成交额，不重抓 Sina 历史
-cne backfill daily_bars --start 2026-08-21 --end 2026-08-21 \
-  --symbols 920000.BJ,920001.BJ --bse-tip-repair
+# 已有 BJ 日线只补当前分区成交额，不重抓 Sina 历史（先预览，再 --apply）
+cne repair bse-tip-turnover --date 2026-08-21 --symbols 920000.BJ,920001.BJ --apply
 ```
 
 ### 衍生品回填
@@ -461,32 +470,33 @@ cne backfill daily_bars --start 2026-08-21 --end 2026-08-21 \
 |------|------|
 | `--plan` | 只读计划：来源、日期、冷缓存请求估算、限速与后续步骤；不联网、不写湖 |
 | `--exchange` | 限定发布者，可重复；INE 归入 SHF 路由，2018 年期货另取能源中心日文件 |
-| `--refresh` | futures_bars / option_bars 忽略收据与旧缓存重取，仍遵守熔断 |
+| `--refetch` | futures_bars / option_bars 忽略收据与旧缓存重取，仍遵守熔断 |
 | `--symbols` | futures_minute_bars 的显式合约列表，如 CU2611.SHF；日线不支持逐合约取文件 |
 
-日线回填自动更新对应合约表及派生，输出 `followup`；分钟线只有滚动窗口，拒绝日期范围。`--force` / `--retry-failed` 在衍生品上报错。连续期货全量重算，拒绝 `derive --start/--end`。完整流程、源端约束和验收见 [衍生品指南](../recipes/derivatives.md)。
+日线回填自动更新对应合约表及派生，输出 `followup`；分钟线只有滚动窗口，拒绝日期范围。连续期货全量重算，拒绝 `derive --start/--end`。上期所年度包用 [`cne import shfe-archive`](#cne-import-shfe-archive) 离线导入。完整流程、源端约束和验收见 [衍生品指南](../recipes/derivatives.md)。
 
 衍生品合约回填的历史参考重放及请求上界见[衍生品研究指南](../recipes/derivatives.md)。合约表的 `--start/--end` 限制参考文件日期，不裁剪最终合约全集。
 
 ### sector_bars
 
-| 选项 | 说明 |
-|------|------|
-| `--retry-failed` | 跳过 checkpoint 中已完成的板块，只重试失败项 |
-| `--force` | 清空 checkpoint 后全量重拉（与 `--retry-failed` 互斥） |
-
-Checkpoint：`meta/state/sector_bars_backfill.json`。失败超过 50% 时 step 状态为 `warning` 但仍写入已成功部分。
+默认从 checkpoint 续跑，跳过已完成的板块；`--refetch` 清空 checkpoint 后全量重拉。Checkpoint：`meta/state/sector_bars_backfill.json`。失败超过 50% 时 step 状态为 `warning` 但仍写入已成功部分。
 
 **网络**：走同花顺 `d.10jqka.com.cn`（日更与历史同源），限速在 `[sources.ths]`。
 与东财无关，`[sources.eastmoney] proxy` 对它不生效。
 
 ```bash
-# 首次或换源后全量
-cne backfill sector_bars --config configs/cnequity.toml --force
-
-# 续跑失败板
-cne backfill sector_bars --config configs/cnequity.toml --retry-failed
+cne backfill sector_bars              # 续跑
+cne backfill sector_bars --refetch    # 首次或换源后全量
 ```
+
+## cne import shfe-archive
+
+```bash
+cne import shfe-archive ZIP --dataset futures_bars --year 2018 --accept-partial-fields           # 预览
+cne import shfe-archive ZIP --dataset futures_bars --year 2018 --accept-partial-fields --apply   # 导入
+```
+
+离线导入上期所官方年度包：校验格式，保留缺失字段标记，跳过已有日线主键，不覆盖完整的日文件数据。`--accept-partial-fields` 必填，表示接受年度包缺少只有日文件才有的字段；`--url` / `--downloaded-at` 附上原始来源证据；`--start` / `--end` 限定在 `--year` 内。默认回填仍用完整日文件，细节见[衍生品指南](../recipes/derivatives.md#官方年度包已验证格式与使用限制)。
 
 ## cne run compact
 
@@ -574,6 +584,13 @@ cne migrate --apply     # 按顺序运行并记录结果
 | 子命令 | 说明 |
 |------|------|
 | `layout DATASET` | 把分区数据集根目录或错误键目录中的文件并入登记分区。同一主键的多份观察只在非空值完全一致时互补填空；有冲突的键按规范规则整行保留一份。重复键的全部原始观察写入 `_quarantine`。发布新版本时若检测到这类布局，会提示运行此命令 |
+| `payment-dates` | `corporate_actions` 现金到账日：先用已审发行人公告，再用 Baostock 匹配；`--issuer-notices-only` 只用发行人公告并应用已审送转条款。需要 `--symbols`/`--start`/`--end` |
+| `delisted-actions --source baostock\|ths` | 补已退市证券的历史分红除权：`baostock` 用于沪深，`ths` 用于北交所 |
+| `ex-dates --ex-dates ...` | 按给定除权日逐日向东财请求历史除权行；只有它能取到 2015-09-29 之前的行 |
+| `bar-amounts` | 新浪补上的沪深北历史日线与通达信核对，开高低收一致且成交量差小于一手时补成交额；价格与成交量不动 |
+| `bar-turnover [--peer-review]` | 成交额缺失、为 0 或量额单位错位的沪深股票日线，用 Baostock 同日行整行替换；`--peer-review` 再用交易所历史价、通达信和东财复查冲突 |
+| `bse-tip-turnover --date D` | 用北交所行情板补最近一个交易日的北交所成交额，不重抓新浪 |
+| `valuation-outage` | 东财快照中断时，用东财数据中心估值报表补 `--start`/`--end` 窗口；只在取到全市场时写入 |
 | `corporate-action-gaps` | 补上新浪与 Baostock 因子都有台阶、湖里却没有记录的除权事件，依据最近一次 `cne derive adj_factor_source` 的证据。附近 10 天内日期错开的记录，若条款能解释台阶就移到台阶日；其余按证券和年份向 Baostock 取分红，按生效交易日匹配，只收条款能解释台阶的行；Baostock 也解释不了的，再到巨潮查发行人的重整转增公告，公告写明的除权参考价能解释台阶才记为 `reorg_transfer`。此命令的计划仍离线，`--apply` 才请求 Baostock 和巨潮 |
 | `orphan-symbols` | **已弃用。** 删除 `daily_bars` 中从未出现的证券在 `adj_factors` 与 `corporate_actions` 里的行：早年作为净值序列误入的场外基金（519xxx）行情已清理，因子和分红却残留；未采集行情的上市基金也在其列。这些行没有可复权的价格，只会被报成因子与公司行为矛盾。按数据集各发布一个新版本 |
 | `stale-suspensions` | **已弃用。** 删除 `trading_status` 中已被实际成交日线否定的推断停牌（`derived_bar_gap`）：某次运行漏抓行情时，缺口曾被误记为停牌；行情补齐后同一天有成交的日线即证明该行错误。独立来源的停牌不受影响 |

@@ -1076,7 +1076,7 @@ def step_corporate_actions(config: Config, trade_date: date, run_id: str, contex
         if getattr(config, "_corporate_actions_baostock_repair", False):
             if not config.sources.get("baostock", False):
                 raise RuntimeError(
-                    "corporate_actions: --baostock-repair requires the baostock source"
+                    "corporate_actions: the Baostock delisted-actions repair requires the baostock source"
                 )
             repair_start = (
                 getattr(config, "_backfill_start", None) or CORPORATE_ACTIONS_BACKFILL_START
@@ -1154,7 +1154,9 @@ def step_corporate_actions(config: Config, trade_date: date, run_id: str, contex
                 )
         if getattr(config, "_corporate_actions_ths_repair", False):
             if not config.sources.get("ths_bonus", False):
-                raise RuntimeError("corporate_actions: --ths-repair requires the ths_bonus source")
+                raise RuntimeError(
+                    "corporate_actions: the THS delisted-actions repair requires the ths_bonus source"
+                )
             repair_start = (
                 getattr(config, "_backfill_start", None) or CORPORATE_ACTIONS_BACKFILL_START
             )
@@ -1304,7 +1306,7 @@ def step_corporate_actions(config: Config, trade_date: date, run_id: str, contex
         if repair_dates:
             if not config.sources.get("eastmoney", False):
                 raise RuntimeError(
-                    "corporate_actions: --eastmoney-date-repair requires the eastmoney source"
+                    "corporate_actions: the ex-dates repair requires the eastmoney source"
                 )
             repair_start = (
                 getattr(config, "_backfill_start", None) or CORPORATE_ACTIONS_BACKFILL_START

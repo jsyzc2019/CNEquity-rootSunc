@@ -135,8 +135,8 @@ bars = load(
 `all_a` 包含沪深北。北交所证券名单与简称在日更时由 BSE 行情板补齐；TDX 名单枚举与 TDX 日线协议的市场能力不能混为一谈。
 
 - BJ 日线历史优先走专用 TDX 路径（market id 2），当期 tip 可用 BSE 板快照，Sina 补未覆盖部分。显式小范围历史请求会跳过无关的全市场快照。
-- Sina 历史行可能缺 `amount`。`--tdx-amount-repair` 只在 OHLC 一致且成交量差小于一手时补成交额；旧代码等未被 TDX 服务的行仍保留缺失和 finding。
-- `--bse-tip-repair` 只对已存当期日线核对 BSE 快照并补量额，不重新请求 Sina 历史。它不能恢复过去的 BSE 快照。
+- Sina 历史行可能缺 `amount`。`cne repair bar-amounts` 只在 OHLC 一致且成交量差小于一手时补成交额；旧代码等未被 TDX 服务的行仍保留缺失和 finding。
+- `cne repair bse-tip-turnover` 只对已存当期日线核对 BSE 快照并补量额，不重新请求 Sina 历史。它不能恢复过去的 BSE 快照。
 
 这些路线补的是行情；BJ 历史 ST 仍需独立证据。完整来源与修复入口见[数据源说明](sources.md#daily_bars)。
 

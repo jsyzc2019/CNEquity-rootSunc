@@ -29,7 +29,10 @@ LEFTOVER_SECTION = N_("Other")
 
 SECTIONS: list[tuple[str, tuple[str, ...]]] = [
     (N_("Start here"), ("config", "doctor", "init")),
-    (N_("Run the pipeline"), ("run", "schedule", "backfill", "derive", "repair", "migrate")),
+    (
+        N_("Run the pipeline"),
+        ("run", "schedule", "backfill", "import", "derive", "repair", "migrate"),
+    ),
     (N_("Check the lake"), ("check", "status", "verify", "audit", "decision-data")),
     (N_("Use the lake"), ("query", "serve", "mcp")),
     (

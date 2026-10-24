@@ -355,9 +355,41 @@ EFFECTS: dict[str, tuple[str, str]] = {
         "无",
         "默认只读预览；--apply 用已提交成交日线补缺失状态键，ST 保持未知，发布新版本并保留旧版本",
     ),
+    "import shfe-archive": (
+        "无",
+        "默认只读预览；--apply 校验本地上期所年度包后写入缺字段的日线行，不覆盖已有主键，保存原包证据",
+    ),
     "migrate": (
         "条件",
         "默认只读预览；--apply 按顺序运行还欠的迁移，经修复门禁发布并保留旧版本，结果写入 meta/state/lake.json；fund-listing-dates 读交易所基金列表，misdated-valuation 有待替换行时读东财数据中心",
+    ),
+    "repair payment-dates": (
+        "仅 --apply 时",
+        "默认只读预览；--apply 用已审发行人公告（巨潮、北交所）与 Baostock 修复现金到账日，经回填门禁发布",
+    ),
+    "repair delisted-actions": (
+        "仅 --apply 时",
+        "默认只读预览；--apply 从 Baostock（沪深）或同花顺（北交所）补已退市证券的历史分红除权并写湖",
+    ),
+    "repair ex-dates": (
+        "仅 --apply 时",
+        "默认只读预览；--apply 按给定除权日逐日向东财请求历史除权行并写湖",
+    ),
+    "repair bar-amounts": (
+        "仅 --apply 时",
+        "默认只读预览；--apply 请求通达信核对新浪补的日线，只补成交额，不改价格与成交量",
+    ),
+    "repair bar-turnover": (
+        "仅 --apply 时",
+        "默认只读预览；--apply 请求 Baostock（--peer-review 另请求交易所历史、通达信与东财）整行替换成交额异常的沪深股票日线",
+    ),
+    "repair bse-tip-turnover": (
+        "仅 --apply 时",
+        "默认只读预览；--apply 请求北交所行情板，只补最近一个交易日的成交额",
+    ),
+    "repair valuation-outage": (
+        "仅 --apply 时",
+        "默认只读预览；--apply 请求东财数据中心估值报表补断档窗口，取到全市场才写入",
     ),
     "repair adj-factors": (
         "仅 --refresh-sources 联网",

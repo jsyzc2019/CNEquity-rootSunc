@@ -288,7 +288,7 @@ backfill = false
 #   * SSE does not publish 融券余额, so `short_balance` is null on SH rows.
 #   * SZSE lands a business day after SSE, and a day is only written once both
 #     have published, so the dataset trails the vendor path by ~one session.
-# A one-off historical repair may use `cne backfill margin_trading --margin-source
+# A one-off historical repair may use `cne backfill margin_trading --source
 # eastmoney|exchange --start YYYY-MM-DD --end YYYY-MM-DD`; this leaves this
 # default and each source's configured limiter unchanged.
 source = "exchange"

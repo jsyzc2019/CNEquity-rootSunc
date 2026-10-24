@@ -302,7 +302,7 @@ An EM response containing a future adjustment rejects the whole snapshot: removi
 | flash_news_wire | publish_date | wire_id, wire_source | compatibility read | ✓ | eastmoney | Projected from the `news_headlines` fact table, compatible with entity files from old revisions; no longer written twice |
 | economic_calendar | event_date (yearly) | event_id | snapshot | ✓ | — (source retired) | EM `RPT_ECONOMICCALENDAR` has been retired (code 9501); the schema is kept pending a replacement source; `required=false`, an empty table is not judged UNHEALTHY |
 
-`sector_bars` uses THS sector market data; history is filled in window by window with `cne backfill sector_bars`. Check the range with `--plan` first, and after failures resume with `--retry-failed` to avoid needless `--force` refetches. Network reachability is determined by a small-scope probe from the current egress.
+`sector_bars` uses THS sector market data; history is filled in window by window with `cne backfill sector_bars`. Check the range with `--plan` first; after failures, rerunning the same command resumes from the checkpoint, so avoid needless `--refetch` full refetches. Network reachability is determined by a small-scope probe from the current egress.
 
 ## L8 Risk and compliance
 

@@ -162,15 +162,15 @@ A proxy is network configuration, not a way to lift a ban. Do not rotate egress 
 - **Observation**: log lines `THS sweep: BKxxxx (板块名) failed: ...` (板块名 = sector name); a high `failed_sectors` count.
 - **Cause**: **this is a THS source, not EastMoney** — `[sources.eastmoney] proxy` has no effect on it.
   `d.10jqka.com.cn` rate-limits or even bans dense requests.
-- **Fix**: after the cooldown, raise `[sources.ths] min_interval_seconds` (default 1.0, not a guaranteed safe threshold), then `cne backfill sector_bars --retry-failed`;
-  after switching sources for the full set, use `--force`. Checkpoint: `meta/state/sector_bars_backfill.json`.
+- **Fix**: after the cooldown, raise `[sources.ths] min_interval_seconds` (default 1.0, not a guaranteed safe threshold), then `cne backfill sector_bars`;
+  it resumes from the checkpoint by default; after switching sources, use `--refetch` for a full refetch. Checkpoint: `meta/state/sector_bars_backfill.json`.
   When the failure rate exceeds 50% the step status is `warning`, and sectors that succeeded are still written.
 
 ### Deploying on another machine
 
 First set up an independent environment and personal configuration following the installation guide, then confirm availability on a small scale with `sources probe --only <key>`. An HTTP proxy may not carry Baostock/TDX TCP protocols; do not guess whether a source is available based on geography.
 
-When you need historical backfill, use `cne backfill sector_bars --retry-failed` or `cne backfill trading_status --symbols <code>` directly; this keeps the existing checkpoint and does not automatically force a refetch of the whole lake. Move data with the reviewed snapshot workflow; do not copy the whole working directory, with its personal credentials, logs and data, as an installation package.
+When you need historical backfill, use `cne backfill sector_bars` or `cne backfill trading_status --symbols <code>` directly; this keeps the existing checkpoint and does not automatically force a refetch of the whole lake. Move data with the reviewed snapshot workflow; do not copy the whole working directory, with its personal credentials, logs and data, as an installation package.
 
 ## Symptom: audit --full UNHEALTHY
 

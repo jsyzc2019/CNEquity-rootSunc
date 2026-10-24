@@ -89,5 +89,6 @@ def test_deprecated_backfill_flags_warn(monkeypatch, tmp_path):
         result = CliRunner().invoke(cli, ["backfill", "daily_bars", flag], prog_name="cne")
         assert result.exit_code != 0
         assert "deprecated" in result.stderr and "0.20.0" in result.stderr
+    # Deprecated modes are out of the help along with the other dataset-specific ones.
     page = CliRunner().invoke(cli, ["backfill", "--help"]).output
-    assert "Deprecated, removed in 0.20.0: corporate_actions only" in " ".join(page.split())
+    assert "--tdx-volume-repair" not in page and "--eastmoney-bj-repair" not in page
