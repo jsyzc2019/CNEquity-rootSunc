@@ -28,7 +28,7 @@ export async function renderSchedule(ctx, home, alive) {
   const datasets = (value.backup_choices || []).map((name) => `<option value="${esc(name)}" ${(value.backup_datasets || []).includes(name) ? "selected" : ""}>${esc(dsWithCode(name))}</option>`).join("");
   const eventGroups = (value.events_groups || []).map((name) => `<option value="${esc(name)}" ${value.events_group === name ? "selected" : ""}>${esc(name)}</option>`).join("");
   const last = value.last_tick;
-  const links = (last?.jobs || []).map((job) => `<a href="#/ops/jobs/${encodeURIComponent(job.job_id)}">${esc(job.job)} · ${esc(job.session)}</a>`).join(" · ");
+  const links = (last?.jobs || []).map((job) => `<a href="#/ops/jobs/${encodeURIComponent(job.job_id)}">${esc(job.job)} ${esc(job.session)}</a>`).join(" ");
   const status = native.error ? tr("系统状态未知", "System status unknown") : value.enabled ? tr("已启用", "Enabled") : tr("已暂停 / 未启用", "Paused / not enabled");
   const tickLabels = {
     idle: tr("已检查，当前无到期任务", "Checked; nothing due"),
@@ -38,13 +38,13 @@ export async function renderSchedule(ctx, home, alive) {
     busy: tr("另一检查正在运行", "Another check is running"),
   };
   host.innerHTML = `<div class="panel-header"><h2>${tr("定时任务", "Schedule")}</h2><span class="status-pill">${esc(status)}</span></div>
-    <p class="panel-note">${esc(value.backend)} · ${esc(pick(value, "note"))}</p>
+    <p class="panel-note">${esc(value.backend)} ${esc(pick(value, "note"))}</p>
     ${native.error ? `<p class="panel-note err">${esc(native.error)}</p>` : ""}
     ${value.warning ? `<p class="panel-note err">${esc(value.warning)}</p>` : ""}
     ${value.timer_health === "stale" ? `<p class="panel-note err">${tr("超过 20 分钟未收到系统触发，请检查登录状态、休眠或 cron 服务，再刷新状态。", "No system trigger for over 20 minutes. Check the login session, sleep settings, or the cron service, then refresh the status.")}</p>` : ""}
     ${value.timer_health === "not_seen" ? `<p class="panel-note">${tr("已注册，等待首次系统检查（最多约 1 分钟）。", "Registered; waiting for the first system check (up to about 1 minute).")}</p>` : ""}
     ${native.installed && (!native.active || !native.matches) ? `<p class="panel-note err">${tr("系统任务未加载或定义与当前安装不符，请核对后重新设置。", "The system job is not loaded or does not match this installation. Check it and set the schedule again.")}</p>` : ""}
-    ${last ? `<p class="panel-note">${tr(`最近检查：${esc(last.at)}`, `Last check: ${esc(last.at)}`)} · ${esc(tickLabels[last.status] || last.status)} ${esc(last.message || "")} ${links}</p>` : `<p class="panel-note">${tr("尚无调度检查记录。", "No scheduler checks recorded yet.")}</p>`}
+    ${last ? `<p class="panel-note">${tr(`最近检查 ${esc(last.at)}`, `Last check ${esc(last.at)}`)} ${esc(tickLabels[last.status] || last.status)} ${esc(last.message || "")} ${links}</p>` : `<p class="panel-note">${tr("尚无调度检查记录。", "No scheduler checks yet.")}</p>`}
     <form id="schedule-fields" class="ops-fields">
       <label class="ops-check"><input id="schedule-daily" type="checkbox" ${value.daily ? "checked" : ""} ${writable ? "" : "disabled"}> ${tr("自动日更（未选研究包时跑全部日更组与事件流）", "Automatic daily update (runs every daily update group and event stream when no research pack is selected)")}</label>
       <fieldset class="ops-fields">
@@ -97,10 +97,10 @@ export async function renderSchedule(ctx, home, alive) {
         body: JSON.stringify(settings),
       });
       if (!alive() || current !== previewGeneration) return;
-      target.innerHTML = `<p class="panel-note">${esc(pick(preview, "action"))} · ${esc(preview.backend)}${tr("（时间均为北京时间）", " (all times are Beijing time)")}</p>
-        <ul class="ops-list"><li>${tr("日更：", "Daily update: ")}${preview.daily ? esc(preview.daily_run_at) : tr("关闭", "off")}${preview.daily_packs?.length ? ` · ${tr(`研究包 ${esc(preview.daily_packs.join("、"))}`, `research packs ${esc(preview.daily_packs.join(", "))}`)}` : ""}${tr("；补抓：", "; catch-up: ")}${preview.stale ? esc(preview.stale_run_at) : tr("关闭", "off")}</li>
-        <li>${tr("每日备份", "Daily backup")}: ${preview.backup ? `${esc(preview.backup_run_at)} · ${esc((preview.backup_datasets || []).map(dsWithCode).join(", "))} → ${esc(preview.backup_root)}` : tr("关闭", "off")}</li>
-        <li>${tr("独立事件流：", "Standalone event stream: ")}${preview.events ? `${esc(preview.events_group)} · ${tr(`每 ${esc(preview.events_interval_minutes)} 分钟`, `every ${esc(preview.events_interval_minutes)} min`)}` : tr("关闭", "off")}</li></ul>
+      target.innerHTML = `<p class="panel-note">${esc(pick(preview, "action"))} ${esc(preview.backend)}${tr("，时间均为北京时间", ", Beijing time")}</p>
+        <ul class="ops-list"><li>${tr("日更 ", "Daily update ")}${preview.daily ? esc(preview.daily_run_at) : tr("关闭", "off")}${preview.daily_packs?.length ? tr(`，研究包 ${esc(preview.daily_packs.join("、"))}`, `, packs ${esc(preview.daily_packs.join(", "))}`) : ""}${tr("；补抓 ", "; catch-up ")}${preview.stale ? esc(preview.stale_run_at) : tr("关闭", "off")}</li>
+        <li>${tr("每日备份 ", "Daily backup ")}${preview.backup ? `${esc(preview.backup_run_at)} ${esc((preview.backup_datasets || []).map(dsWithCode).join(", "))} → ${esc(preview.backup_root)}` : tr("关闭", "off")}</li>
+        <li>${tr("事件流 ", "Event stream ")}${preview.events ? `${esc(preview.events_group)} ${tr(`每 ${esc(preview.events_interval_minutes)} 分钟`, `every ${esc(preview.events_interval_minutes)} min`)}` : tr("关闭", "off")}</li></ul>
         <details><summary>${tr("查看系统任务定义", "View system job definition")}</summary><pre class="ops-log">${esc(preview.artifact || tr("移除本页面创建的定时触发。", "Removes the schedule triggers this page created."))}</pre></details>
         <label class="ops-check"><input id="schedule-ack" type="checkbox"> ${esc(pick(preview, "confirmation"))}</label>
         <div class="action-row"><button class="button button-primary" id="schedule-apply" type="button" disabled>${tr(`确认${esc(preview.action)}`, esc(pick(preview, "action")))}</button></div>
