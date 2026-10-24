@@ -101,8 +101,10 @@ def migrate(config_path: str, apply: bool, only: str | None, as_json: bool):
         created = read_lake(cfg).get("created_with")
         click.echo(
             _(
-                "Nothing owed: every migration is recorded, or the lake was built by {version}."
-            ).format(version=created or "?")
+                "Nothing owed: the lake was built by {version}, or every migration is recorded."
+            ).format(version=created)
+            if created
+            else _("Nothing owed: every migration is recorded in meta/state/lake.json.")
         )
         return
     for migration in chosen:
