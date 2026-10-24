@@ -4,6 +4,7 @@
 
 ## [0.19.0] — 未发布
 
+- `fund_flow_ths` / `sector_fund_flow_ths` 默认仍是不判新鲜度的兜底表；配置的日更调度组里排了它们（push2 不可用时用 `steps_add` 换入）时，改为要求最近收盘交易日有数据，收尾补抓会重试缺的那天，新鲜度门禁也会报出来。
 - `cne backfill` 只保留通用选项（帮助里的选项从 32 个减到 11 个）。数据集专属的修复改为 `cne repair` 子命令，默认预览、`--apply` 运行：`payment-dates`、`delisted-actions`、`ex-dates`、`bar-amounts`、`bar-turnover`、`bse-tip-turnover`、`valuation-outage`；上期所年度包导入改为 `cne import shfe-archive`。新增通用的 `--refetch`（取代衍生品的 `--refresh` 和 `sector_bars` 的 `--force`）和 `--source`（取代 `--margin-source`）；`--retry-failed` 本来就是默认行为，不再需要。旧开关仍可用，输入时提示新写法。
 - 新增 `cne migrate`：一次找出并运行这个湖还欠的一次性数据迁移（默认预览，`--apply` 运行），结果记在 `meta/state/lake.json`。新建的湖会记下建湖版本，不欠早于它的迁移；`cne doctor` 会提示还没检查的迁移。弃用的一次性 `cne repair` 命令改由它统一运行，已从 `cne repair --help` 隐藏，仍可直接调用（0.20.0 移除）；`status-outages` 需要指定停机窗口，仍须手工运行。
 - 仓库 `scripts/migrations/` 的脚本在 `--apply` 时持有湖的变更锁，不再可能与正在发布同一数据集的运行交错写入。

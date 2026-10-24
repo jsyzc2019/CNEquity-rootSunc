@@ -1697,6 +1697,16 @@ def _trading_session_lag(mark: date, anchor: date) -> int:
     return lag
 
 
+#: ``max_staleness_days`` at or above this marks a fallback that is not expected daily.
+_SPORADIC_STALENESS = 3650
+
+
+def scheduled_steps(config) -> frozenset[str]:
+    """Every step the config's daily schedule groups run."""
+    groups = getattr(config, "schedule_groups", None) or {}
+    return frozenset(step for group in groups.values() for step in group.steps)
+
+
 def is_stale(dataset: str, mark, anchor, config=None) -> bool:
     """Whether *dataset*'s freshest date (*mark*) lags *anchor* beyond tolerance.
 
@@ -1731,6 +1741,17 @@ def is_stale(dataset: str, mark, anchor, config=None) -> bool:
         if mark >= spec.source_retired_date:
             return False
     tolerance = spec.max_staleness_days if spec else 1
+    if (
+        config is not None
+        and tolerance >= _SPORADIC_STALENESS
+        and dataset in scheduled_steps(config)
+    ):
+        # A fallback table is sporadic only while something else is primary. A
+        # lake that schedules it every day (push2 unavailable, the THS money flow
+        # swapped in with `steps_add`) depends on it each session. It is a
+        # snapshot, so a missed session cannot be fetched later by date: the
+        # last closed session itself is due, as for a live snapshot.
+        return _trading_session_lag(mark, anchor) > 0
     if staleness_counts_trading_sessions(dataset):
         lag = _trading_session_lag(mark, anchor)
     else:

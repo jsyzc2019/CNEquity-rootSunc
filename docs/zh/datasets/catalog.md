@@ -238,7 +238,7 @@ THS 官方估值快照只能从启用后按日积累，不能用旧日期重放�
 | 数据集 | 分区键 | 主键 | 语义 | 水位 | 主源 | staleness |
 |--------|--------|------|------|------|------|-----------|
 | fund_flow | trade_date | symbol, trade_date | snapshot | ✓ | eastmoney | 1d |
-| fund_flow_ths | trade_date | symbol, trade_date | snapshot | ✓ | ths | 只在 push2 取不到 `fund_flow` 时由同花顺补：流入/流出/净额/成交额，**没有**主力与超大单…小单拆分，金额 4 位有效数字；源覆盖以响应为准，不承诺北交所；不判新鲜度、为空不报 |
+| fund_flow_ths | trade_date | symbol, trade_date | snapshot | ✓ | ths | 只在 push2 取不到 `fund_flow` 时由同花顺补：流入/流出/净额/成交额，**没有**主力与超大单…小单拆分，金额 4 位有效数字；源覆盖以响应为准，不承诺北交所；为空不报。默认不判新鲜度；配置的日更调度组里排了它（例如 push2 不可用时用 `steps_add` 换入），就要求最近收盘交易日有数据 |
 | margin_trading | trade_date | symbol, trade_date | by_date | ✓ | exchange | 沪深交易所自行编制的融资融券明细；SH 无融券余额（`short_balance` 为 null），深交所晚一个交易日发布、两边齐了才写；`[margin_trading] source` 可切回 eastmoney |
 | northbound_holdings | trade_date | symbol, trade_date, channel | by_date | ✓ | eastmoney | 100d（季频） |
 | northbound_flows | trade_date | trade_date, channel | by_date | ✓ | eastmoney | 2d |
@@ -297,7 +297,7 @@ EM 响应若已包含尚未生效的调样行，会拒绝整份快照：删除�
 | hot_rank | trade_date | symbol, trade_date | snapshot | ✓ | eastmoney | 人气榜 top100（公开接口上限） |
 | sector_bars | trade_date | sector_code, trade_date | snapshot | ✓ | ths | 日更与回填都走同花顺 board-kline；无第二源 |
 | sector_fund_flow | trade_date | sector_code, trade_date | snapshot | ✓ | eastmoney | 板块主力净流入 |
-| sector_fund_flow_ths | trade_date | board_type, sector_code, trade_date | snapshot | ✓ | ths | 只在 push2 取不到 `sector_fund_flow` 时由同花顺补：行业（881xxx）+ 概念板块的流入/流出/净额，金额单位亿、精确到 0.01；同花顺板块分类，和东财板块代码不对应 |
+| sector_fund_flow_ths | trade_date | board_type, sector_code, trade_date | snapshot | ✓ | ths | 只在 push2 取不到 `sector_fund_flow` 时由同花顺补：行业（881xxx）+ 概念板块的流入/流出/净额，金额单位亿、精确到 0.01；同花顺板块分类，和东财板块代码不对应。新鲜度规则同 `fund_flow_ths` |
 | news_headlines | publish_date | news_id | snapshot | ✓ | eastmoney | 新闻标题 |
 | flash_news_wire | publish_date | wire_id, wire_source | 兼容读取 | ✓ | eastmoney | 由 `news_headlines` 事实表投影，兼容旧 revision 的实体文件；不再重复写入 |
 | economic_calendar | event_date（按年） | event_id | snapshot | ✓ | —（源已下线） | EM `RPT_ECONOMICCALENDAR` 已退役（code 9501），保留 schema 等替代源；`required=false`，空表不判 UNHEALTHY |
