@@ -190,7 +190,7 @@ pip install -U cnequity
 cne config upgrade
 ```
 
-`cne config upgrade` 把新版本加入的调度 step 补进你的配置，原文件自动备份。
+`cne init` 写出的配置继承内置默认值（`extends = "builtin"`），新版本的调度 step 升级后直接生效，`cne config upgrade` 只会报告无事可做；旧版本写出的完整配置由它补上新 step（原文件自动备份），或用 `cne config upgrade --minimize` 一次性改成继承默认值。
 
 继续阅读：[初始化、范围与续跑](docs/zh/getting-started/initialization.md) → [日常运维](docs/zh/operations/runbook.md)。
 

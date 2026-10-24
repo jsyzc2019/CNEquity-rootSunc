@@ -79,9 +79,9 @@ Node/npm is needed only to modify the dashboard source; the published package al
 cne config create
 ```
 
-It writes the per-user `~/.config/cnequity/config.toml` by default (or `configs/cnequity.toml` when the current directory already has one) and converts `data.root` to an absolute path; macOS / Windows use a conservative `workers=1`. You can also add `--data-root /abs/path/to/lake` when creating it for the first time.
+It writes the per-user `~/.config/cnequity/config.toml` by default (or `configs/cnequity.toml` when the current directory already has one) and converts `data.root` to an absolute path; the file holds only `extends = "builtin"` and the data directory, and every other setting comes from the built-in defaults (a conservative `workers=1` on macOS / Windows). You can also add `--data-root /abs/path/to/lake` when creating it for the first time.
 
-Copying the template directly skips path resolution and platform adjustments, so prefer the generator command. When upgrading an existing config, use `cne config upgrade` to add new schedule steps automatically. Personal configs, credentials and data directories should not be committed to the repository.
+Copying the template directly skips path resolution and platform adjustments, so prefer the generator command. A config that extends the defaults picks up new schedule steps on upgrade; for an older full config, add them with `cne config upgrade`, or convert it once with `cne config upgrade --minimize`. Personal configs, credentials and data directories should not be committed to the repository.
 
 ## Upgrade an existing installation
 
@@ -90,7 +90,7 @@ pip install --upgrade cnequity
 cne config upgrade
 ```
 
-`cne config upgrade` adds the schedule steps and schedule groups introduced by the new version to the config, backs up the original file first, and validates after writing. First read the target version's [changelog](../changelog.md) and [Upgrades and feedback](#upgrades-and-compatibility) to confirm whether a data migration is needed. Do not use `config create --force` in place of a config upgrade.
+A config that extends the built-in defaults (`extends = "builtin"`) needs no change, and this command reports nothing to do. For an older full config, `cne config upgrade` adds the schedule steps and schedule groups introduced by the new version, backs up the original file first, and validates after writing; `--minimize` instead rewrites it to extend the defaults. First read the target version's [changelog](../changelog.md) and [Upgrades and feedback](#upgrades-and-compatibility) to confirm whether a data migration is needed. Do not use `config create --force` in place of a config upgrade.
 
 The old `tdx` / `macro` / `nlp` and other extras have been removed. Unit or schema migrations for past versions should be run according to the corresponding release notes; scripts meant for an old lake must not be reapplied to a new lake. The current `httpx` constraint is `>=0.25`; the actual installed version is resolved by the environment and cannot be inferred as a fixed version from the install command.
 

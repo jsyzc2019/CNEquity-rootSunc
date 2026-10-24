@@ -6,14 +6,47 @@
 cne config create                              # 推荐：写出用户级配置 ~/.config/cnequity/config.toml
  # 首次创建时也可选：cne config create --data-root /data/cnequity
 cne config path                                # 显示当前生效的配置、选中原因和数据目录
+cne config show                                # 打印生效的完整配置，标出文件里写的设置
 cne config validate
 ```
 
 加载与校验：`cnequity.config.loader`。个人文件不参与开源默认配置；参见[升级与反馈](installation.md#升级与兼容性)。配置查找顺序：显式 `--config` → `CNE_CONFIG` → 当前目录的 `configs/cnequity.toml` → 用户级 `~/.config/cnequity/config.toml`（遵循 `XDG_CONFIG_HOME`；Windows 为 `%APPDATA%\cnequity\config.toml`）。CLI、`load()`、MCP 和定时任务用同一套规则，所以在任何目录运行都指向同一个湖。`cne config create` 默认写绝对 `data.root`；手写的相对路径（`data.root`、`duckdb.path`）按**配置文件所在目录**解析。旧版按工作目录解析的相对路径，在新位置不存在而旧位置存在时继续沿用并给出警告，运行 `cne config upgrade` 会把它固定为绝对路径。
 
-本页按配置段查阅。首次使用通常只需确认 `[data].root`，再按需求启用分钟线、分笔或[衍生品](../recipes/derivatives.md)。表中默认值指随包模板；直接构造 `Config()` 与平台生成器的结果可能不同，以 `cne config diff` 和实际配置为准。
+本页按配置段查阅。首次使用通常只需确认 `[data].root`，再按需求启用分钟线、分笔或[衍生品](../recipes/derivatives.md)。表中默认值指随包模板，也就是 `extends = "builtin"` 配置继承的默认值；直接构造 `Config()` 的结果可能不同，以 `cne config show` 为准。
 
 同一出口上多个进程/数据湖用 `CNE_RATE_LIMIT_ROOT` 统一 HTTP/TDX 限流与共享冷却。源保护、CLI 联网边界和使用顺序见[取数指南](../operations/fetch-policy.md)。
+
+## 继承内置默认值（`extends = "builtin"`） {#extends-builtin}
+
+`cne config create` 和首次 `cne init` 写出的配置只有几行：
+
+```toml
+extends = "builtin"
+
+[data]
+root = "/abs/path/to/lake"
+```
+
+其余设置都来自当前安装版本的内置默认值（即随包模板，按本机平台调整过，例如 macOS / Windows 的 `workers = 1`）。文件里只写想改的设置；升级后新版本加入的设置和调度 step 直接生效，不需要 `cne config upgrade`。
+
+- 表按键逐层合并（内联表也一样）；其他值（标量、数组、`[[failover.datasets]]` 这样的表数组）整体替换默认值。
+- `[data].root` 从不取默认值，必须写在文件里。
+- 调度组（`[job.daily.groups.*]`、`[job.events.groups.*]`）支持 `steps_add`、`steps_remove` 和 `enabled = false`，换掉一个 step 不会冻结组内其他 step：
+
+```toml
+[job.daily.groups.capital]
+steps_remove = ["fund_flow"]
+steps_add = ["fund_flow_ths"]
+
+[job.daily.groups.research]
+enabled = false
+```
+
+组内 step 的顺序不影响执行：引擎按依赖、收尾顺序和名称排定。写 `steps = [...]` 仍表示整组替换；它遮住了新版本默认加入的 step 时，`cne config diff` 会报出来。
+
+`cne config show` 打印生效的完整配置，标出哪些值来自文件，凭证打码；`cne config show --defaults` 打印全部设置及说明。
+
+没有 `extends` 的完整配置照旧工作：缺少的键回退到代码里的内置值，升级时需要 `cne config upgrade` 补调度 step。`cne config upgrade --minimize` 把它一次性改写成继承默认值的形式：等于默认值的键删掉，调度组差异写成 `steps_add` / `steps_remove`，配置里没有的默认调度组写成 `enabled = false`，`data.root` 写成当前解析到的绝对路径。改写前会列出加载后行为会变化的设置（旧配置缺键、现在由默认值提供的部分），`--dry-run` 只预览；原文件自动备份。
 
 ## `[data]`
 
@@ -219,11 +252,11 @@ Wave DAG：每个 wave 含 `name`、`parallel`（wave 内 step 是否并行）�
 
 ## 调度组
 
-`[job.daily.groups.<name>]`：`at`（文档/调度参考时间）、`steps`（含末尾 `compact`）。
+`[job.daily.groups.<name>]`：`at`（文档/调度参考时间）、`steps`（含末尾 `compact`）；继承默认值时用 `steps_add` / `steps_remove` / `enabled = false` 修改，见[继承内置默认值](#extends-builtin)。
 
 日更与补跑入口使用北京时间 `[job.daily].run_at`（默认 17:30）、`[job.stale].run_at`（默认 21:00）。组内字段 `at` 是运行参考，不会仅凭配置自动安装系统调度器。
 
-`core`、`capital`、`signals`、`fundamentals`、`macro_risk`、`research` 是日常数据组；分钟、分笔和衍生品按各自开关启用。以随包模板为准，升级后用 `cne config upgrade` 补上新增的 step；不复制个人主机的耗时来设定所有人的任务间隔。
+`core`、`capital`、`signals`、`fundamentals`、`macro_risk`、`research` 是日常数据组；分钟、分笔和衍生品按各自开关启用。以随包模板为准：继承默认值的配置升级后自动获得新增的 step，完整配置用 `cne config upgrade` 补上；不复制个人主机的耗时来设定所有人的任务间隔。
 
 各 daily 任务共用非阻塞写入锁。优先由一个调度入口顺序运行所需组；多个独立定时任务可能撞锁而跳过，必须检查退出码与 run 状态。
 

@@ -88,7 +88,7 @@ def test_write_user_config_defaults_to_absolute_data_root(tmp_path, monkeypatch)
     """Bare ``cne config create`` must not leave ``./data/...`` for doctor to reject."""
     monkeypatch.chdir(tmp_path)
     out = tmp_path / "configs" / "cnequity.toml"
-    write_user_config(out, platform="linux")
+    write_user_config(out)
     try:
         import tomllib
     except ModuleNotFoundError:
@@ -102,11 +102,11 @@ def test_write_user_config_defaults_to_absolute_data_root(tmp_path, monkeypatch)
 
 def test_write_user_config_refuses_overwrite(tmp_path):
     out = tmp_path / "configs" / "cnequity.toml"
-    write_user_config(out, platform="linux")
+    write_user_config(out)
     assert out.is_file()
     with pytest.raises(FileExistsError):
-        write_user_config(out, platform="linux")
-    write_user_config(out, force=True, data_root=str(tmp_path / "data"), platform="linux")
+        write_user_config(out)
+    write_user_config(out, force=True, data_root=str(tmp_path / "data"))
     # Parse rather than substring-match: Windows paths are TOML-escaped (`\\`).
     try:
         import tomllib

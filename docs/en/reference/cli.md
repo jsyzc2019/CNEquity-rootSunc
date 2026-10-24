@@ -194,7 +194,7 @@ Exit: success, source-limited outcomes (`degraded` / `warning`, including 0 rows
 
 ## cne config create
 
-Write the user configuration from the template inside the package (no repository clone needed after a PyPI install).
+Write a short user configuration that extends the built-in defaults (`extends = "builtin"` plus `[data].root`); see [Extending the built-in defaults](../getting-started/configuration.md#extends-builtin).
 
 | Option | Description |
 |------|------|
@@ -202,7 +202,11 @@ Write the user configuration from the template inside the package (no repository
 | `--data-root` | Written into `[data].root` |
 | `--force` | Overwrite an existing file |
 
-On macOS, `orchestrator.workers` is written as `1` (consistent with the `validate` rule). Template source: `cnequity.config.templates` (kept in sync with the repository's `configs/cnequity.example.toml`).
+Platform-dependent defaults (such as `orchestrator.workers = 1` on macOS) come from the built-in defaults and are not written into the file. Source of the defaults: `cnequity.config.templates` (kept in sync with the repository's `configs/cnequity.example.toml`).
+
+## cne config show
+
+Print the full effective configuration (TOML) with credentials masked; for a config that extends the defaults, it marks which values come from the file and which groups `steps_add` / `steps_remove` edited. `--defaults` prints every setting with its default and explanation.
 
 ## cne config validate
 
@@ -226,7 +230,7 @@ The report has three categories, ordered by consequence:
 
 Steps missing from schedule groups are reported separately: a step that the example configuration's group of the same name has, and none of your groups has, is not run by `cne run daily` without arguments, even if some wave still lists it.
 
-Machine-specific values such as `[data].root` and `orchestrator.workers` do not count as drift; extra custom content in your configuration is not reported either.
+Machine-specific values such as `[data].root` and `orchestrator.workers` do not count as drift; extra custom content in your configuration is not reported either. A config that extends the defaults cannot miss keys; only a whole-group `steps = [...]` that shadows a new default step is reported, while `steps_remove` and `enabled = false` are deliberate opt-outs, not drift.
 
 ## cne config upgrade
 
@@ -242,6 +246,8 @@ cne config upgrade
 - Steps that are only in an example wave are appended to your wave of the same name.
 
 Before making changes, the original file is backed up as `cnequity.toml.bak-<timestamp>`, and the configuration is validated after writing. Other settings (times, concurrency, credentials, switches) are untouched; missing configuration keys already use built-in defaults and are not written to the file, so that current defaults are not pinned. `--dry-run` only lists the changes. Groups written as inline tables or dotted keys cannot be edited automatically; the command lists the steps to add by hand and returns 1.
+
+A config that extends the defaults needs no upgrade step. `--minimize` rewrites a full config into the extending form (rules in [Extending the built-in defaults](../getting-started/configuration.md#extends-builtin)): it first lists the settings kept, the schedule groups' `steps_add` / `steps_remove`, the groups set to `enabled = false`, and every setting whose behaviour changes on loading; with `--dry-run` it only previews.
 
 ## cne sources resilience
 

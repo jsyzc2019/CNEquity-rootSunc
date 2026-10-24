@@ -719,9 +719,11 @@ def configured_data_root(path: str | Path) -> Path:
 
 
 def load_config(path: str | Path) -> Config:
+    from cnequity.config.layers import effective_raw
+
     config_path = Path(path).expanduser().resolve()
     with open(config_path, "rb") as f:
-        raw = tomllib.load(f)
+        raw = effective_raw(tomllib.load(f))
 
     data_root = _data_root(raw, config_path.parent)
     lake_profile = raw.get("data", {}).get("profile") or None

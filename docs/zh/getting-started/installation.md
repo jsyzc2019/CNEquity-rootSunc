@@ -79,9 +79,9 @@ pip install -e . --group dev
 cne config create
 ```
 
-默认输出用户级配置 `~/.config/cnequity/config.toml`（当前目录已有 `configs/cnequity.toml` 时写那里），`data.root` 转为绝对路径；macOS / Windows 使用保守的 `workers=1`。也可首次创建时加 `--data-root /abs/path/to/lake`。
+默认输出用户级配置 `~/.config/cnequity/config.toml`（当前目录已有 `configs/cnequity.toml` 时写那里），`data.root` 转为绝对路径；文件只写 `extends = "builtin"` 和数据目录，其余设置继承内置默认值（macOS / Windows 默认保守的 `workers=1`）。也可首次创建时加 `--data-root /abs/path/to/lake`。
 
-直接复制模板不会执行路径解析和平台调整，因此优先使用生成命令。已有配置升级时用 `cne config upgrade` 自动补上新的调度 step。个人配置、凭证与数据目录不应提交到仓库。
+直接复制模板不会执行路径解析和平台调整，因此优先使用生成命令。继承默认值的配置升级后自动获得新的调度 step；旧的完整配置用 `cne config upgrade` 补上，或用 `cne config upgrade --minimize` 一次性改成继承默认值。个人配置、凭证与数据目录不应提交到仓库。
 
 ## 升级已有安装
 
@@ -90,7 +90,7 @@ pip install --upgrade cnequity
 cne config upgrade
 ```
 
-`cne config upgrade` 把新版本加入的调度 step 和调度组补进配置，先备份原文件，写完后校验。先阅读目标版本的[更新日志](../changelog.md)和[升级与反馈](#升级与兼容性)，确认是否需要数据迁移。不要用 `config create --force` 代替配置升级。
+继承内置默认值（`extends = "builtin"`）的配置不需要改动，这条命令只会报告无事可做。旧的完整配置由 `cne config upgrade` 把新版本加入的调度 step 和调度组补进去，先备份原文件，写完后校验；`--minimize` 则把它改写成继承默认值的形式。先阅读目标版本的[更新日志](../changelog.md)和[升级与反馈](#升级与兼容性)，确认是否需要数据迁移。不要用 `config create --force` 代替配置升级。
 
 旧版本的 `tdx` / `macro` / `nlp` 等 extras 已移除。历史版本的单位或 schema 迁移应按对应发布说明执行，不能把针对旧湖的脚本重复应用到新湖。当前 `httpx` 约束为 `>=0.25`；实际安装版本由环境解析，不能从安装命令推定一个固定版本。
 

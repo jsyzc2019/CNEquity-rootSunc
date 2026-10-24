@@ -69,6 +69,8 @@
 | `--force` | `False` | action=create 时覆盖已存在的配置文件。 |
 | `--data-root` | `—` | action=create 时设置 [data].root（默认把 ./data/cnequity 解析成绝对路径）。 |
 | `--dry-run` | `False` | action=upgrade 时只列出要补的 step 和调度组，不写文件。 |
+| `--minimize` | `False` | 用于 action=upgrade：把完整配置改写为继承内置默认值，只保留不同的设置；会列出每项行为会变化的设置。 |
+| `--defaults` | `False` | 用于 action=show：打印每项设置及其内置默认值和说明。 |
 
 ## `cne contract diff`
 

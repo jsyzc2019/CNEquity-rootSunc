@@ -7,6 +7,7 @@ quickstart walks through them.
 from __future__ import annotations
 
 import json
+import re
 from datetime import date
 from pathlib import Path
 
@@ -599,7 +600,7 @@ def _install_pack_schedule(cfg, packs: tuple[str, ...]) -> str:
 #: What `cne config` does, and the spellings that used to mean one of them.
 #: `cnequity.cli._root.MOVED` answers a moved *command*; an argument is not a
 #: command, so it needs its own map — and this is the one people hit first.
-CONFIG_ACTIONS: tuple[str, ...] = ("validate", "create", "diff", "upgrade", "path")
+CONFIG_ACTIONS: tuple[str, ...] = ("validate", "create", "show", "diff", "upgrade", "path")
 CONFIG_ACTIONS_MOVED: dict[str, str] = {"init": "cne config create"}
 
 
@@ -630,21 +631,42 @@ CONFIG_ACTIONS_MOVED: dict[str, str] = {"init": "cne config create"}
         "With action=upgrade: only list the steps and schedule groups to add; writes no files."
     ),
 )
+@click.option(
+    "--minimize",
+    is_flag=True,
+    help=N_(
+        "With action=upgrade: rewrite a full config to extend the built-in defaults, keeping only "
+        "the settings that differ; lists every setting whose behaviour would change."
+    ),
+)
+@click.option(
+    "--defaults",
+    "show_defaults",
+    is_flag=True,
+    help=N_("With action=show: print every setting with its built-in default and explanation."),
+)
 def config_cmd(
-    action: str, config_path: str, force: bool, data_root: str | None, dry_run: bool = False
+    action: str,
+    config_path: str,
+    force: bool,
+    data_root: str | None,
+    dry_run: bool = False,
+    minimize: bool = False,
+    show_defaults: bool = False,
 ):
     """Validate, generate or compare configs.
 
     \b
-    `cne config create` writes the bundled example TOML (no need to clone the repository); it used to be called
-    `cne config init`, one word away from `cne init`, which builds the whole lake and costs far more when run by mistake.
-    On macOS it also forces `orchestrator.workers = 1`.
+    `cne config create` writes a short config that extends the built-in defaults (`extends = "builtin"`) and holds only
+    the data directory; later releases' new settings and schedule steps then apply without editing it. It used to be
+    called `cne config init`, one word away from `cne init`, which builds the whole lake and costs far more when run by mistake.
+    `cne config show` prints the effective configuration and marks what the file sets; `--defaults` prints every setting.
     `cne config validate` validates an existing config.
     `cne config path` shows which config a command would use, why, and the lake it points to.
-    `cne config diff` reports what the example config has and this config lacks; above all the steps new versions add
+    `cne config diff` reports what a full config lacks against the defaults; above all the steps new versions add
     to schedule groups, which a config written once and never updated will never run.
     `cne config upgrade` adds those steps and the missing schedule groups straight into the config (backing up the original first),
-    leaving every other setting alone; missing settings already use built-in defaults and are not written. Run this after upgrading.
+    leaving every other setting alone. `--minimize` instead rewrites a full config to extend the built-in defaults.
 
     """
     # A free-form argument bypasses `token_normalize_func`, which is what makes
@@ -667,6 +689,13 @@ def config_cmd(
         )
     if dry_run and action != "upgrade":
         raise click.UsageError(_("--dry-run only applies to `cne config upgrade`"))
+    if minimize and action != "upgrade":
+        raise click.UsageError(_("--minimize only applies to `cne config upgrade`"))
+    if show_defaults and action != "show":
+        raise click.UsageError(_("--defaults only applies to `cne config show`"))
+    if action == "show":
+        _config_show(config_path, defaults=show_defaults)
+        return
     if action in {"upgrade", "diff"}:
         # A demo or sample config deliberately schedules nothing; comparing it
         # with the full example would list every step as missing, and
@@ -683,7 +712,10 @@ def config_cmd(
             )
             return
     if action == "upgrade":
-        _config_upgrade(resolve_config_path(config_path), dry_run=dry_run)
+        if minimize:
+            _config_minimize(resolve_config_path(config_path), dry_run=dry_run)
+        else:
+            _config_upgrade(resolve_config_path(config_path), dry_run=dry_run)
         return
     if action == "diff":
         from cnequity.config.drift import config_drift, render_drift
@@ -709,7 +741,13 @@ def config_cmd(
         except FileExistsError as exc:
             raise click.ClickException(str(exc)) from exc
         click.echo(_("Written to {out}").format(out=out))
-        click.echo(_("data.root is an absolute path; edit it if needed, then run: cne init"))
+        click.echo(
+            _(
+                "It extends the built-in defaults and sets only data.root (an absolute path); "
+                "add only what you want to change. `cne config show --defaults` lists every setting. "
+                "Then run: cne init"
+            )
+        )
         return
 
     cfg = _cfg(config_path)
@@ -747,6 +785,145 @@ def _config_path_report(config_path: str) -> None:
     for candidate in config_candidates():
         mark = "*" if candidate == path else " "
         click.echo(f"  {mark} {candidate}")
+
+
+_SECRET_KEY = re.compile(r"(?:^|_)(?:token|api_key|secret|password)$")
+_PROXY_USERINFO = re.compile(r"^([a-z][a-z0-9+.-]*://)[^@/]+@", re.I)
+
+
+def _flat_keys(table: dict, prefix: str = "") -> set[str]:
+    out: set[str] = set()
+    for key, value in table.items():
+        path = f"{prefix}{key}"
+        out.add(path)
+        if isinstance(value, dict):
+            out |= _flat_keys(value, f"{path}.")
+    return out
+
+
+def _mask_secrets(table: dict) -> dict:
+    out: dict = {}
+    for key, value in table.items():
+        if isinstance(value, dict):
+            out[key] = _mask_secrets(value)
+        elif isinstance(value, str) and _SECRET_KEY.search(key):
+            out[key] = "***"
+        elif isinstance(value, str) and key == "proxy":
+            out[key] = _PROXY_USERINFO.sub(r"\1***@", value)
+        else:
+            out[key] = value
+    return out
+
+
+def _config_show(config_path: str, *, defaults: bool) -> None:
+    """`cne config show`: the configuration the lake runs with, or every default."""
+    import sys
+
+    from cnequity.config.bootstrap import render_example_toml
+    from cnequity.config.layers import EXTENDS_KEY, effective_raw, is_layered
+    from cnequity.config.toml_out import dumps
+
+    if defaults:
+        click.echo(render_example_toml(platform=sys.platform), nl=False)
+        return
+    if sys.version_info >= (3, 11):
+        import tomllib
+    else:  # pragma: no cover - Python 3.10
+        import tomli as tomllib
+
+    path = resolve_config_path(config_path)
+    cfg = _cfg(config_path)
+    raw = tomllib.loads(path.read_text(encoding="utf-8"))
+    effective = effective_raw(raw)
+    effective.setdefault("data", {})["root"] = cfg.data_root.as_posix()
+    layered = is_layered(raw)
+    own = _flat_keys({k: v for k, v in raw.items() if k != EXTENDS_KEY})
+    edited = {
+        key.rsplit(".", 1)[0] + ".steps"
+        for key in own
+        if key.endswith((".steps_add", ".steps_remove"))
+    }
+
+    def note(key: str) -> str | None:
+        if not layered:
+            return None
+        if key in edited:
+            return _("edited by steps_add / steps_remove")
+        return _("set in this file") if key in own else None
+
+    click.echo(_("# Effective configuration of {path}").format(path=path))
+    click.echo(
+        _("# Built-in defaults of this version, with the settings marked below from the file.")
+        if layered
+        else _(
+            "# A full config: every value is the file's own. "
+            "`cne config upgrade --minimize` turns it into one that extends the built-in defaults."
+        )
+    )
+    click.echo(_("# Secrets are masked."))
+    click.echo("")
+    click.echo(dumps(_mask_secrets(effective), annotate=note), nl=False)
+
+
+def _config_minimize(path: Path, *, dry_run: bool) -> None:
+    """`cne config upgrade --minimize`: keep only what differs from the built-in defaults."""
+    import shutil
+    from datetime import datetime
+
+    from cnequity.config import load_config
+    from cnequity.config.minimize import plan_minimize
+
+    plan = plan_minimize(path)
+    if plan.already_layered:
+        click.echo(
+            _("{path} already extends the built-in defaults; nothing to minimize.").format(
+                path=path
+            )
+        )
+        return
+    click.echo(
+        _(
+            "Keeps {kept} of {total} settings; the rest follow the built-in defaults of each release."
+        ).format(kept=plan.kept_keys, total=plan.total_keys)
+    )
+    for table, (added, removed) in plan.step_edits.items():
+        click.echo(
+            _("[{table}] steps_add = {added}; steps_remove = {removed}").format(
+                table=table, added=added, removed=removed
+            )
+        )
+    for table in plan.disabled_groups:
+        click.echo(
+            _("[{table}] enabled = false (this config does not schedule it today)").format(
+                table=table
+            )
+        )
+    if plan.behaviour_changes:
+        click.echo(
+            _(
+                "These settings change: the old config left them to built-in fallbacks, and the "
+                "defaults now supply them:"
+            )
+        )
+        for name, before, after in plan.behaviour_changes:
+            click.echo(f"  {name}: {before} → {after}")
+    else:
+        click.echo(_("Loading the new file gives the same settings as the old one."))
+    if dry_run:
+        return
+    backup = path.with_name(f"{path.name}.bak-{datetime.now():%Y%m%d-%H%M%S}")
+    shutil.copy2(path, backup)
+    path.write_text(plan.text, encoding="utf-8")
+    click.echo(
+        _("Updated {path} (the original was backed up as {name})").format(
+            path=path, name=backup.name
+        )
+    )
+    errors = validate_config(load_config(path))
+    for e in errors:
+        click.echo(f"ERROR: {e}", err=True)
+    if errors:
+        raise SystemExit(1)
 
 
 def _config_upgrade(path: Path, *, dry_run: bool) -> None:

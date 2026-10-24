@@ -6,14 +6,47 @@ Config file format: TOML. The template ships with the package in `cnequity.confi
 cne config create                              # Recommended: writes the per-user ~/.config/cnequity/config.toml
  # Optional on first creation: cne config create --data-root /data/cnequity
 cne config path                                # Shows the config in effect, why it was chosen, and its data root
+cne config show                                # Prints the full effective configuration, marking what the file sets
 cne config validate
 ```
 
 Loading and validation: `cnequity.config.loader`. Personal files are not part of the open-source default config; see [Upgrades and feedback](installation.md#upgrades-and-compatibility). Config lookup order: explicit `--config` → `CNE_CONFIG` → `configs/cnequity.toml` in the current directory → the per-user `~/.config/cnequity/config.toml` (honours `XDG_CONFIG_HOME`; `%APPDATA%\cnequity\config.toml` on Windows). The CLI, `load()`, MCP and the scheduled tasks share this rule, so a command run from any directory reaches the same lake. `cne config create` writes an absolute `data.root` by default; a hand-written relative path (`data.root`, `duckdb.path`) resolves against **the config file's directory**. A relative path written for the old working-directory rule keeps working, with a warning, while only its old location exists; `cne config upgrade` pins it to the absolute path.
 
-This page is organized by config section. For first use, you usually only need to confirm `[data].root`, then enable minute bars, trade ticks or [derivatives](../recipes/derivatives.md) as needed. Defaults in the tables refer to the bundled template; constructing `Config()` directly and the platform generator may give different results, so `cne config diff` and the actual config are authoritative.
+This page is organized by config section. For first use, you usually only need to confirm `[data].root`, then enable minute bars, trade ticks or [derivatives](../recipes/derivatives.md) as needed. Defaults in the tables refer to the bundled template, which is what an `extends = "builtin"` config inherits; constructing `Config()` directly may give different results, so `cne config show` is authoritative.
 
 When multiple processes/data lakes share one egress, use `CNE_RATE_LIMIT_ROOT` to unify HTTP/TDX rate limiting and shared cooldowns. For source protection, CLI network boundaries and order of use, see the [fetch guide](../operations/fetch-policy.md).
+
+## Extending the built-in defaults (`extends = "builtin"`) {#extends-builtin}
+
+The config written by `cne config create` and by a first `cne init` is a few lines long:
+
+```toml
+extends = "builtin"
+
+[data]
+root = "/abs/path/to/lake"
+```
+
+Every other setting comes from the built-in defaults of the installed version (the bundled template, adjusted for this platform, e.g. `workers = 1` on macOS / Windows). The file holds only the settings you want to change; after an upgrade, the new version's settings and schedule steps apply directly, with no `cne config upgrade`.
+
+- Tables merge key by key, recursively (inline tables too); any other value (scalars, arrays, arrays of tables such as `[[failover.datasets]]`) replaces the default whole.
+- `[data].root` never comes from the defaults and must be written in the file.
+- Schedule groups (`[job.daily.groups.*]`, `[job.events.groups.*]`) accept `steps_add`, `steps_remove` and `enabled = false`, so swapping one step does not freeze the rest of the group:
+
+```toml
+[job.daily.groups.capital]
+steps_remove = ["fund_flow"]
+steps_add = ["fund_flow_ths"]
+
+[job.daily.groups.research]
+enabled = false
+```
+
+Step order inside a group does not affect execution: the engine orders steps by dependency, finalize order and name. Writing `steps = [...]` still replaces the whole group; when it shadows a step a new version adds by default, `cne config diff` reports it.
+
+`cne config show` prints the full effective configuration, marks which values come from the file, and masks credentials; `cne config show --defaults` prints every setting with its explanation.
+
+A full config without `extends` keeps working as before: missing keys fall back to built-in values in the code, and an upgrade needs `cne config upgrade` to add schedule steps. `cne config upgrade --minimize` rewrites it once into the extending form: keys equal to their default are dropped, schedule group differences become `steps_add` / `steps_remove`, default schedule groups the config lacks become `enabled = false`, and `data.root` is written as the absolute path it resolves to now. Before rewriting it lists every setting whose behaviour changes on loading (keys the old config lacked and the defaults now supply); `--dry-run` only previews, and the original is backed up.
 
 ## `[data]`
 
@@ -219,11 +252,11 @@ Four waves by default:
 
 ## Schedule groups {#schedule-groups}
 
-`[job.daily.groups.<name>]`: `at` (reference time for documentation/scheduling), `steps` (including the trailing `compact`).
+`[job.daily.groups.<name>]` (see [Extending the built-in defaults](#extends-builtin) for `steps_add` / `steps_remove` / `enabled = false`): `at` (reference time for documentation/scheduling), `steps` (including the trailing `compact`).
 
 The daily update and catch-up entry points use Beijing time `[job.daily].run_at` (default 17:30) and `[job.stale].run_at` (default 21:00). The in-group field `at` is a run reference; config alone does not install a system scheduler.
 
-`core`, `capital`, `signals`, `fundamentals`, `macro_risk` and `research` are the routine data groups; minute bars, trade ticks and derivatives are enabled by their own switches. The bundled template is authoritative; after upgrading, use `cne config upgrade` to add new steps. Do not copy timings from a personal host to set task intervals for everyone.
+`core`, `capital`, `signals`, `fundamentals`, `macro_risk` and `research` are the routine data groups; minute bars, trade ticks and derivatives are enabled by their own switches. The bundled template is authoritative: a config that extends the defaults picks up new steps on upgrade, and a full config adds them with `cne config upgrade`. Do not copy timings from a personal host to set task intervals for everyone.
 
 All daily tasks share a non-blocking write lock. Prefer a single scheduling entry point that runs the needed groups in sequence; multiple independent scheduled tasks may collide on the lock and be skipped, so you must check exit codes and run status.
 

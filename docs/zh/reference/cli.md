@@ -192,7 +192,7 @@ cne backfill daily_bars --start 2016-01-01 --end COVERAGE_START
 
 ## cne config create
 
-从包内模板写出用户配置（PyPI 安装后无需 clone 仓库）。
+写出继承内置默认值的简短用户配置（`extends = "builtin"` 加 `[data].root`），见[继承内置默认值](../getting-started/configuration.md#extends-builtin)。
 
 | 选项 | 说明 |
 |------|------|
@@ -200,7 +200,11 @@ cne backfill daily_bars --start 2016-01-01 --end COVERAGE_START
 | `--data-root` | 写入 `[data].root` |
 | `--force` | 覆盖已存在文件 |
 
-macOS 上会把 `orchestrator.workers` 写成 `1`（与 `validate` 规则一致）。模板源：`cnequity.config.templates`（与仓库 `configs/cnequity.example.toml` 保持同步）。
+平台相关的默认值（如 macOS 上 `orchestrator.workers = 1`）由内置默认值提供，不写进文件。默认值来源：`cnequity.config.templates`（与仓库 `configs/cnequity.example.toml` 保持同步）。
+
+## cne config show
+
+打印生效的完整配置（TOML），凭证打码；继承默认值的配置会标出哪些值来自文件、哪些组被 `steps_add` / `steps_remove` 修改过。`--defaults` 打印全部设置及其默认值和说明。
 
 ## cne config validate
 
@@ -224,7 +228,7 @@ macOS 上会把 `orchestrator.workers` 写成 `1`（与 `validate` 规则一致�
 
 调度组里缺少的 step 单独报出：示例配置的同名组有、而你的任何一个组都没有的 step，不带参数的 `cne run daily` 不会跑，即使某个 wave 里还列着它。
 
-`[data].root` 和 `orchestrator.workers` 等本机相关取值不算漂移；配置里多出来的自定义内容也不报。
+`[data].root` 和 `orchestrator.workers` 等本机相关取值不算漂移；配置里多出来的自定义内容也不报。继承默认值的配置不会缺键，只有整组替换的 `steps = [...]` 遮住新版本默认 step 时才报；`steps_remove` 和 `enabled = false` 是有意的退出，不算漂移。
 
 ## cne config upgrade
 
@@ -240,6 +244,8 @@ cne config upgrade
 - 只在示例 wave 里的 step，追加到你的同名 wave。
 
 改动前把原文件备份为 `cnequity.toml.bak-时间戳`，写完后校验配置。其余设置（时间、并发、凭证、开关）不动；缺少的配置项本来就用内置默认值，不写入文件，以免把当前默认值固定下来。`--dry-run` 只列出改动。内联表或点号键写法的组无法自动编辑，命令会列出需要手动加入的 step 并返回 1。
+
+继承默认值的配置升级后不需要这一步。`--minimize` 把完整配置改写成继承默认值的形式（规则见[继承内置默认值](../getting-started/configuration.md#extends-builtin)）：先列出保留的设置、调度组的 `steps_add` / `steps_remove`、被设为 `enabled = false` 的组，以及加载后行为会变化的设置；与 `--dry-run` 同用只预览。
 
 ## cne sources resilience
 

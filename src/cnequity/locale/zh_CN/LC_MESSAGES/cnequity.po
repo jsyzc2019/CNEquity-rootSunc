@@ -694,6 +694,23 @@ msgstr " · 约剩 %s"
 msgid " … {value} more days"
 msgstr " … 还有 {value} 天"
 
+#: cnequity/cli/setup_cmds.py
+msgid "# A full config: every value is the file's own. `cne config upgrade --minimize` turns it into one that extends the built-in defaults."
+msgstr "# 完整配置：每个值都来自文件本身。`cne config upgrade --minimize` 可以把它改成继承内置默认值的形式。"
+
+#: cnequity/cli/setup_cmds.py
+msgid "# Built-in defaults of this version, with the settings marked below from the file."
+msgstr "# 本版本的内置默认值；下面标注的设置来自文件。"
+
+#: cnequity/cli/setup_cmds.py
+#, python-brace-format
+msgid "# Effective configuration of {path}"
+msgstr "# {path} 的生效配置"
+
+#: cnequity/cli/setup_cmds.py
+msgid "# Secrets are masked."
+msgstr "# 凭证已打码。"
+
 #: cnequity/diagnostics/source_health.py
 #, python-format
 msgid "%d K-lines"
@@ -946,6 +963,10 @@ msgstr "--dataset 和 --symbol 必须一起给"
 msgid "--days must be >= 1"
 msgstr "--days 必须 >= 1"
 
+#: cnequity/cli/setup_cmds.py
+msgid "--defaults only applies to `cne config show`"
+msgstr "--defaults 只适用于 `cne config show`"
+
 #: cnequity/cli/quality_cmds.py
 msgid "--derivatives does not support other modes, --repair, --kind or run-evidence options"
 msgstr "--derivatives 不支持其他模式、--repair、--kind 或运行证据参数"
@@ -1035,6 +1056,10 @@ msgstr "--if-stale 会重算整个湖；请去掉 --dataset，或者去掉 --if-
 #: cnequity/cli/backfill_cmds.py
 msgid "--margin-source only applies to margin_trading"
 msgstr "--margin-source 只适用于 margin_trading"
+
+#: cnequity/cli/setup_cmds.py
+msgid "--minimize only applies to `cne config upgrade`"
+msgstr "--minimize 只适用于 `cne config upgrade`"
 
 #: cnequity/cli/run_cmds.py
 msgid "--no-events only applies to a full daily update without --group / --all-groups / --stale-only / --core-only."
@@ -1971,6 +1996,11 @@ msgstr "无法生成配置（{name}）。"
 #, python-brace-format
 msgid "Could not load config {path} ({name}{where}); check the TOML syntax, value types, and that rate limits are finite and non-negative."
 msgstr "无法加载配置 {path}（{name}{where}）；请检查 TOML 语法、数值类型和非负有限限速。"
+
+#: cnequity/cli/_shared.py
+#, python-brace-format
+msgid "Could not load config {path}: {reason}"
+msgstr "无法加载配置 {path}：{reason}"
 
 #: cnequity/serve/ops/job.py
 #, python-brace-format
@@ -3143,6 +3173,10 @@ msgid "Invalid version number."
 msgstr "版本编号无效。"
 
 #: cnequity/cli/setup_cmds.py
+msgid "It extends the built-in defaults and sets only data.root (an absolute path); add only what you want to change. `cne config show --defaults` lists every setting. Then run: cne init"
+msgstr "它继承内置默认值，只设置了 data.root（绝对路径）；只需加上想改的设置，`cne config show --defaults` 列出全部设置。然后运行：cne init"
+
+#: cnequity/cli/setup_cmds.py
 msgid "Keep going after a stage fails instead of stopping."
 msgstr "某个阶段失败后继续往下跑，而不是停下来。"
 
@@ -3157,6 +3191,11 @@ msgstr "保留已有快照；将该数据集加入日更配置，从后续采集
 #: cnequity/cli/maintain_cmds.py
 msgid "Keep the latest this many generations plus current/hold per dataset; other versions are only listed as candidates, not marked, and no bytes are freed. Import a reference manifest before marking in the web UI. 0 skips version handling."
 msgstr "每个数据集保留最近这么多代及 current/hold；其他版本只列出候选，不标记、不释放字节。网页标记前须导入引用清单。0 表示跳过版本处理。"
+
+#: cnequity/cli/setup_cmds.py
+#, python-brace-format
+msgid "Keeps {kept} of {total} settings; the rest follow the built-in defaults of each release."
+msgstr "保留 {total} 项设置中的 {kept} 项；其余跟随每个版本的内置默认值。"
 
 #: cnequity/cli/quality_cmds.py
 msgid "Keys to probe, comma-separated; costly/challenged endpoints are probed only when listed explicitly."
@@ -3221,6 +3260,10 @@ msgstr "只读列出版本及其保留原因。"
 #: cnequity/cli/consume_cmds.py
 msgid "Listen address for --http. A non-loopback address requires --token."
 msgstr "--http 的监听地址。非回环地址必须配 --token。"
+
+#: cnequity/cli/setup_cmds.py
+msgid "Loading the new file gives the same settings as the old one."
+msgstr "新文件加载后的设置与旧文件相同。"
 
 #: cnequity/cli/_shared.py
 #, python-brace-format
@@ -3296,8 +3339,8 @@ msgid "Missing config keys ({count}) — built-in defaults are in use:"
 msgstr "缺少的配置项（{count}）—— 当前使用内置默认值："
 
 #: cnequity/config/drift.py
-msgid "Missing config keys use built-in defaults; there is no need to add them by hand."
-msgstr "缺少的配置项使用内置默认值，无需手动补。"
+msgid "Missing config keys fall back to built-in values. Rather than adding them by hand, run `cne config upgrade --minimize --dry-run`: it shows how this config would extend the built-in defaults instead, so it stops falling behind."
+msgstr "缺少的配置项会回退到内置值。不必手工补齐，运行 `cne config upgrade --minimize --dry-run`：它会展示这份配置改为继承内置默认值后的样子，以后就不会再落后。"
 
 #: cnequity/config/drift.py
 #, python-brace-format
@@ -5551,6 +5594,10 @@ msgstr "这些研究包没有日更调度组。历史 ST 用 `cne backfill tradi
 msgid "These schedule groups are not in the config: "
 msgstr "配置里没有这些调度组："
 
+#: cnequity/cli/setup_cmds.py
+msgid "These settings change: the old config left them to built-in fallbacks, and the defaults now supply them:"
+msgstr "以下设置会变化：旧配置把它们留给内置回退值，现在由默认值提供："
+
 #: cnequity/serve/ops/settings.py
 msgid "These switches affect all future fetching, including scheduled daily updates and closing catch-up. Saving does not start fetching. Instrument lists, frequencies and exchanges stay in the config file."
 msgstr "这些开关会改之后的每一次取数，包括定时日更和收尾补抓。保存设置不会启动取数。标的列表、频率和交易所仍在配置文件里。"
@@ -5805,28 +5852,29 @@ msgid ""
 "Validate, generate or compare configs.\n"
 "\n"
 "\n"
-"`cne config create` writes the bundled example TOML (no need to clone the repository); it used to be called\n"
-"`cne config init`, one word away from `cne init`, which builds the whole lake and costs far more when run by mistake.\n"
-"On macOS it also forces `orchestrator.workers = 1`.\n"
+"`cne config create` writes a short config that extends the built-in defaults (`extends = \"builtin\"`) and holds only\n"
+"the data directory; later releases' new settings and schedule steps then apply without editing it. It used to be\n"
+"called `cne config init`, one word away from `cne init`, which builds the whole lake and costs far more when run by mistake.\n"
+"`cne config show` prints the effective configuration and marks what the file sets; `--defaults` prints every setting.\n"
 "`cne config validate` validates an existing config.\n"
 "`cne config path` shows which config a command would use, why, and the lake it points to.\n"
-"`cne config diff` reports what the example config has and this config lacks; above all the steps new versions add\n"
+"`cne config diff` reports what a full config lacks against the defaults; above all the steps new versions add\n"
 "to schedule groups, which a config written once and never updated will never run.\n"
 "`cne config upgrade` adds those steps and the missing schedule groups straight into the config (backing up the original first),\n"
-"leaving every other setting alone; missing settings already use built-in defaults and are not written. Run this after upgrading."
+"leaving every other setting alone. `--minimize` instead rewrites a full config to extend the built-in defaults."
 msgstr ""
 "校验、生成或对比配置。\n"
 "\n"
 "\n"
-"`cne config create` 写出随包携带的示例 TOML（不需要 clone 仓库）—— 它以前叫\n"
-"`cne config init`，和会建整个湖的 `cne init` 只差一个词，而后者误跑的代价大得多。\n"
-"在 macOS 上它还会强制 `orchestrator.workers = 1`。\n"
+"`cne config create` 写出一份简短配置：继承内置默认值（`extends = \"builtin\"`），只记录数据目录；之后版本新增的设置和调度 step\n"
+"不用改文件就会生效。它以前叫 `cne config init`，和会建整个湖的 `cne init` 只差一个词，而后者误跑的代价大得多。\n"
+"`cne config show` 打印生效的配置并标出文件里写了哪些；`--defaults` 打印全部设置。\n"
 "`cne config validate` 校验一份已有的配置。\n"
 "`cne config path` 显示命令会用哪份配置、为什么选中它，以及它指向的湖。\n"
-"`cne config diff` 报告示例配置里有、而这份配置没有的东西 —— 最要紧的是新版本往调度组里\n"
+"`cne config diff` 报告一份完整配置相对默认值缺了什么 —— 最要紧的是新版本往调度组里\n"
 "加的 step：一份写完就再没更新过的配置永远不会跑到它们。\n"
 "`cne config upgrade` 把这些 step 和缺少的调度组直接补进配置（先备份原文件），\n"
-"其余设置不动；缺少的配置项本来就用内置默认值，不会写入。升级版本后跑这一条即可。"
+"其余设置不动。`--minimize` 则把完整配置改写成继承内置默认值的形式。"
 
 #: cnequity/serve/ops/catalog.py
 msgid "Vantage label"
@@ -6028,8 +6076,16 @@ msgid "With action=create: set [data].root (defaults to ./data/cnequity resolved
 msgstr "action=create 时设置 [data].root（默认把 ./data/cnequity 解析成绝对路径）。"
 
 #: cnequity/cli/setup_cmds.py
+msgid "With action=show: print every setting with its built-in default and explanation."
+msgstr "用于 action=show：打印每项设置及其内置默认值和说明。"
+
+#: cnequity/cli/setup_cmds.py
 msgid "With action=upgrade: only list the steps and schedule groups to add; writes no files."
 msgstr "action=upgrade 时只列出要补的 step 和调度组，不写文件。"
+
+#: cnequity/cli/setup_cmds.py
+msgid "With action=upgrade: rewrite a full config to extend the built-in defaults, keeping only the settings that differ; lists every setting whose behaviour would change."
+msgstr "用于 action=upgrade：把完整配置改写为继承内置默认值，只保留不同的设置；会列出每项行为会变化的设置。"
 
 #: cnequity/cli/consume_cmds.py
 #, python-brace-format
@@ -6134,6 +6190,16 @@ msgstr "[{dataset}] 有 {deferred} 个 key 属于尚未收定的交易日；继�
 #, python-brace-format
 msgid "[{dataset}] {index}/{value} {month}: {value2} symbols {lo}..{hi}"
 msgstr "[{dataset}] {index}/{value} {month}：{value2} 只标的 {lo}..{hi}"
+
+#: cnequity/cli/setup_cmds.py
+#, python-brace-format
+msgid "[{table}] enabled = false (this config does not schedule it today)"
+msgstr "[{table}] enabled = false（这份配置目前不调度它）"
+
+#: cnequity/cli/setup_cmds.py
+#, python-brace-format
+msgid "[{table}] steps_add = {added}; steps_remove = {removed}"
+msgstr "[{table}] steps_add = {added}；steps_remove = {removed}"
 
 #: cnequity/cli/setup_cmds.py
 #, python-brace-format
@@ -6286,10 +6352,6 @@ msgstr "data.root 尚不存在: %s"
 msgid "data.root is a relative path: %s"
 msgstr "data.root 是相对路径: %s"
 
-#: cnequity/cli/setup_cmds.py
-msgid "data.root is an absolute path; edit it if needed, then run: cne init"
-msgstr "data.root 是绝对路径，按需修改后执行：cne init"
-
 #: cnequity/diagnostics/report.py
 #, python-format
 msgid "data.root is not writable: %s"
@@ -6349,6 +6411,10 @@ msgstr "doctor 只检查环境/依赖/配置；数据湖状态用 `cne status --
 #: cnequity/serve/ops/catalog.py
 msgid "e.g. local, cn. Defaults to local."
 msgstr "如 local、cn。不填用 local。"
+
+#: cnequity/cli/setup_cmds.py
+msgid "edited by steps_add / steps_remove"
+msgstr "由 steps_add / steps_remove 修改"
 
 #: cnequity/cli/quality_cmds.py
 msgid "empty"
@@ -6641,6 +6707,10 @@ msgstr "同域"
 msgid "security master"
 msgstr "证券目录"
 
+#: cnequity/cli/setup_cmds.py
+msgid "set in this file"
+msgstr "在此文件中设置"
+
 #: cnequity/orchestrator/engine.py
 msgctxt "step status"
 msgid "skipped"
@@ -6884,6 +6954,11 @@ msgstr "{name}（{step}）"
 #, python-brace-format
 msgid "{note}, {found}"
 msgstr "{note}，{found}"
+
+#: cnequity/cli/setup_cmds.py
+#, python-brace-format
+msgid "{path} already extends the built-in defaults; nothing to minimize."
+msgstr "{path} 已经继承内置默认值，无需精简。"
 
 #: cnequity/cli/setup_cmds.py
 #, python-brace-format

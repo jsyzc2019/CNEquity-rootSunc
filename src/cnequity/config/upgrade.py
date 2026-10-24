@@ -40,6 +40,7 @@ else:  # pragma: no cover - Python 3.10
 
 from cnequity.config.bootstrap import _toml_escape, example_toml_text
 from cnequity.config.drift import _group_tables, _scheduled_steps, missing_group_steps
+from cnequity.config.layers import effective_raw
 
 _HEADER = re.compile(r"^\s*\[")
 
@@ -217,18 +218,22 @@ def plan_upgrade(config_path: Path | str) -> UpgradePlan:
     example = example_toml_text()
     theirs = tomllib.loads(example)
     plan = UpgradePlan(text=text)
+    # What the config schedules, opt-outs included: for an `extends = "builtin"`
+    # config that is the defaults plus its overrides, so only a full `steps =`
+    # override can be missing anything. The text edits still go to *mine*.
+    view = effective_raw(mine, apply_opt_outs=False)
 
-    mine_groups = _group_tables(mine)
+    mine_groups = _group_tables(view)
     for table in _group_tables(theirs):
         if table not in mine_groups:
             plan.added_groups.append(table)
-    for table, steps in missing_group_steps(mine, theirs).items():
+    for table, steps in missing_group_steps(view, theirs).items():
         plan.added_steps[table] = list(steps)
 
     # Wave-only steps: scheduled by no group of the example either.
     placed = {step for steps in _group_tables(theirs).values() for step in steps}
-    unscheduled = sorted(_scheduled_steps(theirs) - _scheduled_steps(mine) - placed)
-    mine_waves = {w.get("name") for w in mine.get("job", {}).get("daily", {}).get("waves", [])}
+    unscheduled = sorted(_scheduled_steps(theirs) - _scheduled_steps(view) - placed)
+    mine_waves = {w.get("name") for w in view.get("job", {}).get("daily", {}).get("waves", [])}
     for step in unscheduled:
         wave = next(
             (

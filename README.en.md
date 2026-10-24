@@ -186,7 +186,7 @@ pip install -U cnequity
 cne config upgrade
 ```
 
-`cne config upgrade` adds the schedule steps a new release introduced to your config and keeps a backup of the original.
+The config `cne init` writes extends the built-in defaults (`extends = "builtin"`), so a new release's schedule steps apply after the upgrade and `cne config upgrade` reports nothing to do; for a full config written by an older version it adds the new steps (keeping a backup), or `cne config upgrade --minimize` converts it once to extend the defaults.
 
 Continue with [initialization and recovery](docs/en/getting-started/initialization.md), then the [runbook](docs/en/operations/runbook.md). The full documentation is available in [English](https://rootsunc.github.io/CNEquity/en/) and [Chinese](https://rootsunc.github.io/CNEquity/).
 
