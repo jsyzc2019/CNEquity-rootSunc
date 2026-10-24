@@ -355,6 +355,10 @@ EFFECTS: dict[str, tuple[str, str]] = {
         "无",
         "默认只读预览；--apply 用已提交成交日线补缺失状态键，ST 保持未知，发布新版本并保留旧版本",
     ),
+    "migrate": (
+        "条件",
+        "默认只读预览；--apply 按顺序运行还欠的迁移，经修复门禁发布并保留旧版本，结果写入 meta/state/lake.json；fund-listing-dates 读交易所基金列表，misdated-valuation 有待替换行时读东财数据中心",
+    ),
     "repair adj-factors": (
         "仅 --refresh-sources 联网",
         "默认离线预览并保存计划；--apply 发布有证据支持的修正、保留旧版本和未解决提示，分批保存历史进度",

@@ -619,6 +619,11 @@ msgstr "  写入：            {value:,} 条"
 msgid "  Written:            {value:,} rows"
 msgstr "  写入：            {value:,} 行"
 
+#: cnequity/cli/repair_cmds.py
+#, python-brace-format
+msgid "  applied: {count} row(s)"
+msgstr "  已运行：{count} 行"
+
 #: cnequity/cli/init_summary.py
 #, python-brace-format
 msgid "  cne check{config_arg}          check that the data is complete and usable"
@@ -634,10 +639,28 @@ msgstr "  cne run daily{config_arg}      每天运行一次保持更新"
 msgid "  cne serve{config_arg}          browse the lake in a web page"
 msgstr "  cne serve{config_arg}          在浏览器里看湖"
 
+#: cnequity/cli/repair_cmds.py
+#, python-brace-format
+msgid "  failed: {exc}"
+msgstr "  失败：{exc}"
+
 #: cnequity/cli/quality_cmds.py
 #, python-brace-format
 msgid "  findings: {value} error, {value2} warning, {value3} info"
 msgstr "  findings：{value} error、{value2} warning、{value3} info"
+
+#: cnequity/cli/repair_cmds.py
+msgid "  nothing to do"
+msgstr "  无需处理"
+
+#: cnequity/cli/repair_cmds.py
+msgid "  nothing to do; recorded"
+msgstr "  无需处理；已记录"
+
+#: cnequity/cli/repair_cmds.py
+#, python-brace-format
+msgid "  would change {count} row(s)"
+msgstr "  将改动 {count} 行"
 
 #: cnequity/cli/quality_cmds.py
 #, python-brace-format
@@ -829,6 +852,11 @@ msgstr "%s 期货文件无合约"
 #, python-format
 msgid "%s is in use by another program and still cannot be replaced after %d attempts. Common causes: Jupyter/DuckDB/polars is reading this data, File Explorer has the folder open, or antivirus/sync software is scanning it. Close the program holding it and run again"
 msgstr "%s 正被其他程序占用，重试 %d 次后仍无法替换。常见原因：Jupyter/DuckDB/polars 正在读取这份数据、资源管理器打开了该目录，或杀毒/同步软件正在扫描。关闭占用的程序后重跑即可"
+
+#: cnequity/diagnostics/report.py
+#, python-format
+msgid "%s lake migration(s) not yet checked on this lake"
+msgstr "这个湖还有 %s 个迁移未检查"
 
 #: cnequity/diagnostics/source_health.py
 #, python-format
@@ -1397,6 +1425,10 @@ msgstr "真正写入。不加它只抓取并报告，不改任何东西。"
 msgid "Actually write. Without it, only report differences and change nothing."
 msgstr "真正写入。不加它只报告差异，不改任何东西。"
 
+#: cnequity/storage/migrations.py
+msgid "Add financial statements rebuilt on their original disclosure dates"
+msgstr "补入按原始披露日重建的财报"
+
 #: cnequity/cli/repair_cmds.py
 msgid "Add financial-statement reconstructions based on LICO original disclosure dates, keeping the actually disclosed version and the old lake version."
 msgstr "依据 LICO 原始公告日补财报重建版本，保留实际公告版本及旧湖版本。"
@@ -1430,6 +1462,10 @@ msgstr ""
 #: cnequity/cli/repair_cmds.py
 msgid "Add the share conversions ETF/LOF factors missed, keeping other sources' steps and the cash-dividend basis."
 msgstr "补入 ETF/LOF 因子漏掉的份额折算，保留其他来源台阶及现金分红口径。"
+
+#: cnequity/storage/migrations.py
+msgid "Add the share conversions ETF/LOF factors were missing"
+msgstr "补上 ETF/LOF 因子缺少的份额折算"
 
 #: cnequity/diagnostics/health_page.py
 msgid "Affected datasets"
@@ -1910,6 +1946,10 @@ msgid "Comma-separated indices; defaults to CSI 300, STAR 50, Shenzhen Component
 msgstr "指数代码，逗号分隔；默认沪深300、科创50、深证成指、创业板指。"
 
 #: cnequity/cli/repair_cmds.py
+msgid "Comma-separated migration ids; runs them even when already recorded. Default: every migration this lake still owes."
+msgstr "逗号分隔的迁移 id；即使已记录也重新运行。默认：这个湖还欠的全部迁移。"
+
+#: cnequity/cli/repair_cmds.py
 msgid "Comma-separated stock symbols."
 msgstr "股票代码，逗号分隔。"
 
@@ -2357,8 +2397,8 @@ msgid "Deprecated, removed in 0.20.0; use --tdx-amount-repair: daily_bars only: 
 msgstr "已弃用，将在 0.20.0 移除，请改用 --tdx-amount-repair：仅 daily_bars：从 TDX 补 Sina 从未发布过的北交所成交额，已存的价格和成交量一律不动。需要 --start/--end。"
 
 #: cnequity/cli/repair_cmds.py
-msgid "Deprecated: a one-time migration for lakes written by cnequity 0.17 or earlier; current versions no longer write this defect. It will be removed in 0.20.0."
-msgstr "已弃用：仅用于迁移 cnequity 0.17 及更早版本写入的湖，当前版本已不再写出这类问题。将在 0.20.0 移除。"
+msgid "Deprecated: a one-time migration for lakes written by cnequity 0.17 or earlier; current versions no longer write this defect. `cne migrate` runs it, and records that it ran. It will be removed in 0.20.0."
+msgstr "已弃用：针对 cnequity 0.17 及更早版本写入的湖的一次性迁移；当前版本不再写出这个问题。`cne migrate` 会运行它并记录结果。将在 0.20.0 移除。"
 
 #: cnequity/serve/ops/catalog.py
 msgid "Depth"
@@ -2474,6 +2514,18 @@ msgstr "下载并解析完整历史文件；仅显式诊断，日常优先用采
 msgid "Downstream derivation failed: {name}: {exc}"
 msgstr "下游派生失败：{name}: {exc}"
 
+#: cnequity/storage/migrations.py
+msgid "Drop factor and action rows for securities the lake holds no prices for"
+msgstr "删除湖里没有行情的证券的因子和公司行为行"
+
+#: cnequity/storage/migrations.py
+msgid "Drop inferred suspensions that later evidence contradicts"
+msgstr "删除被后来证据否定的推断停牌"
+
+#: cnequity/storage/migrations.py
+msgid "Drop trading_status rows outside a security's listing window"
+msgstr "删除落在证券上市窗口之外的 trading_status 行"
+
 #: cnequity/serve/ops/settings.py
 msgid "EastMoney"
 msgstr "东财"
@@ -2481,6 +2533,10 @@ msgstr "东财"
 #: cnequity/diagnostics/source_health.py
 msgid "EastMoney datacenter (report API)"
 msgstr "东财 datacenter（报表接口）"
+
+#: cnequity/storage/migrations.py
+msgid "EastMoney datacenter, when there are rows to replace"
+msgstr "东财数据中心（有需要替换的行时）"
 
 #: cnequity/diagnostics/source_health.py
 msgid "EastMoney hosts share one risk control; a ban takes them out together."
@@ -2678,6 +2734,10 @@ msgstr "拉取完整标的清单，然后只保留 {value} 只 demo 标的…"
 msgid "Files the exchange publishes itself; a non-trading day returns a 302 rather than an empty file, so the probe walks back to the latest trading day."
 msgstr "交易所自己发布的文件；休市日返回 302 而不是空文件，探针会往前找最近的交易日。"
 
+#: cnequity/storage/migrations.py
+msgid "Fill fund listing dates from the exchanges' official lists"
+msgstr "按交易所官方列表补基金上市日"
+
 #: cnequity/serve/ops/catalog.py
 #, python-brace-format
 msgid "Fill in {value}."
@@ -2801,6 +2861,10 @@ msgstr "首次配置只能在本机打开，请把 --host 留在 127.0.0.1。"
 #: cnequity/cli/repair_cmds.py
 msgid "Fix valuation zero placeholders and index weights missing from EastMoney and CNI, keeping the old version."
 msgstr "修正估值占位零及东财、国证缺失的指数权重，保留旧版本。"
+
+#: cnequity/diagnostics/report.py
+msgid "Fixes for rows that an older version wrote. `cne migrate` previews what each would change; `--apply` runs them and records the result."
+msgstr "针对旧版本写下的数据的修正。`cne migrate` 预览每个迁移会改动什么；`--apply` 运行并记录结果。"
 
 #: cnequity/cli/quality_cmds.py
 msgid ""
@@ -3698,6 +3762,11 @@ msgstr "注意：还有 {errors} 条 error 不在 sample profile 的预期范围
 msgid "Nothing in staging to publish: every finished run has been compacted."
 msgstr "没有待发布的 staging：所有已结束的 run 都已经 compact。"
 
+#: cnequity/cli/repair_cmds.py
+#, python-brace-format
+msgid "Nothing owed: every migration is recorded, or the lake was built by {version}."
+msgstr "没有欠下的迁移：全部已记录，或这个湖由 {version} 建立。"
+
 #: cnequity/serve/storage.py
 msgid "Nothing to execute this time."
 msgstr "本次没有可执行的对象。"
@@ -3886,8 +3955,8 @@ msgid "Output machine-readable JSON (default)."
 msgstr "输出机器可读的 JSON（默认）。"
 
 #: cnequity/cli/govern_cmds.py cnequity/cli/maintain_cmds.py
-#: cnequity/cli/quality_cmds.py cnequity/cli/schedule_cmds.py
-#: cnequity/cli/setup_cmds.py
+#: cnequity/cli/quality_cmds.py cnequity/cli/repair_cmds.py
+#: cnequity/cli/schedule_cmds.py cnequity/cli/setup_cmds.py
 msgid "Output machine-readable JSON."
 msgstr "输出机器可读的 JSON。"
 
@@ -4029,9 +4098,33 @@ msgstr ""
 msgid "Preview meta/source_snapshots run_id directories older than this many days (the latest one per dataset / source is always kept)."
 msgstr "预览超过这么多天的 meta/source_snapshots run_id 目录（每个数据集 / 源的最新一份始终保留）。"
 
+#: cnequity/cli/repair_cmds.py
+msgid "Preview only. Run `cne migrate --apply` to apply and record them."
+msgstr "仅预览。运行 `cne migrate --apply` 执行并记录。"
+
 #: cnequity/cli/maintain_cmds.py
 msgid "Preview orphan staging older than this many days that is not recorded in the manifest."
 msgstr "预览超过这么多天、且 manifest 里没有记录的孤儿 staging。"
+
+#: cnequity/cli/repair_cmds.py
+msgid ""
+"Preview, or with --apply run, the one-off fixes this lake still owes.\n"
+"\n"
+"\n"
+"A release that fixes a writer can leave rows the old writer stored. Each such fix is a\n"
+"migration; meta/state/lake.json records the version that built the lake (it owes nothing\n"
+"introduced earlier) and every migration it has applied or found nothing to do.\n"
+"A preview reports how many rows each would change. --apply runs them in order: each takes the\n"
+"lake lock, publishes through the repair gate and keeps the previous revision readable."
+msgstr ""
+"预览，或加 --apply 运行这个湖还欠的一次性修正。\n"
+"\n"
+"\n"
+"新版本修好写入逻辑后，旧版本存下的行仍需修正。每个修正是一个\n"
+"迁移；meta/state/lake.json 记录建湖的版本（早于它引入的迁移不需要运行）\n"
+"以及已经运行过、或检查后无需运行的迁移。\n"
+"预览报告每个迁移会改动多少行。--apply 按顺序运行：每个迁移持有\n"
+"湖的变更锁，经修复门禁发布，旧版本保留可读。"
 
 #: cnequity/domain/datasets.py
 msgid "Prices"
@@ -4420,6 +4513,10 @@ msgstr ""
 "与行上日期不一致的行，--apply 时删除，并在同一版本中换成东财 datacenter\n"
 "按日期发布的估值；datacenter 没有的键不再保留错误的行。"
 
+#: cnequity/storage/migrations.py
+msgid "Replace push2 valuation snapshots stored under the wrong date"
+msgstr "替换存错日期的 push2 估值快照"
+
 #: cnequity/cli/repair_cmds.py
 msgid "Replace verified whole rows and publish a retained revision."
 msgstr "核验后替换整行并发布新版本，保留旧版。"
@@ -4721,6 +4818,10 @@ msgstr ""
 "它既不等晚间批次，也不会因为休市而被跳过。每个组通过自带的 `compact` 发布它 staging 的数据。\n"
 "不带参数的 `cne run daily` 末尾已经包含这一步；单独运行用于更高频地刷新某个组。"
 
+#: cnequity/cli/repair_cmds.py
+msgid "Run the owed migrations and record each result in meta/state/lake.json."
+msgstr "运行欠下的迁移，并把每个结果记入 meta/state/lake.json。"
+
 #: cnequity/cli/_root.py
 msgid "Run the pipeline"
 msgstr "跑 pipeline"
@@ -4918,6 +5019,10 @@ msgstr "舆情 / 轮动"
 #: cnequity/cli/ths_official_cmds.py
 msgid "Service start date."
 msgstr "服务起点。"
+
+#: cnequity/storage/migrations.py
+msgid "Settle Beijing whole-day and pre-listing daily-bar debts already proven"
+msgstr "结清已证明的北交所整日与上市前日线欠账"
 
 #: cnequity/cli/_shared.py
 msgid "Shanghai and Shenzhen A shares (config excludes Beijing)"
@@ -5939,10 +6044,22 @@ msgstr "交易日"
 msgid "Trading year covered by the annual ZIP."
 msgstr "年度 ZIP 对应的交易年份。"
 
+#: cnequity/storage/migrations.py
+msgid "Turn missing EastMoney and CNI index weights into nulls"
+msgstr "把东财和国证缺失的指数权重改为空值"
+
+#: cnequity/storage/migrations.py
+msgid "Turn valuation zero placeholders into nulls"
+msgstr "把估值的零占位改为空值"
+
 #: cnequity/research/packs.py
 #, python-brace-format
 msgid "Unadjusted daily bars for {count} stocks can already be queried by symbol (`load(\"daily_bars\", symbols=[...])`). Adjustment factors are published when init finishes. This is not the whole market yet."
 msgstr "已有 {count} 只股票的未复权日线可按代码查询（`load(\"daily_bars\", symbols=[...])`）。复权因子要等初始化收尾发布。这还不是全市场。"
+
+#: cnequity/storage/migrations.py
+msgid "Unify the P/E and market-cap bases of valuation rows"
+msgstr "统一估值行的市盈率与市值口径"
 
 #: cnequity/cli/repair_cmds.py
 msgid ""
@@ -6946,6 +7063,10 @@ msgstr "只读"
 msgid "read-only (--read-only)"
 msgstr "只读（--read-only）"
 
+#: cnequity/cli/repair_cmds.py
+msgid "reads"
+msgstr "读取"
+
 #: cnequity/serve/lake.py
 msgid "recomputed from curated"
 msgstr "由 curated 重算"
@@ -7030,6 +7151,10 @@ msgstr "只证券"
 msgid "the default dataset-coverage mode"
 msgstr "默认的数据集覆盖模式"
 
+#: cnequity/storage/migrations.py
+msgid "the exchanges' official fund lists"
+msgstr "交易所官方基金列表"
+
 #: cnequity/cli/quality_cmds.py
 #, python-brace-format
 msgid "the latest audit has {value} errors"
@@ -7059,6 +7184,11 @@ msgstr "交易状态"
 #, python-brace-format
 msgid "trading_calendar failed: {cal}"
 msgstr "trading_calendar 失败：{cal}"
+
+#: cnequity/cli/repair_cmds.py
+#, python-brace-format
+msgid "unknown migration(s): {names}; known: {known}"
+msgstr "未知迁移：{names}；已知：{known}"
 
 #: cnequity/diagnostics/source_health.py
 msgid "unreachable"

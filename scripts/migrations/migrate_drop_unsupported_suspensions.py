@@ -37,6 +37,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from contextlib import nullcontext
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -46,6 +47,7 @@ sys.path.insert(0, str(ROOT / "src"))
 import polars as pl
 
 from cnequity.config import load_config
+from cnequity.file_lock import lake_mutation_lock
 from cnequity.storage.atomic import write_parquet_atomic
 
 DEFAULT_CONFIG = ROOT / "configs/cnequity.toml"
@@ -140,12 +142,15 @@ def main() -> int:
     parser.add_argument("--apply", action="store_true")
     args = parser.parse_args()
     cfg = load_config(args.config)
-    return run(
-        cfg,
-        cfg.data_root / "_quarantine",
-        source=args.source,
-        apply=args.apply,
-    )
+    # Hold the lock compaction and every packaged repair take, so this
+    # rewrite cannot interleave with a run publishing the same dataset.
+    with lake_mutation_lock(cfg.meta_root, blocking=False) if args.apply else nullcontext():
+        return run(
+            cfg,
+            cfg.data_root / "_quarantine",
+            source=args.source,
+            apply=args.apply,
+        )
 
 
 if __name__ == "__main__":

@@ -88,6 +88,7 @@ cne config create
 ```bash
 pip install --upgrade cnequity
 cne config upgrade
+cne migrate            # 预览还欠的数据迁移；确认后 cne migrate --apply
 ```
 
 继承内置默认值（`extends = "builtin"`）的配置不需要改动，这条命令只会报告无事可做。旧的完整配置由 `cne config upgrade` 把新版本加入的调度 step 和调度组补进去，先备份原文件，写完后校验；`--minimize` 则把它改写成继承默认值的形式。先阅读目标版本的[更新日志](../changelog.md)和[升级与反馈](#升级与兼容性)，确认是否需要数据迁移。不要用 `config create --force` 代替配置升级。
@@ -122,7 +123,7 @@ TDX 线协议客户端随包内置，无需安装通达信桌面软件。依赖�
 
 1. 核对新版本的范围、已知限制与迁移要求。
 2. 更新软件后执行 `cne config upgrade`：把新版本加入的调度 step 和调度组补进本地配置，原文件自动备份，凭证、路径与其他设置不动。想先看改动可加 `--dry-run`；完整差异用 `cne config diff` 查看。
-3. 执行版本说明要求的迁移，并核对状态与质量报告。
+3. 运行 `cne migrate` 预览还欠的数据迁移，确认后 `cne migrate --apply`，再核对状态与质量报告。
 4. 使用原有查询验证关键数据口径，再恢复定时任务。
 
 迁移说明见仓库的 [contracts/migrations](https://github.com/rootSunc/CNEquity/tree/main/contracts/migrations)，常用工具见[运行脚本](../operations/scripts.md)。回退软件不一定能回退已迁移的数据，恢复时同时核对配置、软件与数据版本。

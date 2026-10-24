@@ -30,6 +30,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from contextlib import nullcontext
 from datetime import date, datetime
 from pathlib import Path
 
@@ -44,6 +45,7 @@ from cnequity.domain.pit import (
     PIT_DATASET_NAMES,
     normalize_pit_storage_columns,
 )
+from cnequity.file_lock import lake_mutation_lock
 from cnequity.orchestrator.engine import JobEngine
 from cnequity.steps.http_common import verify_raw_archive, write_fetched
 from cnequity.storage.atomic import write_parquet_atomic
@@ -318,20 +320,23 @@ def main() -> int:
         parser.error("--apply and --dry-run are mutually exclusive")
 
     cfg = load_config(args.config)
-    if args.recover_cninfo_announcement_times:
-        if (args.start is None) != (args.end is None):
-            parser.error("--start and --end must be supplied together")
-        if args.start is not None and args.start > args.end:
-            parser.error("--start must not be after --end")
-        return recover_cninfo_announcement_times(
-            cfg,
-            apply=args.apply,
-            start=args.start,
-            end=args.end,
-        )
-    datasets = tuple(args.dataset or sorted(PIT_DATASET_NAMES))
-    print(f"PIT bitemporal columns under {cfg.curated_root}")
-    return run(cfg.curated_root, datasets=datasets, apply=args.apply)
+    # Hold the lock compaction and every packaged repair take, so this
+    # rewrite cannot interleave with a run publishing the same dataset.
+    with lake_mutation_lock(cfg.meta_root, blocking=False) if args.apply else nullcontext():
+        if args.recover_cninfo_announcement_times:
+            if (args.start is None) != (args.end is None):
+                parser.error("--start and --end must be supplied together")
+            if args.start is not None and args.start > args.end:
+                parser.error("--start must not be after --end")
+            return recover_cninfo_announcement_times(
+                cfg,
+                apply=args.apply,
+                start=args.start,
+                end=args.end,
+            )
+        datasets = tuple(args.dataset or sorted(PIT_DATASET_NAMES))
+        print(f"PIT bitemporal columns under {cfg.curated_root}")
+        return run(cfg.curated_root, datasets=datasets, apply=args.apply)
 
 
 if __name__ == "__main__":

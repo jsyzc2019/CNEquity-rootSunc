@@ -7,7 +7,13 @@ import json
 import click
 
 from cnequity.cli._root import CneCommand, cli
-from cnequity.cli._shared import _cfg, comma_option, config_option, warn_deprecated_migration
+from cnequity.cli._shared import (
+    _cfg,
+    comma_option,
+    comma_values,
+    config_option,
+    warn_deprecated_migration,
+)
 from cnequity.i18n import N_, _
 
 
@@ -27,10 +33,13 @@ class DeprecatedMigration(CneCommand):
     """
 
     def __init__(self, *args, **kwargs):
+        # Hidden from `cne repair --help`: `cne migrate` finds and runs these.
+        kwargs.setdefault("hidden", True)
         super().__init__(*args, **kwargs)
         self.epilog = N_(
             "Deprecated: a one-time migration for lakes written by cnequity 0.17 or earlier; "
-            "current versions no longer write this defect. It will be removed in 0.20.0."
+            "current versions no longer write this defect. `cne migrate` runs it, and records "
+            "that it ran. It will be removed in 0.20.0."
         )
 
     def get_short_help_str(self, limit: int = 45) -> str:
@@ -40,6 +49,90 @@ class DeprecatedMigration(CneCommand):
     def invoke(self, ctx: click.Context):
         warn_deprecated_migration(ctx.command_path)
         return super().invoke(ctx)
+
+
+@cli.command("migrate")
+@config_option
+@click.option(
+    "--apply",
+    is_flag=True,
+    help=N_("Run the owed migrations and record each result in meta/state/lake.json."),
+)
+@comma_option(
+    "--only",
+    "only",
+    help=N_(
+        "Comma-separated migration ids; runs them even when already recorded. "
+        "Default: every migration this lake still owes."
+    ),
+)
+@click.option("--json", "as_json", is_flag=True, help=N_("Output machine-readable JSON."))
+def migrate(config_path: str, apply: bool, only: str | None, as_json: bool):
+    """Preview, or with --apply run, the one-off fixes this lake still owes.
+
+    
+    A release that fixes a writer can leave rows the old writer stored. Each such fix is a
+    migration; meta/state/lake.json records the version that built the lake (it owes nothing
+    introduced earlier) and every migration it has applied or found nothing to do.
+    A preview reports how many rows each would change. --apply runs them in order: each takes the
+    lake lock, publishes through the repair gate and keeps the previous revision readable.
+
+    """
+    from cnequity.storage.migrations import MIGRATIONS, affected, owed, read_lake, record
+
+    cfg = _cfg(config_path)
+    by_id = {m.id: m for m in MIGRATIONS}
+    only = comma_values(only, "--only")
+    if only:
+        unknown = sorted(set(only) - set(by_id))
+        if unknown:
+            raise click.BadParameter(
+                _("unknown migration(s): {names}; known: {known}").format(
+                    names=", ".join(unknown), known=", ".join(by_id)
+                ),
+                param_hint="--only",
+            )
+        chosen = [m for m in MIGRATIONS if m.id in only]
+    else:
+        chosen = owed(cfg)
+    results: list[dict] = []
+    failed = False
+    if not chosen and not as_json:
+        created = read_lake(cfg).get("created_with")
+        click.echo(
+            _(
+                "Nothing owed: every migration is recorded, or the lake was built by {version}."
+            ).format(version=created or "?")
+        )
+        return
+    for migration in chosen:
+        if not as_json:
+            note = f" ({_('reads')} {_(migration.reads)})" if migration.reads else ""
+            click.echo(f"--- {migration.id}: {_(migration.title)}{note}", err=True)
+        try:
+            report = migration.apply(cfg, apply=apply)
+        except Exception as exc:  # noqa: BLE001 — report it and stop; later ones may depend on it
+            failed = True
+            results.append({"id": migration.id, "error": f"{type(exc).__name__}: {exc}"})
+            if not as_json:
+                click.echo(_("  failed: {exc}").format(exc=exc), err=True)
+            break
+        count = affected(report)
+        if apply:
+            record(cfg, migration, report)
+        results.append({"id": migration.id, "affected": count, "report": report})
+        if not as_json:
+            if apply:
+                line = _("  applied: {count} row(s)") if count else _("  nothing to do; recorded")
+            else:
+                line = _("  would change {count} row(s)") if count else _("  nothing to do")
+            click.echo(line.format(count=count), err=True)
+    if as_json:
+        click.echo(json.dumps({"applied": apply, "migrations": results}, default=str, indent=2))
+    elif not apply and not failed:
+        click.echo(_("Preview only. Run `cne migrate --apply` to apply and record them."))
+    if failed:
+        raise SystemExit(1)
 
 
 @cli.group()

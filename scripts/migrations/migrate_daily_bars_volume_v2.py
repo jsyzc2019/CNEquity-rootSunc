@@ -48,6 +48,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from contextlib import nullcontext
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -58,6 +59,7 @@ import polars as pl
 from cnequity.adapters.tdx_protocol._decode import DECODED_ZERO
 from cnequity.config import load_config
 from cnequity.domain.units import SHARES_PER_LOT
+from cnequity.file_lock import lake_mutation_lock
 from cnequity.storage.atomic import write_parquet_atomic
 
 DEFAULT_CONFIG = ROOT / "configs/cnequity.toml"
@@ -162,8 +164,11 @@ def main() -> int:
         parser.error("--apply and --dry-run are mutually exclusive")
 
     cfg = load_config(args.config)
-    print(f"daily_bars volume {FROM_VERSION}→{TO_VERSION} under {cfg.curated_root}")
-    return run(cfg.curated_root, apply=args.apply)
+    # Hold the lock compaction and every packaged repair take, so this
+    # rewrite cannot interleave with a run publishing the same dataset.
+    with lake_mutation_lock(cfg.meta_root, blocking=False) if args.apply else nullcontext():
+        print(f"daily_bars volume {FROM_VERSION}→{TO_VERSION} under {cfg.curated_root}")
+        return run(cfg.curated_root, apply=args.apply)
 
 
 if __name__ == "__main__":

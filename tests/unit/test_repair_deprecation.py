@@ -38,14 +38,17 @@ def test_exactly_the_one_time_migrations_are_deprecated():
     assert deprecated == MIGRATIONS
 
 
-def test_help_marks_deprecated_commands_and_names_the_removal():
+def test_deprecated_commands_leave_the_listing_but_still_run_and_point_to_migrate():
     listing = CliRunner().invoke(cli, ["repair", "--help"]).output
     rows = {line.split()[0]: line for line in listing.splitlines() if line.startswith("  ")}
-    assert "[deprecated]" in rows["orphan-symbols"]
-    assert "[deprecated]" not in rows["layout"]
+    # `cne migrate` finds and runs them; the listing keeps the repairs people choose.
+    assert "orphan-symbols" not in rows
+    assert "layout" in rows
 
     page = CliRunner().invoke(cli, ["repair", "orphan-symbols", "--help"]).output
-    assert "removed in 0.20.0" in " ".join(page.split())
+    flat = " ".join(page.split())
+    assert "removed in 0.20.0" in flat
+    assert "cne migrate" in flat
 
 
 def test_run_warns_on_stderr_and_keeps_stdout_json(monkeypatch):

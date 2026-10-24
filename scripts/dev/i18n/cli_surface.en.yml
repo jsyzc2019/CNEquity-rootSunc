@@ -18,6 +18,7 @@ mcp: ["conditional", "Reads the lake by default; --live may fetch source data; -
 profile list: ["none", "Lists built-in scopes"]
 profile show: ["none", "Shows a built-in scope"]
 query: ["conditional", "SQL reads the lake; fetches data on an on-demand cache miss or refresh"]
+migrate: ["conditional", "Read-only preview by default; --apply runs the owed migrations in order, publishes through the repair gate keeping the old version, and writes the results to meta/state/lake.json; fund-listing-dates reads the exchanges' fund lists, misdated-valuation reads the EastMoney datacenter when it has rows to replace"]
 repair corporate-action-gaps: ["with --apply", "Offline preview by default; --apply queries Baostock and CNINFO per gap, publishes a new version after verification and keeps the old one"]
 repair layout: ["none", "Preview only by default; --apply publishes a new version, keeping the old version and duplicate-observation evidence"]
 repair misdated-valuation: ["with --apply", "Offline preview by default; --apply fetches valuation for the replaced sessions from the EastMoney datacenter, publishes a new version after verification and keeps the old one"]

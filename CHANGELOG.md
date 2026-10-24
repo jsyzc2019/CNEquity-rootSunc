@@ -4,6 +4,8 @@
 
 ## [0.19.0] — 未发布
 
+- 新增 `cne migrate`：一次找出并运行这个湖还欠的一次性数据迁移（默认预览，`--apply` 运行），结果记在 `meta/state/lake.json`。新建的湖会记下建湖版本，不欠早于它的迁移；`cne doctor` 会提示还没检查的迁移。弃用的一次性 `cne repair` 命令改由它统一运行，已从 `cne repair --help` 隐藏，仍可直接调用（0.20.0 移除）；`status-outages` 需要指定停机窗口，仍须手工运行。
+- 仓库 `scripts/migrations/` 的脚本在 `--apply` 时持有湖的变更锁，不再可能与正在发布同一数据集的运行交错写入。
 - 新增 `cne schedule install|status|remove`：在命令行为当前用户安装、查看、移除定时任务（macOS launchd、Linux crontab、Windows 任务计划程序），与 `cne serve` 操作页是同一个任务；没给出的选项保留面板里的设置。
 - 新增 `cne run maintain`，定时任务在每个交易日日更后自动运行：运行审计（`[job.maintenance] full_audit_weekday` 那天做全湖审计）、新鲜度门禁、源探针与 SLO、运行证据核验、元数据备份和过期预览。此前只有仓库脚本做元数据备份，用 `cne init --schedule` 或控制台装定时任务的湖没有 manifest 备份；备份改用 SQLite 备份接口，不再依赖 `sqlite3` 命令。
 - `scripts/scheduler/` 弃用，0.20.0 移除；迁移时先运行 `uninstall_scheduler.sh`，再 `cne schedule install`。`backup_meta.sh` 已改为调用同一份备份代码。

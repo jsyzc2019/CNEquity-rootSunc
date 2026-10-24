@@ -157,6 +157,30 @@ def _check_credentials(config, findings: list[Finding]) -> None:
         )
 
 
+def _check_migrations(config, findings: list[Finding]) -> None:
+    """One-off fixes for rows an older version wrote, not yet run on this lake."""
+    from cnequity.storage.migrations import owed
+
+    meta_root = getattr(config, "meta_root", None)
+    if meta_root is None or not Path(meta_root).is_dir():
+        return
+    pending = owed(config)
+    if pending:
+        findings.append(
+            Finding(
+                severity=Severity.WARN,
+                title=Message(
+                    N_("%s lake migration(s) not yet checked on this lake"), len(pending)
+                ),
+                detail=N_(
+                    "Fixes for rows that an older version wrote. `cne migrate` previews what each "
+                    "would change; `--apply` runs them and records the result."
+                ),
+                fix="cne migrate",
+            )
+        )
+
+
 def _check_data_root(data_root: Path, findings: list[Finding]) -> None:
     if not data_root.is_absolute():
         findings.append(
@@ -227,6 +251,7 @@ def build_report(config=None, config_path: Path | None = None) -> Report:
     else:
         _check_data_root(Path(config.data_root), findings)
         _check_credentials(config, findings)
+        _check_migrations(config, findings)
 
     env = _environment()
     if config_path is not None:

@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from contextlib import nullcontext
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
@@ -40,6 +41,7 @@ import polars as pl
 
 from cnequity.config import load_config
 from cnequity.domain.symbols import is_all_a_symbol, parse_symbol
+from cnequity.file_lock import lake_mutation_lock
 from cnequity.query.canonical import dedupe_lazy_by_primary_key
 from cnequity.query.parquet_scan import scan_parquet_root
 from cnequity.storage.atomic import write_parquet_atomic
@@ -172,8 +174,11 @@ def main() -> int:
     parser.add_argument("--apply", action="store_true")
     args = parser.parse_args()
     cfg = load_config(args.config)
-    td = date.fromisoformat(args.trade_date) if args.trade_date else date.today()
-    return run(cfg, cfg.data_root / "_quarantine", trade_date=td, apply=args.apply)
+    # Hold the lock compaction and every packaged repair take, so this
+    # rewrite cannot interleave with a run publishing the same dataset.
+    with lake_mutation_lock(cfg.meta_root, blocking=False) if args.apply else nullcontext():
+        td = date.fromisoformat(args.trade_date) if args.trade_date else date.today()
+        return run(cfg, cfg.data_root / "_quarantine", trade_date=td, apply=args.apply)
 
 
 if __name__ == "__main__":

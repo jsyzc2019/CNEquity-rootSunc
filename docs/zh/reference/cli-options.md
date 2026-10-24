@@ -192,6 +192,15 @@
 | `--port` | `8788` | --http 的端口。 |
 | `--token` | `—` | --http：每个请求都要带这个令牌（Bearer 头、/mcp/<令牌> 路径或 ?token=）。经隧道公开时必须设置。 |
 
+## `cne migrate`
+
+| 参数 | 默认值 | 说明 |
+|---|---|---|
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
+| `--apply` | `False` | 运行欠下的迁移，并把每个结果记入 meta/state/lake.json。 |
+| `--only` | `—` | 逗号分隔的迁移 id；即使已记录也重新运行。默认：这个湖还欠的全部迁移。 |
+| `--json` | `False` | 输出机器可读的 JSON。 |
+
 ## `cne profile list`
 
 | 参数 | 默认值 | 说明 |

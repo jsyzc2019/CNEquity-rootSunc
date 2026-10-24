@@ -31,6 +31,7 @@
 | [`cne storage`](#cne-storage) | 版本保留登记、清理计划与原地待删除标记 |
 | [`cne backfill`](#cne-backfill-dataset) | 回填一个数据集 |
 | [`cne derive`](#cne-derive-name) | 派生计算数据集 |
+| [`cne migrate`](#cne-migrate) | 预览或运行这个湖还欠的一次性迁移，并记录结果 |
 | [`cne repair`](#cne-repair) | 离线修复已存数据的布局或字段口径；默认只预览，`--apply` 发布新版本 |
 
 `compact` 已经是每个 schedule group 自带的 step，所以 `retry` / `compact` / `clean`
@@ -545,11 +546,28 @@ cne derive trading_status --start 2001-01-01 --end 2001-12-31
 
 `cne derive bse_code_migration`（把北交所旧码合并到 920 新码）和 `cne derive valuation_orphans`（删除没有日线的证券的估值行）已弃用，将在 0.20.0 移除。它们只迁移 0.17 及更早版本写入的湖：新采集不会再把北交所改名记成退市，`valuation_metrics` 回填时也会自动清理孤立的估值行。运行时在 stderr 打印弃用警告。
 
+## cne migrate
+
+升级后修复旧版本写下的数据。新版本修好写入逻辑后，旧版本存下的行仍需一次性修正；每个修正是一个迁移。`meta/state/lake.json` 记录建湖的版本（早于它引入的迁移不需要运行）和这个湖已经运行过、或检查后无需运行的迁移。
+
+```bash
+cne migrate             # 预览：每个迁移会改多少行，不写任何东西
+cne migrate --apply     # 按顺序运行并记录结果
+```
+
+| 选项 | 说明 |
+|------|------|
+| `--apply` | 运行还欠的迁移，并把结果写进 `meta/state/lake.json` |
+| `--only` | 逗号分隔的迁移 id；即使已记录也重新运行 |
+| `--json` | 机器可读输出 |
+
+每个迁移都持有湖的变更锁，经修复门禁发布，旧版本保留可读。一个迁移失败时停止，后面的不运行，也不记录。`fund-listing-dates` 会读取交易所官方基金列表，`misdated-valuation` 在有需要替换的行时读取东财数据中心，其余只读湖。`cne doctor` 会提示还没检查的迁移。仓库 `scripts/migrations/` 里的脚本针对 0.12 及更早版本写入的湖，只在源码 checkout 里有；`--apply` 时同样持有湖的变更锁。
+
 ## cne repair
 
 默认基于湖中已有数据输出计划；加 `--apply` 后以新版本发布，旧版本继续保留，可按版本读取。`corporate-action-gaps --apply` 会按缺口向数据源补取证据。
 
-**一次性迁移命令已弃用，将在 0.20.0 移除。** `missing-values`、`financial-announcements`、`fund-factors`、`daily-bar-coverage`、`fund-listing-dates`、`valuation-basis`、`orphan-symbols`、`stale-suspensions`、`status-outages`、`status-listing-window` 和 `misdated-valuation` 只修 0.17 及更早版本写入的数据，当前版本采集时已不再产生这些问题。新建的湖不需要运行；旧湖如需迁移，请在升级到 0.20.0 之前用 0.18 或 0.19 运行。运行这些命令时会在 stderr 打印弃用警告，stdout 的 JSON 报告不变。
+**一次性迁移命令已弃用，将在 0.20.0 移除。** `missing-values`、`financial-announcements`、`fund-factors`、`daily-bar-coverage`、`fund-listing-dates`、`valuation-basis`、`orphan-symbols`、`stale-suspensions`、`status-outages`、`status-listing-window` 和 `misdated-valuation` 只修 0.17 及更早版本写入的数据，当前版本采集时已不再产生这些问题。新建的湖不需要运行；旧湖用 [`cne migrate`](#cne-migrate) 一次找出并运行（`status-outages` 需要指定停机窗口，仍须手工运行），请在升级到 0.20.0 之前完成。这些命令已从 `cne repair --help` 隐藏，仍可直接调用；运行时会在 stderr 打印弃用警告，stdout 的 JSON 报告不变。
 
 `--apply` 发布前会比较已提交版本与候选版本的离线质量检查。历史因子/公司行为矛盾单独记录为非阻断诊断。无效因子数值、损坏文件、主键错误等结构问题新增或恶化时会阻止发布，候选版本移入 `_quarantine`，报告写入 `meta/quality/publication/`。这项修复门禁不受 `[quality].publication_gate` 的普通日更发布设置影响。
 

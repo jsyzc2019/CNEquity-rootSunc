@@ -184,6 +184,7 @@ When you upgrade:
 ```bash
 pip install -U cnequity
 cne config upgrade
+cne migrate        # preview one-off fixes for data older versions wrote; then add --apply
 ```
 
 The config `cne init` writes extends the built-in defaults (`extends = "builtin"`), so a new release's schedule steps apply after the upgrade and `cne config upgrade` reports nothing to do; for a full config written by an older version it adds the new steps (keeping a backup), or `cne config upgrade --minimize` converts it once to extend the defaults.

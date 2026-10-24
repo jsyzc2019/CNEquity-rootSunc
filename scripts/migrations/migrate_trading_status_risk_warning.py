@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from contextlib import nullcontext
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -45,6 +46,7 @@ import polars as pl
 
 from cnequity.config import load_config
 from cnequity.domain.trading_status import LEGACY_ST_STATUSES, normalize_legacy
+from cnequity.file_lock import lake_mutation_lock
 from cnequity.storage.atomic import write_parquet_atomic
 
 DEFAULT_CONFIG = ROOT / "configs/cnequity.toml"
@@ -109,8 +111,11 @@ def main() -> int:
         parser.error("--apply and --dry-run are mutually exclusive")
 
     cfg = load_config(args.config)
-    print(f"trading_status status/risk_warning split under {cfg.curated_root}")
-    return run(cfg.curated_root, apply=args.apply)
+    # Hold the lock compaction and every packaged repair take, so this
+    # rewrite cannot interleave with a run publishing the same dataset.
+    with lake_mutation_lock(cfg.meta_root, blocking=False) if args.apply else nullcontext():
+        print(f"trading_status status/risk_warning split under {cfg.curated_root}")
+        return run(cfg.curated_root, apply=args.apply)
 
 
 if __name__ == "__main__":

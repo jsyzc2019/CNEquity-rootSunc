@@ -31,6 +31,7 @@ The sections are defined by `SECTIONS` in `cnequity/cli/_root.py`; leaving any c
 | [`cne storage`](#cne-storage) | Version-retention register, cleanup plans and in-place pending-deletion marks |
 | [`cne backfill`](#cne-backfill-dataset) | Backfill one dataset |
 | [`cne derive`](#cne-derive-name) | Compute derived datasets |
+| [`cne migrate`](#cne-migrate) | Preview or run the one-off migrations this lake still owes, and record the results |
 | [`cne repair`](#cne-repair) | Offline repair of stored data layout or field semantics; previews by default, `--apply` publishes a new version |
 
 `compact` is already a step built into every schedule group, so `retry` / `compact` / `clean`
@@ -548,11 +549,28 @@ cne derive trading_status --start 2001-01-01 --end 2001-12-31
 
 `cne derive bse_code_migration` (collapse old BSE codes onto the 920 codes) and `cne derive valuation_orphans` (drop valuation rows of securities without daily bars) are deprecated and will be removed in 0.20.0. They only migrate lakes written by 0.17 or earlier: ingestion no longer records a BSE rename as a delisting, and a `valuation_metrics` backfill drops orphan valuation rows by itself. They print a deprecation warning on stderr.
 
+## cne migrate
+
+Fixes data that older versions wrote, after an upgrade. When a release fixes a writer, rows the old writer stored still need a one-off correction; each such correction is a migration. `meta/state/lake.json` records the version that built the lake (migrations introduced earlier do not apply) and every migration this lake has run or checked and found nothing to do.
+
+```bash
+cne migrate             # preview: how many rows each migration would change; writes nothing
+cne migrate --apply     # runs them in order and records the results
+```
+
+| Option | Description |
+|------|------|
+| `--apply` | Run the owed migrations and write the results to `meta/state/lake.json` |
+| `--only` | Comma-separated migration ids; runs them even when already recorded |
+| `--json` | Machine-readable output |
+
+Each migration holds the lake mutation lock, publishes through the repair gate, and keeps the previous revision readable. When one fails, the run stops; later ones neither run nor get recorded. `fund-listing-dates` reads the exchanges' official fund lists and `misdated-valuation` reads the EastMoney datacenter when it has rows to replace; the rest read only the lake. `cne doctor` reports migrations not yet checked. The scripts in the repository's `scripts/migrations/` target lakes written by 0.12 or earlier and exist only in a source checkout; with `--apply` they hold the lake mutation lock too.
+
 ## cne repair
 
 By default it outputs a plan based on data already in the lake; with `--apply` it publishes as a new version, the old version is kept, and both can be read by version. `corporate-action-gaps --apply` fetches evidence from data sources for each gap.
 
-**One-time migration commands are deprecated and will be removed in 0.20.0.** `missing-values`, `financial-announcements`, `fund-factors`, `daily-bar-coverage`, `fund-listing-dates`, `valuation-basis`, `orphan-symbols`, `stale-suspensions`, `status-outages`, `status-listing-window` and `misdated-valuation` only fix data written by 0.17 or earlier; current versions no longer produce these defects during ingestion. A new lake does not need them; an older lake that needs a migration should run it with 0.18 or 0.19 before upgrading to 0.20.0. These commands print a deprecation warning on stderr; the JSON report on stdout is unchanged.
+**One-time migration commands are deprecated and will be removed in 0.20.0.** `missing-values`, `financial-announcements`, `fund-factors`, `daily-bar-coverage`, `fund-listing-dates`, `valuation-basis`, `orphan-symbols`, `stale-suspensions`, `status-outages`, `status-listing-window` and `misdated-valuation` only fix data written by 0.17 or earlier; current versions no longer produce these defects during ingestion. A new lake does not need them; an older lake finds and runs them in one go with [`cne migrate`](#cne-migrate) (`status-outages` needs an outage window and stays manual), before upgrading to 0.20.0. They are hidden from `cne repair --help` but can still be called; they print a deprecation warning on stderr, and the JSON report on stdout is unchanged.
 
 Before publishing, `--apply` compares offline quality checks between the committed version and the candidate version. Historical factor/action contradictions are advisory diagnostics. New or worsened structural problems, including invalid factor values, corrupt files and primary-key errors, block publication; the candidate version is moved into `_quarantine`, and the report is written to `meta/quality/publication/`. This repair gate is not affected by the ordinary daily-update publication setting `[quality].publication_gate`.
 

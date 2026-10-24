@@ -19,6 +19,7 @@ Checked against the Click command registry by `scripts/dev/sync_docs.py`. “Whe
 | `cne doctor` | none | Checks config and environment offline |
 | `cne init` | conditional | sample is offline; demo/quick/full fetch data; layout-only creates directories |
 | `cne mcp` | conditional | Reads the lake by default; --live may fetch source data; --http listens on a local port |
+| `cne migrate` | conditional | Read-only preview by default; --apply runs the owed migrations in order, publishes through the repair gate keeping the old version, and writes the results to meta/state/lake.json; fund-listing-dates reads the exchanges' fund lists, misdated-valuation reads the EastMoney datacenter when it has rows to replace |
 | `cne profile list` | none | Lists built-in scopes |
 | `cne profile show` | none | Shows a built-in scope |
 | `cne query` | conditional | SQL reads the lake; fetches data on an on-demand cache miss or refresh |

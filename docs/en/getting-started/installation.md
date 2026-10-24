@@ -88,6 +88,7 @@ Copying the template directly skips path resolution and platform adjustments, so
 ```bash
 pip install --upgrade cnequity
 cne config upgrade
+cne migrate            # preview owed data migrations; then cne migrate --apply
 ```
 
 A config that extends the built-in defaults (`extends = "builtin"`) needs no change, and this command reports nothing to do. For an older full config, `cne config upgrade` adds the schedule steps and schedule groups introduced by the new version, backs up the original file first, and validates after writing; `--minimize` instead rewrites it to extend the defaults. First read the target version's [changelog](../changelog.md) and [Upgrades and feedback](#upgrades-and-compatibility) to confirm whether a data migration is needed. Do not use `config create --force` in place of a config upgrade.
@@ -122,7 +123,7 @@ Software version, dataset schema version and data revision mean different things
 
 1. Check the new version's scope, known limitations and migration requirements.
 2. After updating the software, run `cne config upgrade`: it adds the schedule steps and schedule groups introduced by the new version to your local config, backs up the original file automatically, and leaves credentials, paths and other settings untouched. Add `--dry-run` to preview the changes first; use `cne config diff` for the full diff.
-3. Run the migrations required by the release notes, and check the status and quality reports.
+3. Run `cne migrate` to preview owed data migrations, then `cne migrate --apply`, and check the status and quality reports.
 4. Verify the definitions of key data with your existing queries, then re-enable scheduled tasks.
 
 Migration notes are in the repository's [contracts/migrations](https://github.com/rootSunc/CNEquity/tree/main/contracts/migrations); for common tools, see [Operations scripts](../operations/scripts.md). Rolling back the software does not necessarily roll back migrated data; when restoring, check config, software and data versions together.
