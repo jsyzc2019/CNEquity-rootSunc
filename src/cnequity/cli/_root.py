@@ -274,10 +274,11 @@ def _expected_failure(exc: Exception) -> str | None:
     from cnequity.orchestrator.outcomes import InputUnavailableError
     from cnequity.orchestrator.run_lock import RunLockError
     from cnequity.query.reader import ReaderError
+    from cnequity.storage.lifecycle import LifecycleError
 
     # Another job holding the lake is the lake's state too: `cne backfill`
     # beside a running init printed the refusal under a traceback.
-    if isinstance(exc, ReaderError | InputUnavailableError | RunLockError):
+    if isinstance(exc, ReaderError | InputUnavailableError | RunLockError | LifecycleError):
         return str(exc)
     return None
 

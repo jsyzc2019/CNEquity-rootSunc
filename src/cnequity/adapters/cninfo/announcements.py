@@ -441,10 +441,6 @@ def _pagination_page_signature(batch: list[dict]) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
-class _NeedDateSplit(RuntimeError):
-    """Internal signal: this date interval cannot be walked safely as one."""
-
-
 def _pagination_total_records(data: dict, *, column: str, page: int) -> int | None:
     """Read optional record totals used to reconcile unique primary keys."""
     values: dict[str, int] = {}

@@ -21,6 +21,8 @@ from cnequity.domain.schemas import (
     MOCK_SOURCE,
     PRIMARY_KEYS,
     SchemaValidationError,
+    derivative_bar_violations,
+    market_bar_violations,
     required_columns_for_dataset,
 )
 from cnequity.query.parquet_scan import (
@@ -138,6 +140,14 @@ def _validate_parquet_file(path: Path, dataset: str) -> None:
         else:
             casts.append(pl.col(col).cast(dtype, strict=False))
 
+    derivative_predicate = derivative_bar_violations(dataset)
+    if derivative_predicate is not None:
+        # The shared derivative predicate names optional exchange fields too.
+        # Older files may predate them; typed nulls preserve that contract
+        # without materializing any rows or skipping the present fields.
+        casts.extend(
+            pl.lit(None, dtype=schema[col]).alias(col) for col in schema if col not in columns
+        )
     normalized = pl.scan_parquet(path).select(casts)
     expressions = [pl.len().alias("_rows")]
     expressions.extend(pl.col(col).null_count().alias(f"_null_{col}") for col in required)
@@ -153,38 +163,11 @@ def _validate_parquet_file(path: Path, dataset: str) -> None:
         for col in float_columns
     )
 
-    bar_datasets = {
-        "daily_bars",
-        "index_bars",
-        "minute_bars",
-        "minute_bars_5m",
-        "commodity_bars",
-        "sector_bars",
-        "trade_ticks",
-    }
-    price_columns = [col for col in ("open", "high", "low", "close", "price") if col in columns]
-    semantic_checks = [pl.col(col) <= 0 for col in price_columns]
-    if "volume" in columns:
-        semantic_checks.append(pl.col("volume") < 0)
-    if "amount" in columns:
-        semantic_checks.append(pl.col("amount").is_not_null() & (pl.col("amount") < 0))
-    if all(col in columns for col in ("open", "high", "low", "close")):
-        ohlc_row = (
-            pl.col("volume").is_null() | (pl.col("volume") > 0)
-            if "volume" in columns
-            else pl.lit(True)
-        )
-        semantic_checks.extend(
-            [
-                ohlc_row & (pl.col("high") < pl.col("open")),
-                ohlc_row & (pl.col("high") < pl.col("close")),
-                ohlc_row & (pl.col("low") > pl.col("open")),
-                ohlc_row & (pl.col("low") > pl.col("close")),
-                ohlc_row & (pl.col("low") > pl.col("high")),
-            ]
-        )
-    if dataset in bar_datasets and semantic_checks:
-        expressions.append(pl.any_horizontal(semantic_checks).sum().alias("_semantic_bad"))
+    market_predicate = market_bar_violations(dataset, columns)
+    if market_predicate is not None:
+        expressions.append(market_predicate.sum().alias("_semantic_bad"))
+    if derivative_predicate is not None:
+        expressions.append(derivative_predicate.sum().alias("_derivative_bad"))
 
     try:
         summary = normalized.select(expressions).collect(engine="streaming").row(0, named=True)
@@ -229,12 +212,11 @@ def _validate_parquet_file(path: Path, dataset: str) -> None:
         raise SchemaValidationError(
             f"dataset '{dataset}': {semantic_bad} row(s) violate numeric market-data invariants"
         )
-
-
-def _schema_contract_findings(files: list[Path], dataset: str, root: Path) -> dict | None:
-    """Return the schema finding while keeping the scan helper testable."""
-    finding, _, _ = _schema_contract_scan(files, dataset, root)
-    return finding
+    derivative_bad = int(summary.get("_derivative_bad") or 0)
+    if derivative_bad:
+        raise SchemaValidationError(
+            f"dataset '{dataset}': {derivative_bad} row(s) violate futures/option bar invariants"
+        )
 
 
 def _unreadable_parquet_finding(files: list[Path], dataset: str, root: Path) -> dict | None:

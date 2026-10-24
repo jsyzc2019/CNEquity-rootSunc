@@ -6,6 +6,7 @@ import json
 import math
 import sqlite3
 import time
+from contextlib import closing
 from urllib.parse import quote
 
 from cnequity.adapters.eastmoney import host_guard, news_pause
@@ -150,7 +151,7 @@ def _latest_run_metrics(config) -> dict | None:
         return None
     try:
         uri = f"file:{quote(str(path), safe='/')}?mode=ro"
-        with sqlite3.connect(uri, uri=True) as conn:
+        with closing(sqlite3.connect(uri, uri=True)) as conn:
             row = conn.execute(
                 "SELECT run_id, metadata_json FROM ingestion_runs ORDER BY started_at DESC LIMIT 1"
             ).fetchone()

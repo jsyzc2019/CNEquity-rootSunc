@@ -167,46 +167,6 @@ def _instrument_spans(
     }
 
 
-def _classify_daily_scope(
-    config: Config,
-    symbols: list[str],
-    start: date,
-    end: date,
-    *,
-    bar_universe: set[str] | None = None,
-) -> DailyBarOwnership:
-    """Classify one daily-bar request from disk-backed evidence.
-
-    This helper is deliberately disk-only. A missing status file or malformed
-    evidence leaves a symbol ``unknown``; the caller then fetches it and the
-    final validator decides whether the run may be published.
-    """
-    metadata = instrument_metadata(config)
-    spans = {
-        row["symbol"]: (row["list_date"], row["delist_date"], row.get("asset_type"))
-        for row in metadata.iter_rows(named=True)
-    }
-    sessions = list_trading_dates(config, start, end)
-    status = load_curated_trading_status(
-        config,
-        start=start,
-        end=end,
-        symbols=symbols,
-    )
-    evidence = load_negative_evidence(config, "daily_bars", metadata=metadata)
-    return classify_daily_bar_ownership(
-        symbols,
-        spans,
-        start,
-        end,
-        bar_universe=bar_universe,
-        trading_status=status,
-        trading_sessions=sessions,
-        negative_evidence=evidence,
-        no_print_keys=approved_no_print_keys(config, start=start, end=end),
-    )
-
-
 def _placeholder_bar_universe(
     config: Config,
     spans: dict[str, tuple[date | None, date | None, str | None]],
@@ -5200,22 +5160,6 @@ def fetch_bars_via_sina(
         }
     }
     return result
-
-
-def _validate_index_bar_coverage(
-    config: Config,
-    df,
-    start: date,
-    end: date,
-) -> None:
-    """Strict coverage check for callers that require a complete window."""
-    missing = _index_bar_missing_keys(config, df, start, end)
-    if missing:
-        sample = ", ".join(f"{symbol}@{session.isoformat()}" for symbol, session in missing[:8])
-        raise SourceUnavailableError(
-            f"index_bars: {len(missing)} symbol×trading-session key(s) missing "
-            f"in {start}..{end} (e.g. {sample})"
-        )
 
 
 def _index_bar_missing_keys(config: Config, df, start: date, end: date) -> list[tuple[str, date]]:

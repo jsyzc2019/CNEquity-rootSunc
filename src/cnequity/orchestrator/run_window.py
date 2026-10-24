@@ -16,6 +16,7 @@ pipeline after it takes the scheduler lock, so each job runs once per session.
 
 from __future__ import annotations
 
+from contextlib import closing
 from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -86,7 +87,7 @@ def _ran_in_manifest(config, job: str, session: date) -> bool:
         + "LIMIT 1"
     )
     try:
-        with sqlite3.connect(f"file:{path}?mode=ro", uri=True) as conn:
+        with closing(sqlite3.connect(f"file:{path}?mode=ro", uri=True)) as conn:
             return conn.execute(query, (pattern, session.isoformat())).fetchone() is not None
     except sqlite3.Error:
         return False

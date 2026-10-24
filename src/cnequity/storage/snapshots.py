@@ -2072,12 +2072,6 @@ class SnapshotStore:
             f"no delta package named {name!r} ({self.delta_path(name) / 'manifest.json'})"
         )
 
-    @staticmethod
-    def _dataset_layer(dataset: str) -> tuple[str, Path]:
-        spec = DATASETS[dataset]
-        layer = str(spec.layer)
-        return layer, Path(layer) / dataset
-
     @classmethod
     def _lake_index(
         cls,
