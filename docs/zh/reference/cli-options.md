@@ -686,7 +686,7 @@
 | 参数 | 默认值 | 说明 |
 |---|---|---|
 | `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
-| `--vantage` | `local` | 这次探测是从哪儿跑的 —— 'cn'、'overseas'，或你自己用的任何标签。有几个源拒绝非大陆出口，所以没有这个标签的结果没法解读。 |
+| `--vantage` | `CNE_SOURCE_VANTAGE, else [source_health].vantage, else local` | 这次探测是从哪儿跑的 —— 'cn'、'overseas'，或你自己用的任何标签。有几个源拒绝非大陆出口，所以没有这个标签的结果没法解读。 |
 | `--only` | `—` | 要探测的 key，逗号分隔；高成本/已受挑战的端点仅在显式列出时探测。 |
 | `--stale-only` | `False` | 复用 12 小时内已校验的采集证据，只主动探测缺少新证据的端点。 |
 | `--list` | `False` | 离线列出探测源名称，不需要配置。 |
@@ -716,7 +716,7 @@
 | 参数 | 默认值 | 说明 |
 |---|---|---|
 | `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
-| `--vantage` | `local` | 读哪个出口位置（vantage）的报告。 |
+| `--vantage` | `CNE_SOURCE_VANTAGE, else [source_health].vantage, else local` | 读哪个出口位置（vantage）的报告。 |
 | `--probe, --no-probe` | `False` | 现在实测，而不是读已存的报告。请求和 `sources probe` 相同。 |
 | `--json` | `False` | 输出机器可读的 JSON。 |
 

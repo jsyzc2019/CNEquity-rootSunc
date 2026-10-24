@@ -95,6 +95,7 @@ def maintain(config_path: str, groups: str | None, notify: bool):
     findings are reported without failing.
 
     """
+    from cnequity.diagnostics.source_health import effective_vantage
     from cnequity.storage.meta_backup import backup_meta
 
     cfg = _cfg(config_path)
@@ -114,6 +115,8 @@ def maintain(config_path: str, groups: str | None, notify: bool):
         argv = list(args)
         if args[0] == "status" and gate_groups:
             argv += ["--groups", gate_groups]
+        if args[:2] == ("sources", "probe"):
+            argv += ["--vantage", effective_vantage(cfg)]
         click.echo(f"--- {_(label)} ---", err=True)
         if subprocess.run(_cne(*argv, "--config", path), check=False).returncode:
             (problems if gating else notes).append(_(label))

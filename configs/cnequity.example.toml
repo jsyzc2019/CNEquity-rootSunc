@@ -539,6 +539,13 @@ run_at = "21:00"
 # `cne run maintain`, which the scheduled timer runs once after each session's
 # daily update: run audit (whole lake on full_audit_weekday), freshness gate,
 # source probes and SLO, run-evidence check, metadata backup, expiry preview.
+[source_health]
+# Label of this machine's network egress, carried by every source probe and health
+# record ("cn", "overseas", or your own, e.g. "cn-sh"). Some sources refuse
+# non-mainland egress, so results are read per label. CNE_SOURCE_VANTAGE and
+# `--vantage` override it for one run.
+# vantage = "cn"
+
 [job.maintenance]
 # ISO weekday (1 = Monday … 7 = Sunday) of the whole-lake audit, which reads
 # every Parquet file and can take hours on a large lake; 0 never runs it.

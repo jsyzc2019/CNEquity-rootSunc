@@ -27,7 +27,7 @@ The timer runs `cne run maintain` once after each trading day's update; you can 
 
 1. the run audit; on `[job.maintenance] full_audit_weekday` (Saturday by default) the whole-lake `audit --full --quality-only` instead, which reads every Parquet file and can take hours on a large lake;
 2. the freshness gate `status --datasets --gate`, failing only on the schedule groups the timer actually runs (`--groups` overrides);
-3. source probes `sources probe --stale-only` and `sources slo`;
+3. source probes `sources probe --stale-only` (labelled with the `[source_health] vantage` egress) and `sources slo`;
 4. run evidence over the last 20 trading days, `verify --runs --days 20`;
 5. a metadata backup: the manifest database (a consistent copy through SQLite's backup API), incremental state, revision and source receipts and quality findings, written as `meta-<time>.tar.gz` to `[job.maintenance] backup_dir` (default `{data.root}/backups`) and rotated by `backup_retention_days` / `backup_retention_count`;
 6. the expiry preview of `cne run clean`.

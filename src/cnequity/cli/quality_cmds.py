@@ -1579,8 +1579,8 @@ def source_limits(config_path: str):
 @config_option
 @click.option(
     "--vantage",
-    default="local",
-    show_default=True,
+    default=None,
+    show_default="CNE_SOURCE_VANTAGE, else [source_health].vantage, else local",
     help=N_(
         "Where this probe runs from — 'cn', 'overseas', or any label you use. Some sources reject non-mainland egress, so results without this label cannot be interpreted."
     ),
@@ -1616,7 +1616,7 @@ def source_limits(config_path: str):
 )
 def sources_probe(
     config_path: str,
-    vantage: str,
+    vantage: str | None,
     only: str | None,
     out: str | None,
     list_only: bool = False,
@@ -1634,7 +1634,13 @@ def sources_probe(
     and an unauthenticated local service that can reach out to a dozen third parties is not something to leave listening.
 
     """
-    from cnequity.diagnostics.source_health import PROBES, STATUS_LABELS, ProbeStatus, run_probes
+    from cnequity.diagnostics.source_health import (
+        PROBES,
+        STATUS_LABELS,
+        ProbeStatus,
+        effective_vantage,
+        run_probes,
+    )
 
     if list_only:
         for probe in PROBES:
@@ -1644,6 +1650,7 @@ def sources_probe(
     _progress_logging(quiet=True)
     keys = comma_values(only, "--only")
     cfg = _cfg(config_path)
+    vantage = effective_vantage(cfg, vantage)
     try:
         report = run_probes(cfg, vantage=vantage, only=keys, stale_only=stale_only)
     except ValueError as exc:
@@ -1672,8 +1679,8 @@ def sources_probe(
 @config_option
 @click.option(
     "--vantage",
-    default="local",
-    show_default=True,
+    default=None,
+    show_default="CNE_SOURCE_VANTAGE, else [source_health].vantage, else local",
     help=N_("Which egress location (vantage) report to read."),
 )
 @click.option(
@@ -1685,7 +1692,7 @@ def sources_probe(
     ),
 )
 @click.option("--json", "as_json", is_flag=True, help=N_("Output machine-readable JSON."))
-def sources_substitutes(config_path: str, vantage: str, probe: bool, as_json: bool):
+def sources_substitutes(config_path: str, vantage: str | None, probe: bool, as_json: bool):
     """For each source that is down, who else can answer for its datasets.
 
     \b
@@ -1699,7 +1706,12 @@ def sources_substitutes(config_path: str, vantage: str, probe: bool, as_json: bo
     """
     import json as json_mod
 
-    from cnequity.diagnostics.source_health import HealthReport, run_probes, validate_vantage
+    from cnequity.diagnostics.source_health import (
+        HealthReport,
+        effective_vantage,
+        run_probes,
+        validate_vantage,
+    )
     from cnequity.diagnostics.substitutes import (
         IGNORED,
         render_substitutions,
@@ -1708,11 +1720,12 @@ def sources_substitutes(config_path: str, vantage: str, probe: bool, as_json: bo
     )
 
     _progress_logging(quiet=True)
+    cfg = _cfg(config_path)
+    vantage = effective_vantage(cfg, vantage)
     try:
         validate_vantage(vantage)
     except ValueError as exc:
         raise click.BadParameter(str(exc), param_hint="--vantage") from None
-    cfg = _cfg(config_path)
     if probe:
         report = run_probes(cfg, vantage=vantage)
     else:

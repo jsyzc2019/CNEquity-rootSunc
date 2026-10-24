@@ -27,7 +27,7 @@ cne schedule remove         # 停用并注销；正在运行的任务继续
 
 1. 运行审计；`[job.maintenance] full_audit_weekday`（默认周六）改为全湖审计 `audit --full --quality-only`，它读全部 Parquet，大湖可能要几个小时；
 2. 新鲜度门禁 `status --datasets --gate`，只对定时日更实际跑的调度组判失败（`--groups` 可改）；
-3. 源探针 `sources probe --stale-only` 与 `sources slo`；
+3. 源探针 `sources probe --stale-only`（带上 `[source_health] vantage` 出口标签）与 `sources slo`；
 4. 最近 20 个交易日的运行证据 `verify --runs --days 20`；
 5. 元数据备份：manifest 数据库（用 SQLite 备份接口取一致副本）、增量状态、修订与来源收据、质量结论，写成 `meta-<时间>.tar.gz`，放在 `[job.maintenance] backup_dir`（默认 `{data.root}/backups`），按 `backup_retention_days` / `backup_retention_count` 轮换；
 6. `cne run clean` 的过期文件预览。

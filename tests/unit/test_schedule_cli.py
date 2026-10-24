@@ -200,3 +200,37 @@ def test_install_without_yes_asks(fake_timer):
     )
     assert result.exit_code == 1
     assert not settings(fake_timer)["daily"]
+
+
+def test_vantage_comes_from_flag_then_env_then_config(config, monkeypatch):
+    from cnequity.diagnostics.source_health import effective_vantage
+
+    monkeypatch.delenv("CNE_SOURCE_VANTAGE", raising=False)
+    assert effective_vantage(config) == "local"
+    config.source_vantage = "overseas"
+    assert effective_vantage(config) == "overseas"
+    monkeypatch.setenv("CNE_SOURCE_VANTAGE", "cn-sh")
+    assert effective_vantage(config) == "cn-sh"
+    assert effective_vantage(config, "manual") == "manual"
+
+
+def test_maintain_probes_with_the_configured_vantage(maintain_env, monkeypatch):
+    config, calls, _ = maintain_env
+    monkeypatch.delenv("CNE_SOURCE_VANTAGE", raising=False)
+    path = config.config_path
+    path.write_text(
+        path.read_text(encoding="utf-8") + '\n[source_health]\nvantage = "overseas"\n',
+        encoding="utf-8",
+    )
+
+    _maintain(config)
+
+    probe = next(c for c in calls if c[:2] == ["sources", "probe"])
+    assert probe[probe.index("--vantage") + 1] == "overseas"
+
+
+def test_an_invalid_vantage_fails_validation(config):
+    from cnequity.config import validate_config
+
+    config.source_vantage = "bad label!"
+    assert any("source_health.vantage" in e for e in validate_config(config))

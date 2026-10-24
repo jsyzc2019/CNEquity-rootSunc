@@ -166,6 +166,8 @@ class Config:
     maintenance_backup_dir: Path | None = None
     maintenance_backup_retention_days: int = 14
     maintenance_backup_retention_count: int = 30
+    # [source_health].vantage: the egress label probes and health records carry.
+    source_vantage: str | None = None
     # Continuous event streams. Same shape as a daily schedule group, but the
     # job they belong to runs on the natural calendar and takes its own
     # ingestion lock, so a disclosure or news sweep neither waits for the
@@ -1126,6 +1128,7 @@ def load_config(path: str | Path) -> Config:
         maintenance_backup_dir=maintenance_backup_dir,
         maintenance_backup_retention_days=int(maintenance_raw.get("backup_retention_days", 14)),
         maintenance_backup_retention_count=int(maintenance_raw.get("backup_retention_count", 30)),
+        source_vantage=str((raw.get("source_health") or {}).get("vantage") or "").strip() or None,
         events_groups=events_groups,
         init_phases=init_phases,
         on_demand_enabled=bool(on_demand.get("enabled", True)),
@@ -1242,6 +1245,14 @@ def validate_config(cfg: Config) -> list[str]:
         if not match or int(match.group(1)) > 23 or int(match.group(2)) > 59:
             section = "job.daily" if key == "daily_run_at" else "job.stale"
             errors.append(f"{section}.run_at must be Beijing time HH:MM; got {value!r}")
+    vantage = getattr(cfg, "source_vantage", None)
+    if vantage:
+        from cnequity.diagnostics.source_health import validate_vantage
+
+        try:
+            validate_vantage(vantage)
+        except ValueError as exc:
+            errors.append(f"source_health.vantage: {exc}")
     if not 0 <= int(getattr(cfg, "maintenance_full_audit_weekday", 6)) <= 7:
         errors.append("job.maintenance.full_audit_weekday must be 0 (never) or an ISO weekday 1-7")
     for key in ("backup_retention_days", "backup_retention_count"):

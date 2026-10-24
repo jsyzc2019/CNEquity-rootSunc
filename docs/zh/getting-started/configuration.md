@@ -297,6 +297,12 @@ weekday = 5          # 每周组在哪天之前的最后一个交易日跑，ISO
   所以 `cne status`、`[job.stale].run_at`（默认北京时间 21:00）的补跑和健康门禁不会在休息日把它当成落后、再去抓一遍。
 - 一个数据集同时在每天和每周的组里时，按每天算。
 
+## `[source_health]`
+
+| 键 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| `vantage` | string | `local` | 本机网络出口的标签（`cn`、`overseas` 或自定义，如 `cn-sh`），源探针和源健康记录都带上它；有些来源拒绝非大陆出口，结果按标签分开解读。`CNE_SOURCE_VANTAGE` 和 `--vantage` 可在单次运行时覆盖 |
+
 ## `[job.maintenance]`
 
 `cne run maintain` 的设置；`cne schedule install` 安装的定时任务在每个交易日日更后运行它，见[运行手册](../operations/runbook.md#maintain)。

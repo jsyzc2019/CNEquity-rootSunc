@@ -297,6 +297,12 @@ weekday = 5          # A weekly group runs on the last trading day on or before 
   so `cne status`, the catch-up at `[job.stale].run_at` (default 21:00 Beijing time) and the health gate do not treat it as behind on rest days and fetch it again.
 - When a dataset is in both a daily and a weekly group, daily wins.
 
+## `[source_health]`
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `vantage` | string | `local` | Label of this machine's network egress (`cn`, `overseas`, or your own, e.g. `cn-sh`), carried by every source probe and health record; some sources refuse non-mainland egress, so results are read per label. `CNE_SOURCE_VANTAGE` and `--vantage` override it for one run |
+
 ## `[job.maintenance]`
 
 Settings of `cne run maintain`, which the timer `cne schedule install` installs runs after each trading day's update; see the [runbook](../operations/runbook.md#maintain).
