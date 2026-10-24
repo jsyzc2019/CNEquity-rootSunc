@@ -80,12 +80,16 @@ def _gates_on_dataset(cfg, dataset: str, wanted_groups: set[str] | None) -> bool
 
     ``--groups`` names the schedule groups this machine actually runs. A
     dataset nothing schedules still gates: "I cannot tell who fetches this" is
-    not the same claim as "another host fetches it".
+    not the same claim as "another host fetches it". A dataset the config took
+    out of its groups on purpose (``steps_remove``, ``enabled = false``) is the
+    one exception: the operator has said this host does not fetch it.
     """
     if wanted_groups is None:
         return True
     by_group = stale_datasets_by_group(cfg, [dataset])
     owners = {group for group, names in by_group.items() if dataset in names}
+    if owners == {"(unscheduled)"} and dataset in getattr(cfg, "opted_out_steps", ()):
+        return False
     if not owners:
         return True
     return any(group in wanted_groups or group == "(unscheduled)" for group in owners)
@@ -1349,6 +1353,7 @@ def status(
                     for group, names in by_group.items()
                     if group in wanted or group == "(unscheduled)"
                     for name in names
+                    if _gates_on_dataset(cfg, name, wanted)
                 )
                 skipped = stale - len(gating)
                 if skipped:

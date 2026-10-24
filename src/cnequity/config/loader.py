@@ -196,6 +196,8 @@ class Config:
     # evening batch nor is skipped because the market was closed.
     events_groups: dict[str, ScheduleGroup] = field(default_factory=dict)
     event_schedules: list[EventSchedule] = field(default_factory=list)
+    #: Steps the config removed on purpose (``steps_remove``, ``enabled = false``).
+    opted_out_steps: frozenset[str] = frozenset()
     init_phases: list[str] = field(default_factory=list)
     on_demand_enabled: bool = True
     on_demand_datasets: list[str] = field(default_factory=list)
@@ -789,11 +791,12 @@ def configured_data_root(path: str | Path) -> Path:
 
 
 def load_config(path: str | Path) -> Config:
-    from cnequity.config.layers import effective_raw
+    from cnequity.config.layers import OPTED_OUT_KEY, effective_raw
 
     config_path = Path(path).expanduser().resolve()
     with open(config_path, "rb") as f:
         raw = effective_raw(tomllib.load(f))
+    opted_out_steps = frozenset(raw.pop(OPTED_OUT_KEY, ()))
 
     data_root = _data_root(raw, config_path.parent)
     lake_profile = raw.get("data", {}).get("profile") or None
@@ -1169,6 +1172,7 @@ def load_config(path: str | Path) -> Config:
         source_vantage=str((raw.get("source_health") or {}).get("vantage") or "").strip() or None,
         events_groups=events_groups,
         event_schedules=event_schedules,
+        opted_out_steps=opted_out_steps,
         init_phases=init_phases,
         on_demand_enabled=bool(on_demand.get("enabled", True)),
         on_demand_datasets=list(on_demand.get("datasets", [])),

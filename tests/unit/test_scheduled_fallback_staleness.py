@@ -31,3 +31,14 @@ def test_a_weekend_is_not_a_missed_session(config):
     assert not is_stale("sector_fund_flow_ths", date(2026, 10, 23), date(2026, 10, 24), config)
     # Friday's rows once Monday has closed: Monday is missing.
     assert is_stale("sector_fund_flow_ths", date(2026, 10, 23), date(2026, 10, 26), config)
+
+
+def test_the_gate_skips_a_dataset_the_config_removed_on_purpose(config):
+    from dataclasses import replace
+
+    from cnequity.cli.quality_cmds import _gates_on_dataset
+
+    _with_groups(config, ["fund_flow_ths", "compact"])
+    assert _gates_on_dataset(config, "fund_flow", {"capital"})  # unknown owner still gates
+    opted = replace(config, opted_out_steps=frozenset({"fund_flow"}))
+    assert not _gates_on_dataset(opted, "fund_flow", {"capital"})

@@ -50,6 +50,8 @@ BUILTIN = "builtin"
 EXTENDS_KEY = "extends"
 GROUP_SCOPES = ("daily", "events")
 GROUP_EDIT_KEYS = ("steps_add", "steps_remove", "enabled")
+#: Where `effective_raw` leaves the steps a config removed on purpose, for the loader.
+OPTED_OUT_KEY = "__opted_out_steps__"
 
 
 class ConfigLayerError(ConfigError):
@@ -101,14 +103,18 @@ def effective_raw(raw: dict, *, apply_opt_outs: bool = True) -> dict:
     else:
         raise ConfigLayerError(f'extends must be "{BUILTIN}"')
     out.pop(EXTENDS_KEY, None)
-    _apply_group_edits(out, apply_opt_outs=apply_opt_outs)
+    opted_out = _apply_group_edits(out, apply_opt_outs=apply_opt_outs)
+    if apply_opt_outs and opted_out:
+        out[OPTED_OUT_KEY] = sorted(opted_out)
     return out
 
 
-def _apply_group_edits(raw: dict, *, apply_opt_outs: bool) -> None:
+def _apply_group_edits(raw: dict, *, apply_opt_outs: bool) -> set[str]:
+    """Apply group edits; return the steps the config opted out of on purpose."""
+    opted_out: set[str] = set()
     job = raw.get("job")
     if not isinstance(job, dict):
-        return
+        return opted_out
     for scope in GROUP_SCOPES:
         groups = (job.get(scope) or {}).get("groups")
         if not isinstance(groups, dict):
@@ -124,6 +130,7 @@ def _apply_group_edits(raw: dict, *, apply_opt_outs: bool) -> None:
             add = _step_list(group.pop("steps_add", []), f"{location}.steps_add")
             remove = _step_list(group.pop("steps_remove", []), f"{location}.steps_remove")
             if not enabled and apply_opt_outs:
+                opted_out.update(group.get("steps", []) or [])
                 del groups[name]
                 continue
             steps = list(group.get("steps", []) or [])
@@ -135,10 +142,12 @@ def _apply_group_edits(raw: dict, *, apply_opt_outs: bool) -> None:
                         location,
                         ", ".join(absent),
                     )
+                opted_out.update(step for step in remove if step in steps)
                 steps = [step for step in steps if step not in remove]
             steps.extend(step for step in add if step not in steps)
             if add or remove:
                 group["steps"] = steps
+    return opted_out
 
 
 def _step_list(value: Any, location: str) -> list[str]:

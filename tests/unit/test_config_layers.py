@@ -205,3 +205,15 @@ def test_show_defaults_prints_the_documented_template():
 
     assert result.exit_code == 0, result.output
     assert "[job.daily.groups.core]" in result.output
+
+
+def test_explicit_opt_outs_are_recorded_on_the_config(tmp_path):
+    path = _layered(
+        tmp_path,
+        '[job.daily.groups.capital]\nsteps_remove = ["fund_flow"]\nsteps_add = ["fund_flow_ths"]\n'
+        "[job.daily.groups.research]\nenabled = false\n",
+    )
+    cfg = load_config(path)
+    assert "fund_flow" in cfg.opted_out_steps
+    assert set(_example_groups()["research"]["steps"]) <= cfg.opted_out_steps
+    assert "fund_flow_ths" not in cfg.opted_out_steps
