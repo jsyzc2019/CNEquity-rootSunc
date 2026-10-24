@@ -22,6 +22,8 @@
 | 命令 | 作用 |
 |------|------|
 | [`cne run daily`](#cne-run-daily) | 跑一天的更新：全部日更调度组，再跑事件流 |
+| [`cne run maintain`](#cne-run-maintain) | 日更后的维护：审计、门禁、源探针、运行证据、元数据备份 |
+| [`cne schedule`](#cne-schedule) | 安装、查看、移除当前用户的定时任务 |
 | [`cne run events`](#cne-run-events) | 7×24 事件流（公告、资讯），走自然日历而非交易日历 |
 | [`cne run retry`](#cne-run-retry) | 重试一个 run，或每个 daily 分组最新的失败 run |
 | [`cne run compact`](#cne-run-compact) | 把已结束、未发布的 staging 合进 curated |
@@ -324,7 +326,7 @@ diff 会把删列、改类型、改主键、单位/PIT/历史语义变化识别�
 
 ```cron
 # 主 pipeline
-5 16 * * 1-5 /path/to/cnequity/scripts/scheduler/daily_pipeline.sh
+5 16 * * 1-5 cne run daily && cne run maintain
 
 # 收尾补抓：只跑仍然落后的，没有就空转
 5 20 * * 1-5 cd /path/to/cnequity && cne run daily --stale-only
@@ -334,11 +336,32 @@ diff 会把删列、改类型、改主键、单位/PIT/历史语义变化识别�
 
 派生数据集不在其中：它们由 curated 重算，该跑的是 `cne derive`，不是重抓。
 
-**不带参数就是完整的一天。** 按配置顺序串行跑完 `[job.daily.groups]` 的每个组，对整个湖跑一次 `audit`（它读全湖，所以放在所有组落盘之后；没有组实际运行时跳过），再跑 `[job.events.groups]` 事件流：一个组失败不中断后面的组，退出码取最差的一个，数据集全部关闭的组自动跳过。非交易日调度组自动跳过，事件流照常运行，所以一条定时任务每天跑一次即可（仓库 checkout 另有 `scripts/scheduler/daily_pipeline.sh`，它还会做健康检查与元数据备份）。事件流的锁已被单独的 `cne run events` 持有时，这一段记为 `skipped_locked`，不算失败；`--backfill` 补跑某个交易日时不跑事件流。配置比当前版本少了调度 step 时，会提示运行 `cne config upgrade`。
+**不带参数就是完整的一天。** 按配置顺序串行跑完 `[job.daily.groups]` 的每个组，对整个湖跑一次 `audit`（它读全湖，所以放在所有组落盘之后；没有组实际运行时跳过），再跑 `[job.events.groups]` 事件流：一个组失败不中断后面的组，退出码取最差的一个，数据集全部关闭的组自动跳过。非交易日调度组自动跳过，事件流照常运行，所以一条定时任务每天跑一次即可；`cne schedule install` 安装的定时任务在它之后再跑 `cne run maintain`（审计、门禁与元数据备份）。事件流的锁已被单独的 `cne run events` 持有时，这一段记为 `skipped_locked`，不算失败；`--backfill` 补跑某个交易日时不跑事件流。配置比当前版本少了调度 step 时，会提示运行 `cne config upgrade`。
 
 `--core-only` 跑 `[[job.daily.waves]]` DAG —— 只有核心骨架；配置里没有调度组时不带参数也走这条路，没有 waves 时直接报错，不会假装成功。`intraday` 组需先开 `[minute_bars].enabled`，它的数据集关闭时整组自动跳过。
 
 成功、有效部分结果或 `skipped_non_trading_day` 退出 0；执行失败返回 1。
+
+## cne run maintain
+
+日更之后的维护，`cne schedule install` 安装的定时任务每个交易日在日更后运行一次：运行审计（`[job.maintenance] full_audit_weekday` 那天改为全湖审计）、新鲜度门禁、源探针与 SLO、最近 20 个交易日的运行证据、元数据备份（manifest 数据库、收据、质量结论，不含 curated Parquet，按 `[job.maintenance]` 的保留期轮换），以及 `cne run clean` 的预览。
+
+| 选项 | 说明 |
+|------|------|
+| `--groups` | 新鲜度门禁判失败的调度组（空格或逗号分隔）；默认是定时日更实际跑的组 |
+| `--notify` | 有问题时弹出桌面通知（macOS） |
+
+审计、新鲜度门禁或备份失败时退出 1；源探针和运行证据的问题只报告。各步骤说明见[运行手册](../operations/runbook.md#maintain)。
+
+## cne schedule
+
+管理当前用户的定时任务（macOS launchd、Linux crontab、Windows 任务计划程序），与 `cne serve` 操作页是同一个任务。每分钟检查一次；每个交易日过了 `[job.daily] run_at`（北京时间）跑 `cne run daily`，然后 `cne run maintain`；过了 `[job.stale] run_at` 重试缺的快照。
+
+| 子命令 | 说明 |
+|------|------|
+| `install` | 确认后注册或更新定时任务。`--pack` 只更新所选研究包的调度组；`--no-stale` 不装收尾补抓；`--events-group` / `--events-every` 另按间隔跑一个事件组；没给的选项保留现有设置；`--yes` 跳过确认 |
+| `status` | 是否已安装、是否在运行、跑什么、最近一次检查；`--json` 输出机器可读结果；检测到旧的 `scripts/scheduler` launchd 任务时提示 |
+| `remove` | 确认后停用并注销系统任务；正在运行的任务继续 |
 
 ## cne run events
 
@@ -353,10 +376,10 @@ diff 会把删列、改类型、改主键、单位/PIT/历史语义变化识别�
 
 ```cron
 # 每天（含周末）一次全量事件流
-0 14 * * *  /path/to/cnequity/scripts/scheduler/events_pipeline.sh
+0 14 * * *  cne run events --config /abs/path/to/cnequity.toml
 
 # 只要资讯的日内新鲜度：单张实时页，代价很低
-*/30 9-22 * * *  CNE_EVENTS_GROUP=news_wire /path/to/cnequity/scripts/scheduler/events_pipeline.sh
+*/30 9-22 * * *  cne run events --group news_wire --config /abs/path/to/cnequity.toml
 ```
 
 `disclosures` 组每次都会重读 30 天对账尾窗，高频跑它是在重复付这份代价；

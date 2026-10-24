@@ -22,6 +22,8 @@ The sections are defined by `SECTIONS` in `cnequity/cli/_root.py`; leaving any c
 | Command | Purpose |
 |------|------|
 | [`cne run daily`](#cne-run-daily) | Run one day's update: every daily schedule group, then the event streams |
+| [`cne run maintain`](#cne-run-maintain) | Post-update maintenance: audit, gates, source probes, run evidence, metadata backup |
+| [`cne schedule`](#cne-schedule) | Install, inspect or remove the current user's timer |
 | [`cne run events`](#cne-run-events) | 7×24 event streams (announcements, news), on the natural calendar rather than the trading calendar |
 | [`cne run retry`](#cne-run-retry) | Retry one run, or the latest failed run of each daily group |
 | [`cne run compact`](#cne-run-compact) | Merge finished, unpublished staging into curated |
@@ -325,7 +327,7 @@ Schedule it a few hours after the main pipeline:
 
 ```cron
 # Main pipeline
-5 16 * * 1-5 /path/to/cnequity/scripts/scheduler/daily_pipeline.sh
+5 16 * * 1-5 cne run daily && cne run maintain
 
 # Closing catch-up: run only what is still behind; idles if nothing is
 5 20 * * 1-5 cd /path/to/cnequity && cne run daily --stale-only
@@ -335,11 +337,32 @@ The freshness criterion is exactly the same as `cne status --datasets` (includin
 
 Derived datasets are not included: they are recomputed from curated, so what should run is `cne derive`, not a refetch.
 
-**Without arguments, it is a complete day.** It runs every group of `[job.daily.groups]` serially in configuration order, runs one `audit` over the whole lake (it reads the whole lake, so it comes after all groups have landed; skipped when no group actually ran), then runs the `[job.events.groups]` event streams: one failed group does not interrupt later groups, the exit code is the worst one, and groups whose datasets are all disabled are skipped automatically. On non-trading days the schedule groups are skipped automatically while the event streams run as usual, so one scheduled job running once a day is enough (a repository checkout also has `scripts/scheduler/daily_pipeline.sh`, which additionally does health checks and metadata backups). When the event-stream lock is already held by a separate `cne run events`, this part is recorded as `skipped_locked`, which is not a failure; when `--backfill` reruns a trading day, the event streams are not run. When the configuration has fewer schedule steps than the current version, you are prompted to run `cne config upgrade`.
+**Without arguments, it is a complete day.** It runs every group of `[job.daily.groups]` serially in configuration order, runs one `audit` over the whole lake (it reads the whole lake, so it comes after all groups have landed; skipped when no group actually ran), then runs the `[job.events.groups]` event streams: one failed group does not interrupt later groups, the exit code is the worst one, and groups whose datasets are all disabled are skipped automatically. On non-trading days the schedule groups are skipped automatically while the event streams run as usual, so one scheduled job running once a day is enough; the timer `cne schedule install` installs runs `cne run maintain` (audit, gates and metadata backup) after it. When the event-stream lock is already held by a separate `cne run events`, this part is recorded as `skipped_locked`, which is not a failure; when `--backfill` reruns a trading day, the event streams are not run. When the configuration has fewer schedule steps than the current version, you are prompted to run `cne config upgrade`.
 
 `--core-only` runs the `[[job.daily.waves]]` DAG, which is only the core skeleton; when the configuration has no schedule groups, running without arguments also takes this path, and with no waves it fails outright instead of pretending to succeed. The `intraday` group requires `[minute_bars].enabled` first; when its datasets are disabled, the whole group is skipped automatically.
 
 Success, a valid partial result, or `skipped_non_trading_day` exits 0; execution failure returns 1.
+
+## cne run maintain
+
+Maintenance after the daily update; the timer `cne schedule install` installs runs it once after each trading day's update: the run audit (the whole-lake audit on `[job.maintenance] full_audit_weekday`), the freshness gate, source probes and SLO, run evidence over the last 20 trading days, a metadata backup (manifest database, receipts, quality findings, never curated Parquet, rotated by the `[job.maintenance]` retention), and the preview of `cne run clean`.
+
+| Option | Description |
+|------|------|
+| `--groups` | Schedule groups the freshness gate fails on (space- or comma-separated); default: the groups the scheduled update runs |
+| `--notify` | On problems, also show a desktop notification (macOS) |
+
+It exits 1 when the audit, the freshness gate or the backup fails; source probe and run evidence problems are only reported. See the [runbook](../operations/runbook.md#maintain) for each step.
+
+## cne schedule
+
+Manages the current user's timer (launchd on macOS, crontab on Linux, Task Scheduler on Windows), the same task the `cne serve` operations page manages. It checks once a minute; on each trading day, after `[job.daily] run_at` (Beijing time), it runs `cne run daily`, then `cne run maintain`; after `[job.stale] run_at` it retries the missed snapshots.
+
+| Subcommand | Description |
+|------|------|
+| `install` | Registers or updates the timer after confirmation. `--pack` updates only the selected research packs' schedule groups; `--no-stale` leaves out the closing catch-up; `--events-group` / `--events-every` also run one event group on an interval; options not given keep their current settings; `--yes` skips the confirmation |
+| `status` | Installed? active? what it runs and when it last checked; `--json` for machine-readable output; flags legacy `scripts/scheduler` launchd jobs |
+| `remove` | Pauses and unregisters the system task after confirmation; running jobs finish |
 
 ## cne run events
 
@@ -354,10 +377,10 @@ and it takes its own `events_ingestion` lock, so it does not compete with the ev
 
 ```cron
 # Full event streams once a day (weekends included)
-0 14 * * *  /path/to/cnequity/scripts/scheduler/events_pipeline.sh
+0 14 * * *  cne run events --config /abs/path/to/cnequity.toml
 
 # Intraday freshness for news only: a single live page, very cheap
-*/30 9-22 * * *  CNE_EVENTS_GROUP=news_wire /path/to/cnequity/scripts/scheduler/events_pipeline.sh
+*/30 9-22 * * *  cne run events --group news_wire --config /abs/path/to/cnequity.toml
 ```
 
 The `disclosures` group rereads a 30-day reconciliation tail window every time, so running it at high frequency pays that cost over and over;

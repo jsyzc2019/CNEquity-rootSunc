@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# DEPRECATED (removal in 0.20.0): `cne schedule install` installs the packaged,
+# cross-platform timer, which runs `cne run daily` and then `cne run maintain`.
+# Run scripts/scheduler/uninstall_scheduler.sh before switching, or both update the lake.
 # B1 — Continuous event streams (disclosures, regulatory events, news).
 #
 # A separate entry point from daily_pipeline.sh on purpose. These feeds publish

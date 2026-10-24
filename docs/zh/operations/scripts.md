@@ -9,7 +9,7 @@
 | `scripts/migrations/` | 一次性数据迁移与分区重写，按版本说明执行 |
 | `scripts/dev/` | 仓库维护：文档同步（`sync_*`）、发布检查、离线基准与端到端检查、探针 |
 
-这些脚本需要源码 checkout，不随 PyPI 包安装。仅用安装包时，每天调度一次 `cne run daily`（含全部日更组与事件流）；仓库日更以 `daily_pipeline.sh` 为主入口。
+这些脚本需要源码 checkout，不随 PyPI 包安装。定时更新用 `cne schedule install`（安装包自带，跨平台）；`scripts/scheduler/` 已弃用，0.20.0 移除。
 
 > 以下脚本面向 **自托管本机/VPS**（含 macOS launchd 与服务器回填）。开源贡献者只需
 > CLI（`cne init` / `run`）即可；调度与告警按需选用，并非唯一部署方式。

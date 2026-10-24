@@ -29,7 +29,7 @@ LEFTOVER_SECTION = N_("Other")
 
 SECTIONS: list[tuple[str, tuple[str, ...]]] = [
     (N_("Start here"), ("config", "doctor", "init")),
-    (N_("Run the pipeline"), ("run", "backfill", "derive", "repair")),
+    (N_("Run the pipeline"), ("run", "schedule", "backfill", "derive", "repair")),
     (N_("Check the lake"), ("check", "status", "verify", "audit", "decision-data")),
     (N_("Use the lake"), ("query", "serve", "mcp")),
     (
@@ -388,6 +388,12 @@ class SectionedGroup(LocalizedHelpOption, TranslatedHelp, moved_hints(MOVED, bas
     command_class = CneCommand
 
     def format_commands(self, ctx: click.Context, formatter: click.HelpFormatter) -> None:
+        if ctx.parent is not None:
+            # SECTIONS describe the top level. A subgroup inherits this class,
+            # and sectioning it filed `cne schedule status` under "Check the
+            # lake" beside a root command that merely shares its name.
+            super().format_commands(ctx, formatter)
+            return
         listed = self.list_commands(ctx)
         remaining = set(listed)
         sections: list[tuple[str, list[tuple[str, str]]]] = []

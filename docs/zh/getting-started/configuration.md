@@ -297,6 +297,17 @@ weekday = 5          # 每周组在哪天之前的最后一个交易日跑，ISO
   所以 `cne status`、`[job.stale].run_at`（默认北京时间 21:00）的补跑和健康门禁不会在休息日把它当成落后、再去抓一遍。
 - 一个数据集同时在每天和每周的组里时，按每天算。
 
+## `[job.maintenance]`
+
+`cne run maintain` 的设置；`cne schedule install` 安装的定时任务在每个交易日日更后运行它，见[运行手册](../operations/runbook.md#maintain)。
+
+| 键 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| `full_audit_weekday` | int | `6` | 全湖审计的 ISO 星期（1 = 周一 … 7 = 周日）；它读全部 Parquet，大湖可能要几个小时。0 表示从不 |
+| `backup_dir` | string | `{data.root}/backups` | 元数据备份目录；相对路径按配置文件所在目录解析，最好放在另一块盘 |
+| `backup_retention_days` | int | `14` | 删除早于这么多天的备份；0 不按天数删 |
+| `backup_retention_count` | int | `30` | 只保留最新的这么多份；0 不按份数删 |
+
 ## 事件流调度组（7x24）
 
 `[job.events.groups.<name>]`：字段与调度组相同（`at`、`steps`、`parallel`），但属于

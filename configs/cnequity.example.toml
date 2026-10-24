@@ -536,6 +536,18 @@ run_at = "17:30"
 [job.stale]
 # Only retries the snapshot datasets the day's run missed.
 run_at = "21:00"
+# `cne run maintain`, which the scheduled timer runs once after each session's
+# daily update: run audit (whole lake on full_audit_weekday), freshness gate,
+# source probes and SLO, run-evidence check, metadata backup, expiry preview.
+[job.maintenance]
+# ISO weekday (1 = Monday … 7 = Sunday) of the whole-lake audit, which reads
+# every Parquet file and can take hours on a large lake; 0 never runs it.
+full_audit_weekday = 6
+# Metadata archives (manifest DB, receipts, quality findings); default
+# {data.root}/backups. Keep it on another disk if you can.
+# backup_dir = "/path/to/backups"
+backup_retention_days = 14
+backup_retention_count = 30
 
 # Per-group fetch frequency (docs/zh/getting-started/configuration.md, 取数频率):
 #   cadence = "daily"   (default) or "weekly"

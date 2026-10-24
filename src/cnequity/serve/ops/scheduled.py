@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import os
 import secrets
+import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -69,14 +70,18 @@ def events_due(config, saved: dict, now: datetime | None = None) -> bool:
     )
 
 
+#: A job switched on by another job's setting: maintenance follows the daily update.
+_SETTING = {"maintain": "daily"}
+
+
 def claim_session(config, scheduled: dict) -> None:
     """Recheck under both the child's scheduler lock and the control lock."""
     job = scheduled.get("job")
-    if job not in {"daily", "stale", "backup", "events"}:
+    if job not in {"daily", "maintain", "stale", "backup", "events"}:
         raise OpsError(_("Invalid scheduled task type."))
     with exclusive_lock(state_dir(config) / "control.lock", blocking=False):
         saved = settings(config)
-        if not saved.get(job):
+        if not saved.get(_SETTING.get(job, job)):
             raise OpsError(_("The scheduled task is paused, so no fetch started."))
         if job == "events":
             if (
@@ -126,11 +131,13 @@ def tick(config, *, now: datetime | None = None) -> dict:
                 service = OpsService(config, storage_busy=lambda: False)
                 for job, operation in (
                     ("daily", "daily.full"),
+                    # After the day's run; waits on its lock while it is going.
+                    ("maintain", "daily.maintain"),
                     ("stale", "daily.stale"),
                     ("backup", "snapshot.create"),
                     ("events", "events.run"),
                 ):
-                    if not saved.get(job):
+                    if not saved.get(_SETTING.get(job, job)):
                         continue
                     if job == "events":
                         if not events_due(config, saved, now):
@@ -167,6 +174,8 @@ def tick(config, *, now: datetime | None = None) -> dict:
                             scheduled.update(
                                 datasets=params["datasets"], root=params["snapshot_root"]
                             )
+                        elif job == "maintain":
+                            params = {"notify": True} if sys.platform == "darwin" else {}
                         else:
                             params = (
                                 _daily_params(saved, session)

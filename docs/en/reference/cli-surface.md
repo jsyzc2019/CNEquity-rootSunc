@@ -7,7 +7,7 @@ Checked against the Click command registry by `scripts/dev/sync_docs.py`. “Whe
 | `cne audit` | conditional | Reads the lake and prints the audit; accesses sources when external comparison is enabled |
 | `cne backfill` | when run | Backfills history, writing staging and published data; --plan only reads config and state |
 | `cne check` | none | Reads status, freshness, audit results and stats; recomputes stale stats, --full reruns the full-lake audit |
-| `cne config` | none | create writes the personal config; upgrade backs up, then adds schedule steps; validate/diff only read |
+| `cne config` | none | create writes a personal config that extends the built-in defaults; upgrade backs up and adds schedule steps, --minimize backs up and rewrites it to extend the defaults; validate/diff/show/path are read-only |
 | `cne contract diff` | none | Reads contracts and prints the diff |
 | `cne contract show` | none | Reads the contract; writes a file when an output path is given |
 | `cne contract validate` | none | Validates the contract |
@@ -47,7 +47,11 @@ Checked against the Click command registry by `scripts/dev/sync_docs.py`. “Whe
 | `cne run compact` | none | Publishes finished, unpublished staging data to the lake |
 | `cne run daily` | when run | Fetches incrementally and writes the lake; includes all schedule groups and event streams by default |
 | `cne run events` | when run | Fetches events and writes the lake |
+| `cne run maintain` | when run | Post-update maintenance: audit, freshness gate, source probes and SLO, run-evidence check (read-only); writes a metadata backup and rotates old ones by retention; expired files are only previewed |
 | `cne run retry` | when run | Retries failed scopes and writes the lake |
+| `cne schedule install` | none | After confirmation, registers the current user's system timer (launchd/cron/Task Scheduler) and writes schedule settings; keeps the backup and event schedules set on the dashboard |
+| `cne schedule remove` | none | After confirmation, pauses scheduling and unregisters the system task; jobs already running continue |
+| `cne schedule status` | none | Read-only: the system timer's state and its last check |
 | `cne serve` | conditional | Starts the lake dashboard. On a loopback address the operations page can start allowlisted fetches and daily updates; --read-only disables write endpoints; remote fetches require --allow-remote-ops; storage cleanup still needs web confirmation; fetch toggles are written back to the config, with a backup, after preview confirmation and do not start a fetch |
 | `cne snapshot create` | none | Creates a local snapshot |
 | `cne snapshot delta apply` | none | Applies a local delta package; --dry-run only validates |

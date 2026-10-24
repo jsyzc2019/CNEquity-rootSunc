@@ -177,7 +177,7 @@ Adapters and batch orchestration collect data into staging; validated batches be
 cne run daily
 ```
 
-Schedule this one command every day, weekends included: on trading days it runs every enabled daily group, then updates announcements, regulatory events and news; on other days it runs only the event stream. You can also do it from the operations page in `cne serve`: opening a daily run, catch-up or backfill shows the command it will run, and Start runs it. The same page installs the scheduled daily run and catch-up pass for the current user, without copying the repository scripts. Accept the lake with `cne check`, which exits non-zero on gaps or quality errors.
+`cne schedule install` installs a timer for the current user (macOS / Linux / Windows) that runs it each trading day, followed by `cne run maintain` for the audit, gates and metadata backup; or schedule this one command yourself every day, weekends included: on trading days it runs every enabled daily group, then updates announcements, regulatory events and news; on other days it runs only the event stream. You can also do it from the operations page in `cne serve`: opening a daily run, catch-up or backfill shows the command it will run, and Start runs it. The same page installs the scheduled daily run and catch-up pass for the current user, without copying the repository scripts. Accept the lake with `cne check`, which exits non-zero on gaps or quality errors.
 
 When you upgrade:
 

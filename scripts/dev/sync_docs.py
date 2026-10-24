@@ -308,7 +308,10 @@ EFFECTS: dict[str, tuple[str, str]] = {
     "audit": ("条件", "读取湖、输出审计；启用外部对照时访问源"),
     "backfill": ("执行时", "补历史并写暂存与发布数据；--plan 仅读配置和状态"),
     "check": ("无", "读取状态、新鲜度、审计结果与统计；统计过期时重算，--full 重跑全湖审计"),
-    "config": ("无", "create 写个人配置；upgrade 备份后补调度 step；validate/diff 仅读"),
+    "config": (
+        "无",
+        "create 写继承内置默认值的个人配置；upgrade 备份后补调度 step，--minimize 备份后改写为继承默认值；validate/diff/show/path 仅读",
+    ),
     "contract diff": ("无", "读取契约并输出差异"),
     "contract show": ("无", "读取契约；指定输出路径时写文件"),
     "contract validate": ("无", "校验契约"),
@@ -405,11 +408,21 @@ EFFECTS: dict[str, tuple[str, str]] = {
     "run compact": ("无", "将已结束、未发布的暂存数据发布到湖"),
     "run daily": ("执行时", "增量取数并写湖；默认含全部调度组与事件流"),
     "run events": ("执行时", "事件取数并写湖"),
+    "run maintain": (
+        "执行时",
+        "日更后的维护：审计、新鲜度门禁、源探针与 SLO、运行证据核验（只读），写元数据备份并按保留期轮换旧备份，过期文件仅预览",
+    ),
     "run retry": ("执行时", "重试失败范围并写湖"),
     "serve": (
         "条件",
         "启动湖面板。回环地址可从操作页发起白名单内的取数与日更；--read-only 关闭写入口；远程取数须 --allow-remote-ops；存储清理仍须网页确认；取数开关经预览确认后写回配置并备份，不因此启动取数",
     ),
+    "schedule install": (
+        "无",
+        "确认后为当前用户注册系统定时任务（launchd/cron/任务计划），写定时设置；保留面板设置的备份与事件流",
+    ),
+    "schedule remove": ("无", "确认后停用定时并注销系统任务；正在运行的任务继续"),
+    "schedule status": ("无", "只读：系统定时任务状态与最近一次检查"),
     "snapshot create": ("无", "创建本地快照"),
     "snapshot delta apply": ("无", "应用本地增量包；--dry-run 仅校验"),
     "snapshot delta create": ("无", "创建本地增量包"),

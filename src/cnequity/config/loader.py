@@ -160,6 +160,12 @@ class Config:
     # timezone and daylight saving never enter into it.
     daily_run_at: str = "17:30"
     stale_run_at: str = "21:00"
+    # [job.maintenance]: what `cne run maintain` does after a session's daily run.
+    # ISO weekday (1-7) of the whole-lake audit; 0 never runs it.
+    maintenance_full_audit_weekday: int = 6
+    maintenance_backup_dir: Path | None = None
+    maintenance_backup_retention_days: int = 14
+    maintenance_backup_retention_count: int = 30
     # Continuous event streams. Same shape as a daily schedule group, but the
     # job they belong to runs on the natural calendar and takes its own
     # ingestion lock, so a disclosure or news sweep neither waits for the
@@ -620,6 +626,11 @@ class Config:
     def meta_root(self) -> Path:
         return self.data_root / "meta"
 
+    @property
+    def backup_root(self) -> Path:
+        """Where `cne run maintain` writes metadata archives."""
+        return self.maintenance_backup_dir or self.data_root / "backups"
+
 
 def _expand(path_str: str, data_root: Path, base: Path | None = None) -> Path:
     path = Path(path_str.replace("{data.root}", str(data_root))).expanduser()
@@ -950,6 +961,11 @@ def load_config(path: str | Path) -> Config:
     schedule_groups: dict[str, ScheduleGroup] = {}
     daily_run_at = str(raw.get("job", {}).get("daily", {}).get("run_at", "17:30")).strip()
     stale_run_at = str(raw.get("job", {}).get("stale", {}).get("run_at", "21:00")).strip()
+    maintenance_raw = raw.get("job", {}).get("maintenance", {}) or {}
+    backup_dir_raw = str(maintenance_raw.get("backup_dir") or "").strip()
+    maintenance_backup_dir = (
+        _expand(backup_dir_raw, data_root, config_path.parent) if backup_dir_raw else None
+    )
     groups_raw = raw.get("job", {}).get("daily", {}).get("groups", {})
     for name, group in groups_raw.items():
         schedule_groups[name] = ScheduleGroup(
@@ -1106,6 +1122,10 @@ def load_config(path: str | Path) -> Config:
         schedule_groups=schedule_groups,
         daily_run_at=daily_run_at,
         stale_run_at=stale_run_at,
+        maintenance_full_audit_weekday=int(maintenance_raw.get("full_audit_weekday", 6)),
+        maintenance_backup_dir=maintenance_backup_dir,
+        maintenance_backup_retention_days=int(maintenance_raw.get("backup_retention_days", 14)),
+        maintenance_backup_retention_count=int(maintenance_raw.get("backup_retention_count", 30)),
         events_groups=events_groups,
         init_phases=init_phases,
         on_demand_enabled=bool(on_demand.get("enabled", True)),
@@ -1222,6 +1242,11 @@ def validate_config(cfg: Config) -> list[str]:
         if not match or int(match.group(1)) > 23 or int(match.group(2)) > 59:
             section = "job.daily" if key == "daily_run_at" else "job.stale"
             errors.append(f"{section}.run_at must be Beijing time HH:MM; got {value!r}")
+    if not 0 <= int(getattr(cfg, "maintenance_full_audit_weekday", 6)) <= 7:
+        errors.append("job.maintenance.full_audit_weekday must be 0 (never) or an ISO weekday 1-7")
+    for key in ("backup_retention_days", "backup_retention_count"):
+        if int(getattr(cfg, f"maintenance_{key}", 0)) < 0:
+            errors.append(f"job.maintenance.{key} must be 0 (no limit) or positive")
     for name, group in (getattr(cfg, "schedule_groups", None) or {}).items():
         if getattr(group, "cadence", "daily") not in {"daily", "weekly"}:
             errors.append(

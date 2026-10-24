@@ -442,6 +442,14 @@
 | `--trade-date` | `—` | as-of 自然日 YYYY-MM-DD（默认今天），含周末与节假日。 |
 | `--quiet` | `False` | 只留 warning 及以上，不打逐步进度。 |
 
+## `cne run maintain`
+
+| 参数 | 默认值 | 说明 |
+|---|---|---|
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
+| `--groups` | `—` | 新鲜度门禁判失败的调度组（空格或逗号分隔）。默认：定时日更实际运行的组。 |
+| `--notify` | `False` | 有问题时同时弹出桌面通知（macOS）。 |
+
 ## `cne run retry`
 
 | 参数 | 默认值 | 说明 |
@@ -449,6 +457,31 @@
 | `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 | `--run-id` | `—` | 重试指定的一次 run。 |
 | `--failed-groups` | `False` | 重试每个 daily 调度组最近一次失败的 run。 |
+
+## `cne schedule install`
+
+| 参数 | 默认值 | 说明 |
+|---|---|---|
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
+| `--pack` | `—` | 只更新这些研究包的调度组，不含事件流。可重复。默认保留当前选择（首次安装为全部调度组）。 |
+| `--no-stale` | `False` | 不在 [job.stale].run_at 之后重试缺失的快照。 |
+| `--events-group` | `—` | 另按自己的间隔运行这个事件流组（公告、资讯）。 |
+| `--events-every` | `60` | 配合 --events-group：两次运行之间的分钟数。 |
+| `--yes, -y` | `False` | 不询问确认直接安装。 |
+
+## `cne schedule remove`
+
+| 参数 | 默认值 | 说明 |
+|---|---|---|
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
+| `--yes, -y` | `False` | 不询问确认直接移除。 |
+
+## `cne schedule status`
+
+| 参数 | 默认值 | 说明 |
+|---|---|---|
+| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
+| `--json` | `False` | 输出机器可读的 JSON。 |
 
 ## `cne serve`
 

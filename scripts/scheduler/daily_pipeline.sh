@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# DEPRECATED (removal in 0.20.0): `cne schedule install` installs the packaged,
+# cross-platform timer, which runs `cne run daily` and then `cne run maintain`.
+# Run scripts/scheduler/uninstall_scheduler.sh before switching, or both update the lake.
 # B1 — Daily ingestion pipeline. Runs the schedule groups in dependency order,
 # then the health check and metadata backup. Designed to be the single entry
 # point a launchd/cron job fires each trading day.
