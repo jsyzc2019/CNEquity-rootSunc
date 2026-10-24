@@ -563,6 +563,7 @@
 | `--no-stale` | `False` | 不在 [job.stale].run_at 之后重试缺失的快照。 |
 | `--events-group` | `—` | 另按自己的间隔运行这个事件流组（公告、资讯）。 |
 | `--events-every` | `60` | 配合 --events-group：两次运行之间的分钟数。 |
+| `--events, --no-events` | `—` | 运行配置里的 [[job.events.schedules]]（或关闭）。默认保留现有设置；配置定义了计划且尚无设置时开启。 |
 | `--yes, -y` | `False` | 不询问确认直接安装。 |
 
 ## `cne schedule remove`

@@ -362,7 +362,7 @@ Manages the current user's timer (launchd on macOS, crontab on Linux, Task Sched
 
 | Subcommand | Description |
 |------|------|
-| `install` | Registers or updates the timer after confirmation. `--pack` updates only the selected research packs' schedule groups; `--no-stale` leaves out the closing catch-up; `--events-group` / `--events-every` also run one event group on an interval; options not given keep their current settings; `--yes` skips the confirmation |
+| `install` | Registers or updates the timer after confirmation. `--pack` updates only the selected research packs' schedule groups; `--no-stale` leaves out the closing catch-up; `--events` runs event streams on the config's `[[job.events.schedules]]`; without them, `--events-group` / `--events-every` run one event group on an interval; options not given keep their current settings; `--yes` skips the confirmation |
 | `status` | Installed? active? what it runs and when it last checked; `--json` for machine-readable output; flags legacy `scripts/scheduler` launchd jobs |
 | `remove` | Pauses and unregisters the system task after confirmation; running jobs finish |
 

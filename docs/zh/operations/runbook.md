@@ -19,7 +19,7 @@ cne schedule remove         # 停用并注销；正在运行的任务继续
 
 定时任务属于当前用户：macOS 用 launchd，Linux 用 crontab，Windows 用任务计划程序。它每分钟检查一次；每个交易日过了 `[job.daily] run_at`（北京时间）跑 `cne run daily`，跑完再跑 `cne run maintain`；过了 `[job.stale] run_at` 只重试当天缺的快照数据。一个交易日只算一次：过了 `run_at` 就跑，直到下一个交易日 09:15 开盘前都算这一天；本机时区、夏令时都不影响，电脑睡着时不跑，醒来后的下一次检查会补上。
 
-`--pack` 只更新所选研究包的调度组（不含事件流）；`--events-group` 另按 `--events-every` 分钟间隔跑一个事件组；`--no-stale` 不装收尾补抓。没有给出的选项保留现有设置，所以在命令行安装不会撤掉面板里设置的备份或事件流。这和 `cne serve` 操作页管理的是同一个定时任务，两边都能查看和修改。检测到旧的 `scripts/scheduler` launchd 任务时会提示先卸载，否则同一个湖会更新两遍。
+`--pack` 只更新所选研究包的调度组（不含事件流）；`--events` 按配置的 [`[[job.events.schedules]]`](../getting-started/configuration.md#event-schedules) 跑事件流（可写多条，每条有自己的间隔、随机延迟和静默时段）；配置没写计划时，`--events-group` 另按 `--events-every` 分钟间隔跑一个事件组；`--no-stale` 不装收尾补抓。没有给出的选项保留现有设置，所以在命令行安装不会撤掉面板里设置的备份或事件流。这和 `cne serve` 操作页管理的是同一个定时任务，两边都能查看和修改。检测到旧的 `scripts/scheduler` launchd 任务时会提示先卸载，否则同一个湖会更新两遍。
 
 ### 日更之后的维护（`cne run maintain`） {#maintain}
 

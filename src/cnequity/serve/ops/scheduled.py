@@ -83,6 +83,18 @@ def claim_session(config, scheduled: dict) -> None:
         saved = settings(config)
         if not saved.get(_SETTING.get(job, job)):
             raise OpsError(_("The scheduled task is paused, so no fetch started."))
+        if job == "events" and scheduled.get("schedule"):
+            from cnequity.serve.ops import event_schedules
+
+            spec = event_schedules.find(config, scheduled["schedule"])
+            if spec is None or not event_schedules.is_due(spec, state_dir(config)):
+                raise OpsError(
+                    _(
+                        "The event-stream settings or run interval changed, so nothing was fetched twice."
+                    )
+                )
+            event_schedules.record_attempt(spec, state_dir(config))
+            return
         if job == "events":
             if (
                 saved.get("events_group") != scheduled.get("group")
@@ -121,6 +133,38 @@ def claim_session(config, scheduled: dict) -> None:
         mark_done(config.meta_root, job, session)
 
 
+def _start_event_schedule(config, service, now, report) -> bool:
+    """Start the first due ``[[job.events.schedules]]`` entry; True when one started."""
+    from cnequity.serve.ops import event_schedules
+
+    for spec in config.event_schedules:
+        if not event_schedules.is_due(spec, state_dir(config), now):
+            continue
+        params = {"group": spec.group} if spec.group else {}
+        scheduled = {
+            "job": "events",
+            "schedule": spec.id,
+            "session": (now or datetime.now(timezone.utc)).isoformat(),
+        }
+        preview = service.preview("events.run", params)
+        if not preview["launch_token"]:
+            report.update(status="waiting", message=" ".join(preview["blockers"]))
+            return True
+        record = service.start(
+            preview["preview_id"],
+            preview["launch_token"],
+            [item["id"] for item in preview["acknowledgements"]],
+            requested_by="system-scheduler",
+            scheduled=scheduled,
+        )
+        report["jobs"].append(
+            {"job": "events", "session": scheduled["session"], "job_id": record["job_id"]}
+        )
+        report["status"] = "started"
+        return True
+    return False
+
+
 def tick(config, *, now: datetime | None = None) -> dict:
     report = {"at": datetime.now(timezone.utc).isoformat(), "status": "idle", "jobs": []}
     directory = state_dir(config)
@@ -138,6 +182,12 @@ def tick(config, *, now: datetime | None = None) -> dict:
                     ("events", "events.run"),
                 ):
                     if not saved.get(_SETTING.get(job, job)):
+                        continue
+                    if job == "events" and config.event_schedules:
+                        # Config schedules replace the single dashboard one.
+                        started = _start_event_schedule(config, service, now, report)
+                        if started:
+                            break
                         continue
                     if job == "events":
                         if not events_due(config, saved, now):

@@ -923,6 +923,10 @@ msgstr "%s：未处理的错误"
 msgid "%s: worker pool broke (likely OOM under load); retrying %d batch(es) serially"
 msgstr "%s：工作进程池崩溃（多半是负载下内存不足），改为串行重试 %d 批"
 
+#: cnequity/cli/schedule_cmds.py
+msgid "(all)"
+msgstr "（全部）"
+
 #: cnequity/cli/init_summary.py cnequity/cli/quality_cmds.py
 #: cnequity/cli/run_cmds.py cnequity/cli/setup_cmds.py
 #: cnequity/diagnostics/health_page.py cnequity/research/packs.py
@@ -935,6 +939,11 @@ msgstr "、"
 #, python-format
 msgid ", %d option contracts"
 msgstr "、期权 %d 个合约"
+
+#: cnequity/cli/schedule_cmds.py
+#, python-brace-format
+msgid ", every {minutes} minutes during {hours} Beijing time"
+msgstr "，北京时间 {hours} 点每 {minutes} 分钟"
 
 #: cnequity/cli/quality_cmds.py
 #, python-brace-format
@@ -950,6 +959,11 @@ msgstr "，标的 {symbols}"
 #, python-brace-format
 msgid ", the closest receipt is short {short}/{total} symbols"
 msgstr "，最接近的回执差 {short}/{total} 只"
+
+#: cnequity/cli/schedule_cmds.py
+#, python-brace-format
+msgid ", up to {seconds}s later at random"
+msgstr "，随机延后至多 {seconds} 秒"
 
 #: cnequity/serve/ops/scheduler.py
 msgid ", without event streams. A snapshot missed for a day cannot be filled back by date."
@@ -4934,6 +4948,10 @@ msgstr "只跑这些研究包对应的日更调度组，不跑事件流。不写
 msgid "Run only the selected daily-update schedule group. Does not mark today as done, so the scheduled full run still happens."
 msgstr "只跑选定的日更调度组。不写“今天已跑过”的标记，定时全流程仍会执行。"
 
+#: cnequity/cli/schedule_cmds.py
+msgid "Run the config's [[job.events.schedules]] (or turn them off). Default: keep the current setting; on when the config defines schedules and nothing is set yet."
+msgstr "运行配置里的 [[job.events.schedules]]（或关闭）。默认保留现有设置；配置定义了计划且尚无设置时开启。"
+
 #: cnequity/cli/run_cmds.py
 msgid ""
 "Run the continuous event streams by calendar day (announcements, news).\n"
@@ -6099,6 +6117,10 @@ msgstr "这个备份名已存在，请填写新的名称。"
 #: cnequity/cli/run_cmds.py
 msgid "This config"
 msgstr "这份配置"
+
+#: cnequity/cli/schedule_cmds.py
+msgid "This config defines [[job.events.schedules]]; edit them there instead of --events-group."
+msgstr "这份配置定义了 [[job.events.schedules]]；请在配置里修改，不要用 --events-group。"
 
 #: cnequity/cli/run_cmds.py
 msgid "This config has no [job.events.groups]; see configs/cnequity.example.toml"

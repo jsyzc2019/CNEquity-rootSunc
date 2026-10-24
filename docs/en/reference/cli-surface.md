@@ -58,7 +58,7 @@ Checked against the Click command registry by `scripts/dev/sync_docs.py`. “Whe
 | `cne run events` | when run | Fetches events and writes the lake |
 | `cne run maintain` | when run | Post-update maintenance: audit, freshness gate, source probes and SLO, run-evidence check (read-only); writes a metadata backup and rotates old ones by retention; expired files are only previewed |
 | `cne run retry` | when run | Retries failed scopes and writes the lake |
-| `cne schedule install` | none | After confirmation, registers the current user's system timer (launchd/cron/Task Scheduler) and writes schedule settings; keeps the backup and event schedules set on the dashboard |
+| `cne schedule install` | none | After confirmation, registers the current user's system timer (launchd/cron/Task Scheduler) and writes schedule settings; keeps the backup and event schedules set on the dashboard; --events runs event streams on the config's [[job.events.schedules]] |
 | `cne schedule remove` | none | After confirmation, pauses scheduling and unregisters the system task; jobs already running continue |
 | `cne schedule status` | none | Read-only: the system timer's state and its last check |
 | `cne serve` | conditional | Starts the lake dashboard. On a loopback address the operations page can start allowlisted fetches and daily updates; --read-only disables write endpoints; remote fetches require --allow-remote-ops; storage cleanup still needs web confirmation; fetch toggles are written back to the config, with a backup, after preview confirmation and do not start a fetch |

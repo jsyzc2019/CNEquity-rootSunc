@@ -58,7 +58,7 @@
 | `cne run events` | 执行时 | 事件取数并写湖 |
 | `cne run maintain` | 执行时 | 日更后的维护：审计、新鲜度门禁、源探针与 SLO、运行证据核验（只读），写元数据备份并按保留期轮换旧备份，过期文件仅预览 |
 | `cne run retry` | 执行时 | 重试失败范围并写湖 |
-| `cne schedule install` | 无 | 确认后为当前用户注册系统定时任务（launchd/cron/任务计划），写定时设置；保留面板设置的备份与事件流 |
+| `cne schedule install` | 无 | 确认后为当前用户注册系统定时任务（launchd/cron/任务计划），写定时设置；保留面板设置的备份与事件流；--events 按配置的 [[job.events.schedules]] 运行事件流 |
 | `cne schedule remove` | 无 | 确认后停用定时并注销系统任务；正在运行的任务继续 |
 | `cne schedule status` | 无 | 只读：系统定时任务状态与最近一次检查 |
 | `cne serve` | 条件 | 启动湖面板。回环地址可从操作页发起白名单内的取数与日更；--read-only 关闭写入口；远程取数须 --allow-remote-ops；存储清理仍须网页确认；取数开关经预览确认后写回配置并备份，不因此启动取数 |

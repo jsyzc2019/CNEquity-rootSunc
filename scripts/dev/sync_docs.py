@@ -455,7 +455,7 @@ EFFECTS: dict[str, tuple[str, str]] = {
     ),
     "schedule install": (
         "无",
-        "确认后为当前用户注册系统定时任务（launchd/cron/任务计划），写定时设置；保留面板设置的备份与事件流",
+        "确认后为当前用户注册系统定时任务（launchd/cron/任务计划），写定时设置；保留面板设置的备份与事件流；--events 按配置的 [[job.events.schedules]] 运行事件流",
     ),
     "schedule remove": ("无", "确认后停用定时并注销系统任务；正在运行的任务继续"),
     "schedule status": ("无", "只读：系统定时任务状态与最近一次检查"),

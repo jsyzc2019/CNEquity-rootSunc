@@ -361,7 +361,7 @@ diff 会把删列、改类型、改主键、单位/PIT/历史语义变化识别�
 
 | 子命令 | 说明 |
 |------|------|
-| `install` | 确认后注册或更新定时任务。`--pack` 只更新所选研究包的调度组；`--no-stale` 不装收尾补抓；`--events-group` / `--events-every` 另按间隔跑一个事件组；没给的选项保留现有设置；`--yes` 跳过确认 |
+| `install` | 确认后注册或更新定时任务。`--pack` 只更新所选研究包的调度组；`--no-stale` 不装收尾补抓；`--events` 按配置的 `[[job.events.schedules]]` 跑事件流；配置没写计划时，`--events-group` / `--events-every` 另按间隔跑一个事件组；没给的选项保留现有设置；`--yes` 跳过确认 |
 | `status` | 是否已安装、是否在运行、跑什么、最近一次检查；`--json` 输出机器可读结果；检测到旧的 `scripts/scheduler` launchd 任务时提示 |
 | `remove` | 确认后停用并注销系统任务；正在运行的任务继续 |
 

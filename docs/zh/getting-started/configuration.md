@@ -341,6 +341,33 @@ weekday = 5          # 每周组在哪天之前的最后一个交易日跑，ISO
 `sentiment_scores` 仍留在 `research` 组：它读的是**湖里已提交的**公告和资讯，
 从来不是同一次 run 里现抓的，所以拆开之后行为不变。
 
+### 事件流计划（`[[job.events.schedules]]`） {#event-schedules}
+
+打包定时任务（`cne schedule install --events`）按这里的计划运行事件组；没有写计划时，用控制台设置的单个事件组和间隔。可以写多条，每条一个事件组：
+
+| 键 | 默认 | 说明 |
+|---|---|---|
+| `group` | 不写 = 全部 | `[job.events.groups]` 中的组名；不写时按配置顺序跑全部组 |
+| `every_minutes` | `60` | 两次尝试开始之间的分钟数（1–1440） |
+| `jitter_seconds` | `0` | 每次运行后把下一次随机延后 0–N 秒（0–3600），避免整点齐发请求 |
+| `quiet_hours` | 不写 | 北京时间的静默时段，如 `"1-7"`（01:00–06:59），`"23-6"` 跨午夜 |
+| `quiet_every_minutes` | `60` | 静默时段内的间隔，留 5 分钟余量 |
+
+```toml
+[[job.events.schedules]]
+group = "news_wire"
+every_minutes = 15
+jitter_seconds = 120
+quiet_hours = "1-7"
+quiet_every_minutes = 60
+
+[[job.events.schedules]]
+every_minutes = 360
+jitter_seconds = 300
+```
+
+同一个组不能写两条；组名必须存在。控制台的定时任务页只读展示这些计划，修改要改配置。
+
 ## `[minute_bars]`
 
 可选日内线。默认关闭，且**不在** `[job.daily.waves]` 上；其请求量和磁盘量随标的范围、回溯窗口与交易活跃度增长，不会自动成为 `cne init` 的成本。开启后用 `cne run daily --group intraday` 或 `cne backfill`，先在小范围核对实际用量。

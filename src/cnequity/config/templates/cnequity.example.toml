@@ -686,6 +686,24 @@ at = "21:00"
 parallel = true
 steps = ["news_headlines", "flash_news_wire", "compact"]
 
+# How often the packaged timer (`cne schedule install --events`) runs event
+# groups. Without schedules here it uses the single group and interval set on the
+# dashboard. `group` left out runs every group above in order. Inside
+# `quiet_hours` (Beijing hours; "23-6" wraps midnight) the spacing is
+# `quiet_every_minutes`; each run pushes the next one out by up to
+# `jitter_seconds` at random.
+#
+# [[job.events.schedules]]
+# group = "news_wire"
+# every_minutes = 15
+# jitter_seconds = 120
+# quiet_hours = "1-7"
+# quiet_every_minutes = 60
+#
+# [[job.events.schedules]]
+# every_minutes = 360
+# jitter_seconds = 300
+
 [job.init.phases]
 names = [
   "phase1_reference",

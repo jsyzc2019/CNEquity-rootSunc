@@ -4,6 +4,7 @@
 
 ## [0.19.0] — 未发布
 
+- 新增 `[[job.events.schedules]]`：在配置里写多条事件流计划，每条有自己的事件组、间隔、随机延迟和北京时间静默时段，打包定时任务按计划运行（`cne schedule install --events`），控制台只读展示。没写计划时仍用控制台设置的单个事件组。
 - 新增 `[source_health] vantage`：在配置里写一次网络出口标签，源探针、源健康记录和 `cne run maintain` 都会带上它；`CNE_SOURCE_VANTAGE` 和 `--vantage` 仍可在单次运行时覆盖。
 - `fund_flow_ths` / `sector_fund_flow_ths` 默认仍是不判新鲜度的兜底表；配置的日更调度组里排了它们（push2 不可用时用 `steps_add` 换入）时，改为要求最近收盘交易日有数据，收尾补抓会重试缺的那天，新鲜度门禁也会报出来。
 - `cne backfill` 只保留通用选项（帮助里的选项从 32 个减到 11 个）。数据集专属的修复改为 `cne repair` 子命令，默认预览、`--apply` 运行：`payment-dates`、`delisted-actions`、`ex-dates`、`bar-amounts`、`bar-turnover`、`bse-tip-turnover`、`valuation-outage`；上期所年度包导入改为 `cne import shfe-archive`。新增通用的 `--refetch`（取代衍生品的 `--refresh` 和 `sector_bars` 的 `--force`）和 `--source`（取代 `--margin-source`）；`--retry-failed` 本来就是默认行为，不再需要。旧开关仍可用，输入时提示新写法。

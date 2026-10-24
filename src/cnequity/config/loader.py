@@ -45,6 +45,28 @@ class ScheduleGroup:
 
 
 @dataclass
+class EventSchedule:
+    """One ``[[job.events.schedules]]`` entry: how often the timer runs an event group.
+
+    ``group`` None runs every event group in config order, as ``cne run events``
+    does. Inside ``quiet_hours`` (Beijing hours, ``"1-7"`` = 01:00-06:59,
+    ``"23-6"`` wraps midnight) the spacing is ``quiet_every_minutes``. Each run
+    pushes the next one out by a random 0..``jitter_seconds``, so a 15-minute
+    feed does not reach the upstream on a metronome.
+    """
+
+    every_minutes: int
+    group: str | None = None
+    jitter_seconds: int = 0
+    quiet_hours: str | None = None
+    quiet_every_minutes: int = 60
+
+    @property
+    def id(self) -> str:
+        return self.group or "all"
+
+
+@dataclass
 class FailoverDatasetSpec:
     name: str
     primary: str
@@ -173,6 +195,7 @@ class Config:
     # ingestion lock, so a disclosure or news sweep neither waits for the
     # evening batch nor is skipped because the market was closed.
     events_groups: dict[str, ScheduleGroup] = field(default_factory=dict)
+    event_schedules: list[EventSchedule] = field(default_factory=list)
     init_phases: list[str] = field(default_factory=list)
     on_demand_enabled: bool = True
     on_demand_datasets: list[str] = field(default_factory=list)
@@ -987,6 +1010,21 @@ def load_config(path: str | Path) -> Config:
             parallel=bool(group.get("parallel", True)),
         )
 
+    event_schedules: list[EventSchedule] = []
+    for entry in raw.get("job", {}).get("events", {}).get("schedules", []) or []:
+        if not isinstance(entry, dict):
+            raise ValueError("[[job.events.schedules]] entries must be tables")
+        group = entry.get("group")
+        event_schedules.append(
+            EventSchedule(
+                every_minutes=int(entry.get("every_minutes", 60)),
+                group=str(group) if group not in (None, "", "all") else None,
+                jitter_seconds=int(entry.get("jitter_seconds", 0)),
+                quiet_hours=str(entry["quiet_hours"]) if entry.get("quiet_hours") else None,
+                quiet_every_minutes=int(entry.get("quiet_every_minutes", 60)),
+            )
+        )
+
     duckdb_raw = raw.get("duckdb", {})
     duckdb_path_str = duckdb_raw.get("path")
     duckdb_path = (
@@ -1130,6 +1168,7 @@ def load_config(path: str | Path) -> Config:
         maintenance_backup_retention_count=int(maintenance_raw.get("backup_retention_count", 30)),
         source_vantage=str((raw.get("source_health") or {}).get("vantage") or "").strip() or None,
         events_groups=events_groups,
+        event_schedules=event_schedules,
         init_phases=init_phases,
         on_demand_enabled=bool(on_demand.get("enabled", True)),
         on_demand_datasets=list(on_demand.get("datasets", [])),
@@ -1245,6 +1284,22 @@ def validate_config(cfg: Config) -> list[str]:
         if not match or int(match.group(1)) > 23 or int(match.group(2)) > 59:
             section = "job.daily" if key == "daily_run_at" else "job.stale"
             errors.append(f"{section}.run_at must be Beijing time HH:MM; got {value!r}")
+    seen_schedules: set[str] = set()
+    for spec in getattr(cfg, "event_schedules", None) or []:
+        where = f"job.events.schedules[{spec.id}]"
+        if spec.id in seen_schedules:
+            errors.append(f"{where}: two schedules for the same event group")
+        seen_schedules.add(spec.id)
+        if spec.group is not None and spec.group not in (cfg.events_groups or {}):
+            errors.append(f"{where}: unknown event group {spec.group!r}")
+        if not 1 <= spec.every_minutes <= 1440 or not 1 <= spec.quiet_every_minutes <= 1440:
+            errors.append(f"{where}: every_minutes and quiet_every_minutes must be 1-1440")
+        if not 0 <= spec.jitter_seconds <= 3600:
+            errors.append(f"{where}: jitter_seconds must be 0-3600")
+        if spec.quiet_hours is not None:
+            match = _re.fullmatch(r"(\d{1,2})-(\d{1,2})", spec.quiet_hours)
+            if not match or int(match[1]) > 23 or int(match[2]) > 23 or match[1] == match[2]:
+                errors.append(f"{where}: quiet_hours must be Beijing hours like '1-7' or '23-6'")
     vantage = getattr(cfg, "source_vantage", None)
     if vantage:
         from cnequity.diagnostics.source_health import validate_vantage

@@ -181,6 +181,19 @@ def _service(config_path: str):
         raise click.ClickException(str(exc)) from None
 
 
+def _describe_schedule(spec) -> str:
+    line = _("Event group {group} every {minutes} minutes").format(
+        group=spec.group or _("(all)"), minutes=spec.every_minutes
+    )
+    if spec.jitter_seconds:
+        line += _(", up to {seconds}s later at random").format(seconds=spec.jitter_seconds)
+    if spec.quiet_hours:
+        line += _(", every {minutes} minutes during {hours} Beijing time").format(
+            minutes=max(spec.every_minutes, spec.quiet_every_minutes), hours=spec.quiet_hours
+        )
+    return line
+
+
 def _legacy_jobs() -> list[str]:
     if sys.platform != "darwin":
         return []
@@ -206,6 +219,7 @@ def schedule_status(config_path: str, as_json: bool):
         payload.update(
             events=home.get("events"),
             events_group=home.get("events_group"),
+            event_schedules=home.get("event_schedules"),
             daily_packs=home.get("daily_packs"),
             timer_health=home.get("timer_health"),
             last_tick=home.get("last_tick"),
@@ -235,7 +249,12 @@ def schedule_status(config_path: str, as_json: bool):
         click.echo(_("  Snapshot catch-up after {at}").format(at=home.get("stale_run_at")))
     if home.get("daily_packs"):
         click.echo(_("  Research packs: {packs}").format(packs=", ".join(home["daily_packs"])))
-    if home.get("events"):
+    if home.get("events") and home.get("event_schedules"):
+        from cnequity.config import EventSchedule
+
+        for entry in home["event_schedules"]:
+            click.echo("  " + _describe_schedule(EventSchedule(**entry)))
+    elif home.get("events"):
         click.echo(
             _("  Event group {group} every {minutes} minutes").format(
                 group=home.get("events_group"), minutes=home.get("events_interval_minutes")
@@ -290,6 +309,15 @@ def schedule_status(config_path: str, as_json: bool):
     show_default=True,
     help=N_("With --events-group: minutes between runs."),
 )
+@click.option(
+    "--events/--no-events",
+    "events_switch",
+    default=None,
+    help=N_(
+        "Run the config's [[job.events.schedules]] (or turn them off). Default: keep the current "
+        "setting; on when the config defines schedules and nothing is set yet."
+    ),
+)
 @click.option("--yes", "-y", is_flag=True, help=N_("Install without asking for confirmation."))
 def schedule_install(
     config_path: str,
@@ -297,6 +325,7 @@ def schedule_install(
     no_stale: bool,
     events_group: str | None,
     events_every: int,
+    events_switch: bool | None,
     yes: bool,
 ):
     """Install (or update) the current user's timer for this lake."""
@@ -309,7 +338,18 @@ def schedule_install(
     # its current value, so installing from here never undoes a backup or event
     # schedule set up on the dashboard.
     saved = settings(cfg)
-    events = events_group is not None or bool(saved.get("events"))
+    if cfg.event_schedules and events_group is not None:
+        raise click.UsageError(
+            _(
+                "This config defines [[job.events.schedules]]; edit them there instead of --events-group."
+            )
+        )
+    if events_switch is not None:
+        events = events_switch
+    elif cfg.event_schedules and "events" not in saved:
+        events = True
+    else:
+        events = events_group is not None or bool(saved.get("events"))
     try:
         preview = service.preview(
             daily=True,
@@ -339,7 +379,10 @@ def schedule_install(
     )
     if not no_stale:
         click.echo(_("Snapshot catch-up after {at}").format(at=cfg.stale_run_at))
-    if preview.get("events"):
+    if preview.get("events") and cfg.event_schedules:
+        for spec in cfg.event_schedules:
+            click.echo(_describe_schedule(spec))
+    elif preview.get("events"):
         click.echo(
             _("Event group {group} every {minutes} minutes").format(
                 group=preview.get("events_group"), minutes=preview.get("events_interval_minutes")

@@ -341,6 +341,33 @@ and `[job.events]` — the two tasks hold different locks, so fetching the same 
 `sentiment_scores` stays in the `research` group: it reads announcements and news **already committed to the lake**,
 never ones fetched in the same run, so its behavior is unchanged by the split.
 
+### Event schedules (`[[job.events.schedules]]`) {#event-schedules}
+
+The packaged timer (`cne schedule install --events`) runs event groups on these schedules; without any, it uses the single group and interval set on the dashboard. Write one entry per event group:
+
+| Key | Default | Description |
+|---|---|---|
+| `group` | omitted = all | A group from `[job.events.groups]`; omitted runs every group in config order |
+| `every_minutes` | `60` | Minutes between attempt starts (1–1440) |
+| `jitter_seconds` | `0` | After each run, push the next one out by a random 0–N seconds (0–3600), so requests do not land on the hour |
+| `quiet_hours` | omitted | Beijing-time quiet window, e.g. `"1-7"` (01:00–06:59); `"23-6"` wraps midnight |
+| `quiet_every_minutes` | `60` | Spacing inside the quiet window, with 5 minutes of slack |
+
+```toml
+[[job.events.schedules]]
+group = "news_wire"
+every_minutes = 15
+jitter_seconds = 120
+quiet_hours = "1-7"
+quiet_every_minutes = 60
+
+[[job.events.schedules]]
+every_minutes = 360
+jitter_seconds = 300
+```
+
+A group may appear only once, and it must exist. The dashboard's schedule page shows these schedules read-only; change them in the config.
+
 ## `[minute_bars]`
 
 Optional intraday bars. Off by default and **not** in `[job.daily.waves]`; their request volume and disk usage grow with symbol scope, lookback window and trading activity, and never automatically become a cost of `cne init`. Once enabled, use `cne run daily --group intraday` or `cne backfill`, and check actual usage on a small scope first.
