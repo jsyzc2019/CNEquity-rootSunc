@@ -255,16 +255,19 @@ batch_rest_seconds = 120
 # Optional Tushare Pro — historical BJ ST evidence (stock_st).
 # stock_st starts at 2017-01-01; 2016 uses bak_basic name evidence. Both need a
 # token; older BJ bars remain unresolved instead of certifying them as normal.
-# Prefer the environment variable TUSHARE_TOKEN so the credential never enters config.
+# Credential lookup: TUSHARE_TOKEN, then token_file, then token. A file (chmod 600)
+# also reaches launchd/cron runs, which do not see your shell's environment;
+# `cne doctor` warns about a token written inline here.
 [sources.tushare]
 enabled = false
 min_interval_seconds = 1.0
-# token = "..."
+# token_file = "~/.config/cnequity/tushare_token"
 
 # Optional 同花顺 official API (fuyao.aicubes.cn) — a licensed peer source, never
 # a primary. With no key every path that uses it degrades to silence and the lake
 # keeps its existing sources, so leaving this section out costs only the extra
-# cross-checks. Prefer HITHINK_FINANCE_API_KEY so the credential never enters config.
+# cross-checks. Key lookup: HITHINK_FINANCE_API_KEY, then api_key_file, then api_key
+# (as for [sources.tushare] above).
 #
 # `verify` and `backfill` are deliberately separate. Verification writes source
 # snapshots and findings and never touches curated rows, so it is safe whenever a
@@ -275,7 +278,7 @@ enabled = false
 min_interval_seconds = 0.4
 verify = true
 backfill = false
-# api_key = "..."
+# api_key_file = "~/.config/cnequity/ths_official_key"
 
 [margin_trading]
 # "exchange" reads 融资融券 detail from the SSE and SZSE, which compile it from

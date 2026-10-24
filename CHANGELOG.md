@@ -4,6 +4,8 @@
 
 ## [0.19.0] — 未发布
 
+- 凭证读取顺序改为环境变量 → 文件 → 配置里的值：新增 `[sources.tushare].token_file` 和 `[sources.ths_official].api_key_file`（定时任务读不到 shell 环境变量时用它），环境变量现在优先于配置里直接写的值。`cne doctor` 会提示写在配置里的凭证和其他用户可读的配置文件。
+- 修复同花顺官方 API Key 参与配置指纹计算的问题：所有凭证字段只按「是否设置」计入指纹，轮换 Key 不再改变指纹。设置了这个 Key 的湖，指纹会在升级后变化一次。东财代理地址也不再出现在 `Config` 的 repr 里。
 - 配置可以继承内置默认值：`cne config create` 和首次 `cne init` 写出的配置只有 `extends = "builtin"` 和 `[data].root`，其余设置来自当前安装版本，新版本的设置和调度 step 升级后直接生效，不再需要 `cne config upgrade`。调度组新增 `steps_add` / `steps_remove` / `enabled = false`，换掉一个 step 不会冻结整组。没有 `extends` 的完整配置照旧工作。
 - 新增 `cne config show`（生效配置，标出文件里写的值，凭证打码；`--defaults` 打印全部设置）和 `cne config upgrade --minimize`（把完整配置改写成继承默认值的形式，先列出加载后会变化的设置，`--dry-run` 只预览，原文件自动备份）。
 - 配置查找统一：未给 `--config` 时依次找 `CNE_CONFIG`、当前目录的 `configs/cnequity.toml`、用户级 `~/.config/cnequity/config.toml`（Windows 为 `%APPDATA%\cnequity\config.toml`）。CLI、`load()`、MCP 用同一套规则，在任何目录运行都指向同一个湖。首次 `cne init` / `cne config create` 在当前目录没有项目配置时写用户级配置；新增 `cne config path` 显示实际生效的配置、选中原因和数据目录。

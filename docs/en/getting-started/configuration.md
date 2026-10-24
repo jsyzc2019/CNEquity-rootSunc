@@ -110,12 +110,12 @@ Main sources and request channels in the template:
 | `ths_official` | **THS official API (keyed)**, see [`cne ths-official`](../reference/cli.md#cne-ths-official) |
 | `sw` / `cni` | Shenwan historical industry and CNI historical constituent files; default interval 1 second, a single request in flight |
 | `futures_exchange` | Futures exchange files, with per-host rate limiting and caching |
-| `tushare` | Optional Tushare Pro: BJ historical ST evidence (`stock_st`). Requires a token; **prefer the environment variable `TUSHARE_TOKEN`**, and do not put credentials in the config |
+| `tushare` | Optional Tushare Pro: BJ historical ST evidence (`stock_st`). Requires a token: the environment variable `TUSHARE_TOKEN` or `token_file`; do not put credentials in the config |
 
 
 | Key | Description |
 |----|------|
-| `enabled` | An explicit false blocks the source and its sub-channels at the HTTP request boundary. When the whole section is omitted, the default behavior of the various legacy paths is not entirely consistent; in production, use the full template and write `enabled = false` for sources you do not use, rather than expressing "off" by deleting the section |
+| `enabled` | An explicit false blocks the source and its sub-channels at the HTTP request boundary. When the whole section is omitted, the default behavior of the various legacy paths is not entirely consistent; write `enabled = false` for sources you do not use (in a config that extends the defaults too), rather than expressing "off" by deleting the section |
 | `min_interval_seconds` | Cross-process request interval; must be a non-negative finite number. 0 disables the fixed interval but not the rejection cooldown. It waits outside the lock and rechecks the shared time on waking; before the actual request it also acquires a concurrency slot |
 | `js_runtime` (ths) | Optional. Path to Deno used to generate the THS `hexin-v` token; if unset, it searches `PATH` and common install locations. The token script runs in Deno **with no permissions at all** (no file read/write, no network, no environment variables). Without Deno, the THS fund-flow fallback fails and is logged, without affecting other data |
 | `ths_data` (rate-limit channel) | THS data center pages (fund-flow fallback) default to 3 seconds per page and share 1 concurrency slot with other THS pages; adjust with `[sources.ths_data] min_interval_seconds` |
@@ -133,7 +133,7 @@ Main sources and request channels in the template:
 | `batch_size` / `batch_rest_seconds` (baostock) | Extra batch cooldown for full-market backfills. The 50,000 requests/day cap, single connection and blacklist freeze duration are hard-coded and cannot be raised through config |
 | `verify` (ths_official) | **On** by default. It may only write `meta/source_snapshots` and findings and never touches curated rows, so it is safe to leave on if you have a key |
 | `backfill` (ths_official) | **Off** by default. It changes the lake's contents, so it must be turned on explicitly. Holding credentials, enabling the source and allowing it to modify data are three separate decisions |
-| `api_key` (ths_official) | Prefer the environment variable `HITHINK_FINANCE_API_KEY` over writing it into the config |
+| `api_key` / `api_key_file` (ths_official) | Prefer the environment variable `HITHINK_FINANCE_API_KEY` or `api_key_file` over writing it into the config |
 
 The fetch settings in `cne serve` only change `enabled` for TDX, EastMoney, Sina daily bars, Baostock, the BSE website, THS pages and CNINFO, plus EastMoney's `push2_paused`. The minute-bar, trade-tick and futures switches and `[universe] ingest` / `ingest_listed_funds` / `ingest_eligible_etfs` are on that page too. Before confirming, it lists the differences, and it backs up before writing; intervals, budgets, breakers and credentials are left untouched. The environment variable `CNE_PUSH2_PAUSED=1` still takes precedence over the pause switch in the config.
 
@@ -152,12 +152,14 @@ Template request intervals (conservative client-side settings, not a guarantee o
 | sina_bars | 1.0 | BJ/delisted daily-bar fallback; rate limited independently of adjustment factors, with limited retries on HTTP 456 |
 | baostock | 1.0 + batch 20/120s | Historical market cap/ST. There is also a hard-coded cap of 50,000 per Shanghai calendar day and a single connection; the blacklist freeze is the number of occurrences this year × 6 hours |
 
+Credentials (the `[sources.tushare]` token and the `[sources.ths_official]` api_key) are looked up in this order: the environment variable (`TUSHARE_TOKEN` / `HITHINK_FINANCE_API_KEY`) → a file (`token_file` / `api_key_file`; a relative path resolves against the config file's directory, and only the first line is read) → the value written in the config. Scheduled runs started by launchd / cron do not see variables exported in your login shell, so a scheduled lake should use a file with mode 600. `cne doctor` warns when a credential is written in the config, and when such a config file is readable by other users.
+
 ## THS official API {#ths-official-api}
 `ths_official` is an optional API that requires account credentials; it is configured, rate limited and recorded as a source separately from the `ths` public pages. It must not become a hard dependency of the free core data chain. For source registration and data-use conditions, see the [source matrix](../legal-and-data-sources.md#source-compliance-matrix); the client code license is not a data redistribution license.
 
 ### Configuration and entry points
 
-Set `HITHINK_FINANCE_API_KEY` in the calling environment; do not put the key in public templates, logs or issue reports. Explicitly enable `[sources.ths_official] enabled = true` in your personal config. `verify` controls comparison evidence and `backfill` controls content backfill; the latter is off by default.
+Provide the key through the environment variable `HITHINK_FINANCE_API_KEY` or `api_key_file`; do not put the key in public templates, logs or issue reports. Explicitly enable `[sources.ths_official] enabled = true` in your personal config. `verify` controls comparison evidence and `backfill` controls content backfill; the latter is off by default.
 
 | Command | Fetch and write boundary |
 |---|---|

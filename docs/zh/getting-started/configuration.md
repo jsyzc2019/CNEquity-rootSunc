@@ -110,12 +110,12 @@ enabled = false
 | `ths_official` | **同花顺官方 API（keyed）**，见 [`cne ths-official`](../reference/cli.md#cne-ths-official) |
 | `sw` / `cni` | 申万历史行业、国证历史成分文件，默认间隔 1 秒、单请求在途 |
 | `futures_exchange` | 期货交易所文件，逐主机限速与缓存 |
-| `tushare` | 可选 Tushare Pro——BJ 历史 ST 证据（`stock_st`）。需 token，**优先用环境变量 `TUSHARE_TOKEN`**，别把凭证写进配置 |
+| `tushare` | 可选 Tushare Pro——BJ 历史 ST 证据（`stock_st`）。需 token：环境变量 `TUSHARE_TOKEN` 或 `token_file`，别把凭证写进配置 |
 
 
 | 键 | 说明 |
 |----|------|
-| `enabled` | 显式 false 会在 HTTP 请求边界拦截该源及子通道。省略整段时各旧路径的默认行为不完全相同；生产使用完整模板，对不用的源写 `enabled = false`，不要通过删配置段表达关闭 |
+| `enabled` | 显式 false 会在 HTTP 请求边界拦截该源及子通道。省略整段时各旧路径的默认行为不完全相同；对不用的源写 `enabled = false`（继承默认值的配置也一样），不要通过删配置段表达关闭 |
 | `min_interval_seconds` | 跨进程请求间隔；必须是非负有限数，0 表示关闭固定间隔但不关闭拒绝冷却。锁外等待，醒来重查共享时间；实际请求前同时取得并发名额 |
 | `js_runtime`（ths） | 可选。生成同花顺 `hexin-v` 令牌用的 Deno 路径；不填就在 `PATH` 和常见安装位置里找。令牌脚本在 Deno 里**不给任何权限**运行（不能读写文件、联网、读环境变量）。没有 Deno 时同花顺资金流兜底会失败并记日志，不影响其他数据 |
 | `ths_data`（限速通道） | 同花顺数据中心页面（资金流兜底）默认 3 秒一页，与同花顺其他页面共用 1 个并发；可用 `[sources.ths_data] min_interval_seconds` 调整 |
@@ -133,7 +133,7 @@ enabled = false
 | `batch_size` / `batch_rest_seconds`（baostock） | 全市场回填的额外批次冷却。日请求上限 5 万次、单连接、黑名单冻结时长写在代码里，不能用配置调高 |
 | `verify`（ths_official） | 默认 **开**。只允许写 `meta/source_snapshots` 与 findings，从不碰 curated 行，所以有 key 就可以安全开着 |
 | `backfill`（ths_official） | 默认 **关**。它会改变湖里的内容，所以必须显式打开。持有凭证、启用源、允许它改数据是三个决定 |
-| `api_key`（ths_official） | 建议用环境变量 `HITHINK_FINANCE_API_KEY` 而非写进配置 |
+| `api_key` / `api_key_file`（ths_official） | 建议用环境变量 `HITHINK_FINANCE_API_KEY` 或 `api_key_file`，而非写进配置 |
 
 `cne serve` 的取数设置只改通达信、东财、新浪日线、Baostock、北交所官网、同花顺页面和巨潮的 `enabled`，以及东财的 `push2_paused`。分钟线、分笔、期货开关和 `[universe] ingest` / `ingest_listed_funds` / `ingest_eligible_etfs` 也在那一页。确认前先列出差异，写入前备份；间隔、预算、熔断和凭据不动。环境变量 `CNE_PUSH2_PAUSED=1` 仍优先于配置里的暂停开关。
 
@@ -152,12 +152,14 @@ enabled = false
 | sina_bars | 1.0 | BJ/退市日线 fallback；独立于复权因子限速，配合 HTTP 456 有限重试 |
 | baostock | 1.0 + batch 20/120s | 历史市值/ST。另有写死的上海自然日 5 万次上限和单连接；黑名单冻结为本年次数 × 6 小时 |
 
+凭证（`[sources.tushare]` 的 token、`[sources.ths_official]` 的 api_key）按以下顺序读取：环境变量（`TUSHARE_TOKEN` / `HITHINK_FINANCE_API_KEY`）→ 文件（`token_file` / `api_key_file`，相对路径按配置文件所在目录解析，只读第一行）→ 配置里直接写的值。launchd / cron 启动的定时任务读不到登录 shell 里 export 的变量，所以定时运行的湖建议用权限为 600 的文件。凭证直接写在配置里时，`cne doctor` 会提示，配置文件其他用户可读时也会提示。
+
 ## THS 官方接口
 `ths_official` 是需要账号凭证的可选接口，与 `ths` 公共页面分开配置、限流与记录来源。它不能成为免费核心数据链的强依赖。源登记和数据使用条件见 [来源矩阵](../legal-and-data-sources.md#来源合规矩阵)；客户端代码许可证不等于数据再分发许可。
 
 ### 配置与入口
 
-通过调用环境设置 `HITHINK_FINANCE_API_KEY`；不要在公共模板、日志或问题报告中写入 Key。个人配置中显式启用 `[sources.ths_official] enabled = true`。`verify` 控制对照证据，`backfill` 控制内容补入，默认后者关闭。
+通过环境变量 `HITHINK_FINANCE_API_KEY` 或 `api_key_file` 提供 Key；不要在公共模板、日志或问题报告中写入 Key。个人配置中显式启用 `[sources.ths_official] enabled = true`。`verify` 控制对照证据，`backfill` 控制内容补入，默认后者关闭。
 
 | 命令 | 获取与写入边界 |
 |---|---|

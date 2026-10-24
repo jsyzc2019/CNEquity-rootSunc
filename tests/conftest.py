@@ -57,6 +57,10 @@ _USER_CONFIG_HOME = tempfile.mkdtemp(prefix="cne-test-config-")
 os.environ["XDG_CONFIG_HOME"] = _USER_CONFIG_HOME
 os.environ["APPDATA"] = _USER_CONFIG_HOME
 os.environ.pop("CNE_CONFIG", None)
+# Credentials in the developer's shell would outrank the config under test
+# (environment first, see `config.loader._credential`).
+for _credential_env in ("TUSHARE_TOKEN", "HITHINK_FINANCE_API_KEY"):
+    os.environ.pop(_credential_env, None)
 
 
 def pytest_configure(config):

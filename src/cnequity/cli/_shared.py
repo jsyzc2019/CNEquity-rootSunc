@@ -15,7 +15,7 @@ from pathlib import Path
 import click
 
 from cnequity.config import load_config
-from cnequity.config.layers import ConfigLayerError
+from cnequity.config.errors import ConfigError
 from cnequity.config.locate import PROJECT_CONFIG, default_config_path, user_config_path
 from cnequity.i18n import N_, _
 
@@ -112,7 +112,7 @@ def _cfg(config: str):
     path = resolve_config_path(config)
     try:
         cfg = load_config(path)
-    except ConfigLayerError as exc:
+    except ConfigError as exc:
         raise click.ClickException(
             _("Could not load config {path}: {reason}").format(path=path, reason=exc)
         ) from None

@@ -10,6 +10,7 @@ from datetime import date
 from pathlib import Path
 from typing import Literal
 
+from cnequity.config.errors import ConfigError
 from cnequity.domain.rate_limit import RateLimitSpec
 from cnequity.domain.symbols import INGEST_UNIVERSES
 
@@ -96,7 +97,9 @@ class Config:
     source_intervals: dict[str, float] = field(default_factory=dict)
     # Optional HTTP(S) proxy for EastMoneyClient (e.g. mainland egress for push2his).
     # Env HTTPS_PROXY / HTTP_PROXY still work when this is unset.
-    eastmoney_proxy: str | None = None
+    # Hidden from repr like the credentials below: a proxy URL can carry
+    # user:password.
+    eastmoney_proxy: str | None = field(default=None, repr=False)
     # Per-request timeout for EastMoneyClient (connect+read). Keep modest so
     # overseas daily groups fail fast instead of 30s × max_retries hangs.
     eastmoney_timeout_sec: float = 15.0
@@ -107,16 +110,18 @@ class Config:
     # explicit `cne backfill trading_status` removes this bound and checkpoints
     # the full sweep while retaining the provider pacing above.
     st_history_symbols_per_run: int = 400
-    # Optional Tushare Pro token for historical BJ ST evidence.  The token is
-    # read from [sources.tushare].token or TUSHARE_TOKEN and is never written
-    # to manifests, checkpoints, or provenance.
+    # Optional Tushare Pro token for historical BJ ST evidence: TUSHARE_TOKEN,
+    # then [sources.tushare].token_file, then .token (see `_credential`). Never
+    # written to manifests, checkpoints, or provenance.
     tushare_token: str | None = field(default=None, repr=False)
     tushare_timeout_sec: float = 30.0
-    # Optional 同花顺 official API key. Read from [sources.ths_official].api_key
-    # or HITHINK_FINANCE_API_KEY, and never written to manifests, checkpoints,
-    # or provenance. The whole source is optional: with no key every path that
+    # Optional 同花顺 official API key: HITHINK_FINANCE_API_KEY, then
+    # [sources.ths_official].api_key_file, then .api_key. Never written to
+    # manifests, checkpoints, or provenance. The whole source is optional: with no key every path that
     # uses it degrades to silence and the lake keeps its existing sources.
     ths_official_api_key: str | None = field(default=None, repr=False)
+    #: Dotted keys of credentials written inline in the config file (`cne doctor` warns).
+    inline_credentials: tuple[str, ...] = ()
     ths_official_timeout_sec: float = 30.0
     # Verification (arbitration, cross-checks) is safe to run whenever a key is
     # present — it writes source snapshots and findings, never curated rows.
@@ -623,6 +628,35 @@ def _expand(path_str: str, data_root: Path, base: Path | None = None) -> Path:
     return path.resolve()
 
 
+def _credential(
+    sources_raw: dict, table: str, key: str, env: str, base: Path
+) -> tuple[str | None, bool]:
+    """A credential, and whether the config file holds it inline.
+
+    The environment variable wins, then ``<key>_file`` (read relative to the
+    config's directory), then the inline value. A file is what a scheduled run
+    needs: launchd and cron do not start from the login shell, so a credential
+    exported in ``~/.zshrc`` never reaches them, while an inline one sits in a
+    file that gets copied, backed up and pasted into bug reports.
+    """
+    section = sources_raw.get(table)
+    section = section if isinstance(section, dict) else {}
+    inline = str(section.get(key) or "").strip() or None
+    value = os.environ.get(env, "").strip() or None
+    if value is None and section.get(f"{key}_file"):
+        path = Path(str(section[f"{key}_file"])).expanduser()
+        if not path.is_absolute():
+            path = base / path
+        try:
+            lines = path.read_text(encoding="utf-8").splitlines()
+        except OSError:
+            raise ConfigError(f"[sources.{table}].{key}_file: cannot read {path}") from None
+        value = lines[0].strip() if lines and lines[0].strip() else None
+        if value is None:
+            raise ConfigError(f"[sources.{table}].{key}_file: {path} is empty")
+    return value or inline, inline is not None
+
+
 def _absolute(path: Path) -> Path:
     """Normalize a path to an absolute lexical path without following links."""
     return Path(os.path.abspath(os.fspath(path)))
@@ -793,9 +827,21 @@ def load_config(path: str | Path) -> Config:
     eastmoney_timeout_sec = 15.0
     baostock_batch_size = 20
     baostock_batch_rest_seconds = 120.0
-    tushare_token: str | None = os.environ.get("TUSHARE_TOKEN") or None
+    tushare_token, tushare_inline = _credential(
+        sources_raw, "tushare", "token", "TUSHARE_TOKEN", config_path.parent
+    )
     tushare_timeout_sec = 30.0
-    ths_official_api_key: str | None = os.environ.get("HITHINK_FINANCE_API_KEY") or None
+    ths_official_api_key, ths_official_inline = _credential(
+        sources_raw, "ths_official", "api_key", "HITHINK_FINANCE_API_KEY", config_path.parent
+    )
+    inline_credentials = tuple(
+        name
+        for name, inline in (
+            ("sources.tushare.token", tushare_inline),
+            ("sources.ths_official.api_key", ths_official_inline),
+        )
+        if inline
+    )
     ths_official_timeout_sec = 30.0
     ths_official_verify_enabled = True
     ths_official_backfill_enabled = False
@@ -861,13 +907,9 @@ def load_config(path: str | Path) -> Config:
                 if val.get("batch_rest_seconds") is not None:
                     baostock_batch_rest_seconds = float(val["batch_rest_seconds"])
             if name == "tushare":
-                if val.get("token"):
-                    tushare_token = str(val["token"]).strip() or None
                 if val.get("timeout_sec") is not None:
                     tushare_timeout_sec = float(val["timeout_sec"])
             if name == "ths_official":
-                if val.get("api_key"):
-                    ths_official_api_key = str(val["api_key"]).strip() or None
                 if val.get("timeout_sec") is not None:
                     ths_official_timeout_sec = float(val["timeout_sec"])
                 if val.get("verify") is not None:
@@ -1050,6 +1092,7 @@ def load_config(path: str | Path) -> Config:
         tushare_token=tushare_token,
         tushare_timeout_sec=tushare_timeout_sec,
         ths_official_api_key=ths_official_api_key,
+        inline_credentials=inline_credentials,
         ths_official_timeout_sec=ths_official_timeout_sec,
         ths_official_verify_enabled=ths_official_verify_enabled,
         ths_official_backfill_enabled=ths_official_backfill_enabled,

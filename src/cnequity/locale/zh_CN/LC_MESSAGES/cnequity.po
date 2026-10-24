@@ -1268,6 +1268,11 @@ msgstr "已经有配置。"
 msgid "A config written by `cne config create` has both."
 msgstr "`cne config create` 生成的配置两者都有。"
 
+#: cnequity/diagnostics/report.py
+#, python-format
+msgid "A credential is written in the config file: %s"
+msgstr "凭证直接写在配置文件里：%s"
+
 #: cnequity/serve/ops/preflight.py
 msgid "A daily update is running (all schedule groups share one ingest lock)."
 msgstr "有日更正在运行（各调度组共用一把采集锁）。"
@@ -3352,6 +3357,11 @@ msgstr "缺少的配置段（{count}）—— 当前使用内置默认值："
 msgid "Mode:      {mode}"
 msgstr "模式：    {mode}"
 
+#: cnequity/diagnostics/report.py
+#, python-format
+msgid "Move it to a file and set [%s].%s = <path> (chmod 600), or export %s"
+msgstr "把它移到文件里并设置 [%s].%s = <路径>（chmod 600），或 export %s"
+
 #: cnequity/diagnostics/source_health.py
 msgid "NBS (PMI release)"
 msgstr "国家统计局（PMI 发布）"
@@ -5210,9 +5220,18 @@ msgstr "配置文件无法解析，请先修正 TOML。"
 msgid "The config file cannot be read right now, so a task would fail after starting. Fix the config file, then start it."
 msgstr "配置文件现在读不出来，任务启动后会失败。修好配置文件后再启动。"
 
+#: cnequity/diagnostics/report.py
+msgid "The config file gets copied, backed up and pasted into bug reports. An environment variable does not reach launchd/cron jobs, so a scheduled lake should read the credential from a file only you can read."
+msgstr "配置文件会被复制、备份，甚至贴进问题报告。环境变量到不了 launchd/cron 任务，所以定时运行的湖应从只有你能读的文件里读取凭证。"
+
 #: cnequity/serve/ops/settings.py
 msgid "The config file has changed; preview again."
 msgstr "配置文件已经变了，请重新预览。"
+
+#: cnequity/diagnostics/report.py
+#, python-format
+msgid "The config file holding a credential is readable by others: %s"
+msgstr "含凭证的配置文件其他用户可读：%s"
 
 #: cnequity/serve/ops/settings.py
 msgid "The config file is not UTF-8 and cannot be edited on the page."

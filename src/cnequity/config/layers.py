@@ -41,6 +41,8 @@ if sys.version_info >= (3, 11):
 else:  # pragma: no cover - Python 3.10
     import tomli as tomllib  # type: ignore
 
+from cnequity.config.errors import ConfigError
+
 logger = logging.getLogger(__name__)
 
 #: The only base layer there is today; the key leaves room for a shared file.
@@ -50,7 +52,7 @@ GROUP_SCOPES = ("daily", "events")
 GROUP_EDIT_KEYS = ("steps_add", "steps_remove", "enabled")
 
 
-class ConfigLayerError(ValueError):
+class ConfigLayerError(ConfigError):
     """A malformed layering key. The message names keys only, never values, so it is safe to print."""
 
 
