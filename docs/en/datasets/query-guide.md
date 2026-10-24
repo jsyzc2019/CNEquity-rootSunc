@@ -115,7 +115,7 @@ For how to use profile versions and hashes see [Universe profiles](../reference/
 The old `universe="all_a"` / `"all_a_sh_sz"` parameters remain available for compatibility; the former emits a
 `DeprecationWarning`, and neither automatically becomes a strict profile. Base rules of the compatibility filter:
 
-1. **instruments**: `list_date <= trade_date`, and either not delisted or `delist_date > trade_date`
+1. **instruments**: `list_date <= trade_date`, and either not delisted or `delist_date >= trade_date` (`delist_date` is the last listed session)
 2. Exclude CDRs (689xxx.SH)
 3. **trading_status** (only on dates with data): drop ST/*ST and suspended securities
 

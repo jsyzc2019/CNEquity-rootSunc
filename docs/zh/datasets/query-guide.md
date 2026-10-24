@@ -115,7 +115,7 @@ bars = load(
 旧的 `universe="all_a"` / `"all_a_sh_sz"` 参数仍供兼容使用；前者会发出
 `DeprecationWarning`，两者都不会自动成为严格画像。兼容过滤的基础规则：
 
-1. **instruments**：`list_date <= trade_date`，且未退市或 `delist_date > trade_date`
+1. **instruments**：`list_date <= trade_date`，且未退市或 `delist_date >= trade_date`（`delist_date` 是最后一个上市交易日）
 2. 排除 CDR（689xxx.SH）
 3. **trading_status**（仅有数据的日期）：剔除 ST/*ST 与停牌
 
