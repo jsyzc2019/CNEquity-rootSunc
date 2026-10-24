@@ -34,9 +34,9 @@ cne schedule remove         # 停用并注销；正在运行的任务继续
 
 审计、新鲜度门禁或备份失败时退出 1；源探针和运行证据的问题只报告，不判失败。macOS 上定时任务加 `--notify`，有问题时弹出桌面通知。
 
-## 旧版仓库脚本（已弃用，0.20.0 移除） {#legacy-scripts}
+## 旧版仓库脚本（已弃用） {#legacy-scripts}
 
-`scripts/scheduler/` 只在源码 checkout 里有，0.20.0 移除。迁移：先运行 `scripts/scheduler/uninstall_scheduler.sh` 卸载 launchd 任务（cron 里的条目手工删掉），再运行 `cne schedule install`。`backup_meta.sh` 已改为调用与 `cne run maintain` 相同的备份代码。
+`scripts/scheduler/` 只在源码 checkout 里有，已弃用；打包定时任务覆盖它的全部功能并在真实湖上验证之后才会移除，移除前在更新日志中预告。迁移：先运行 `scripts/scheduler/uninstall_scheduler.sh` 卸载 launchd 任务（cron 里的条目手工删掉），再运行 `cne schedule install`。`backup_meta.sh` 已改为调用与 `cne run maintain` 相同的备份代码。
 
 
 | 能力 | 脚本 | 作用 |

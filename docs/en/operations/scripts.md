@@ -9,7 +9,7 @@ Path: `scripts/`
 | `scripts/migrations/` | One-off data migrations and partition rewrites, run according to the version notes |
 | `scripts/dev/` | Repository maintenance: docs sync (`sync_*`), release checks, offline benchmarks and end-to-end checks, probes |
 
-These scripts need a source checkout and are not installed with the PyPI package. For scheduled updates use `cne schedule install` (it ships with the package and works on every platform); `scripts/scheduler/` is deprecated and removed in 0.20.0.
+These scripts need a source checkout and are not installed with the PyPI package. For scheduled updates use `cne schedule install` (it ships with the package and works on every platform); `scripts/scheduler/` is deprecated and will be removed once the packaged timer covers what it does.
 
 > The scripts below target **self-hosted machines/VPS** (including macOS launchd and server backfills). Open-source contributors only need
 > the CLI (`cne init` / `run`); scheduling and alerting are optional and not the only way to deploy.

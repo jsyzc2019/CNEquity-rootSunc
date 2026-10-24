@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # B3 — Daily snapshot of the metadata that cannot be rebuilt from the curated
-# lake. Deprecated with the rest of scripts/scheduler (removal in 0.20.0): the
+# lake. Deprecated with the rest of scripts/scheduler: the
 # packaged timer (`cne schedule install`) runs `cne run maintain`, which makes
 # the same backup. The work itself is `cnequity.storage.meta_backup`; this
 # wrapper keeps the old calling convention for existing launchd jobs.

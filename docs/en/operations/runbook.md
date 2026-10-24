@@ -34,9 +34,9 @@ The timer runs `cne run maintain` once after each trading day's update; you can 
 
 It exits 1 when the audit, the freshness gate or the backup fails; source probe and run evidence problems are reported without failing. On macOS the timer adds `--notify` for a desktop notification on problems.
 
-## Legacy repository scripts (deprecated, removed in 0.20.0) {#legacy-scripts}
+## Legacy repository scripts (deprecated) {#legacy-scripts}
 
-`scripts/scheduler/` exists only in a source checkout and is removed in 0.20.0. To migrate, run `scripts/scheduler/uninstall_scheduler.sh` to remove the launchd jobs (delete cron entries by hand), then run `cne schedule install`. `backup_meta.sh` now calls the same backup code as `cne run maintain`.
+`scripts/scheduler/` exists only in a source checkout and is deprecated; it is removed only after the packaged timer covers everything it does and has been verified on a real lake, announced in the changelog beforehand. To migrate, run `scripts/scheduler/uninstall_scheduler.sh` to remove the launchd jobs (delete cron entries by hand), then run `cne schedule install`. `backup_meta.sh` now calls the same backup code as `cne run maintain`.
 
 
 | Capability | Script | Purpose |

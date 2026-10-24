@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# DEPRECATED (removal in 0.20.0): `cne schedule install` installs the packaged,
+# DEPRECATED: `cne schedule install` installs the packaged,
 # cross-platform timer, which runs `cne run daily` and then `cne run maintain`.
 # Run scripts/scheduler/uninstall_scheduler.sh before switching, or both update the lake.
 # Preserve host groups, vantage, cadence and config overrides on reinstall.
@@ -8,7 +8,7 @@
 # --daily-only updates the daily agent without adding/changing other jobs.
 set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-echo "install_scheduler: deprecated, removal in 0.20.0; use \`cne schedule install\` instead." >&2
+echo "install_scheduler: deprecated; use \`cne schedule install\` instead." >&2
 if [[ "$(uname)" != "Darwin" ]]; then
   echo "install_scheduler: launchd is macOS-only; use daily_pipeline.sh/stale_pipeline.sh with cron." >&2
   exit 1
