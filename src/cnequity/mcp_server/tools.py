@@ -657,7 +657,7 @@ def run_sql(config: Config, *, sql: str, limit: int | None = None) -> dict:
     con = views_connection(config)
     try:
         _configure_sql_connection(con, config)
-        df = con.execute(text).pl()
+        df = pl.from_arrow(con.sql(text).to_arrow_table())
     except Exception as exc:  # noqa: BLE001 — surfaced as a fixable tool error
         raise ToolError(f"query failed: {exc}") from exc
     finally:

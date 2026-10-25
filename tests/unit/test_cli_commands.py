@@ -1262,8 +1262,8 @@ def test_query_rejects_partial_on_demand_options(cfg_path, args):
 
 def test_query_sql(cfg_path, monkeypatch):
     class FakeCon:
-        def execute(self, sql):
-            return SimpleNamespace(pl=lambda: pl.DataFrame({"n": [1]}))
+        def sql(self, sql):
+            return SimpleNamespace(to_arrow_table=lambda: pl.DataFrame({"n": [1]}).to_arrow())
 
         def close(self):
             pass

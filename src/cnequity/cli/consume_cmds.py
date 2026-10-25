@@ -287,6 +287,7 @@ def query(
             raise SystemExit(1)
         return
     import duckdb
+    import polars as pl
 
     con = views_connection(cfg)
     try:
@@ -294,7 +295,7 @@ def query(
         # DuckDB's own message already names the line, the column and the near
         # miss. Keep that text and drop the Python traceback wrapped around it.
         try:
-            df = con.execute(sql).pl()
+            df = pl.from_arrow(con.sql(sql).to_arrow_table())
         except duckdb.Error as exc:
             raise click.ClickException(str(exc)) from exc
         click.echo(df)

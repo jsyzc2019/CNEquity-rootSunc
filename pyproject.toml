@@ -53,7 +53,7 @@ classifiers = [
 # in config with no package behind it, degrading silently on a scheduled run.
 dependencies = [
   "click>=8.1",
-  "duckdb>=1.0",
+  "duckdb>=1.5",
   # The 0.25 floor existed only so mootdx (httpx>=0.25,<0.26) could co-resolve.
   # mootdx is gone — the TDX client is vendored — so nothing caps httpx now and
   # the floor just marks the oldest release with the Client() options we use.
