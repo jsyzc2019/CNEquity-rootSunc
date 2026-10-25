@@ -2468,6 +2468,10 @@ msgid "Drop Shenwan industry rows dated on or after the stock's delisting"
 msgstr "删除日期在退市日及之后的申万行业行"
 
 #: cnequity/storage/migrations.py
+msgid "Drop Shenwan industry rows of securities that never listed"
+msgstr "删除从未上市证券的申万行业行"
+
+#: cnequity/storage/migrations.py
 msgid "Drop factor and action rows for securities the lake holds no prices for"
 msgstr "删除湖里没有行情的证券的因子和公司行为行"
 

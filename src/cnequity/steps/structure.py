@@ -406,6 +406,7 @@ def _backfill_industry_members(config: Config, trade_date: date, run_id: str) ->
             raise
         intervals = fetch_sw_industry_intervals()
     df = expand_sw_industry_as_of(intervals, todo, _delist_dates(config))
+    df = _drop_never_listed(config, df)
     if df.is_empty():
         raise SourceUnavailableError("industry_members backfill: Shenwan expansion produced 0 rows")
     # A month with far fewer names than typical means the XLS window does not
@@ -460,6 +461,28 @@ def _backfill_industry_members(config: Config, trade_date: date, run_id: str) ->
             }
         ]
     return result
+
+
+def _drop_never_listed(config: Config, df: pl.DataFrame) -> pl.DataFrame:
+    """Drop Shenwan classes of securities the lake has no record of ever listing."""
+    from cnequity.query.parquet_scan import dataset_has_parquet
+    from cnequity.storage.repairs.sw_never_listed import never_listed, record_never_listed
+
+    # Without a security master there is no evidence either way.
+    if df.is_empty() or not dataset_has_parquet(config.curated_root / "instruments"):
+        return df
+    gone = never_listed(config, df["symbol"].unique().to_list())
+    if not gone:
+        return df
+    hits = df.filter(pl.col("symbol").is_in(sorted(gone)))
+    record_never_listed(
+        config,
+        hits.group_by("symbol").agg(
+            pl.col("as_of_date").min().alias("first_class_date"),
+            pl.col("industry_code").sort_by("as_of_date").last(),
+        ),
+    )
+    return df.filter(~pl.col("symbol").is_in(sorted(gone)))
 
 
 def _delist_dates(config: Config) -> pl.DataFrame | None:

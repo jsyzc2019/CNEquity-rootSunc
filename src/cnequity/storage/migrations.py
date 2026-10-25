@@ -163,6 +163,12 @@ MIGRATIONS: tuple[Migration, ...] = (
         _repair("offshore_final", "repair_offshore_final"),
         N_("Sina's COMEX gold daily bars"),
     ),
+    Migration(
+        "sw-never-listed",
+        N_("Drop Shenwan industry rows of securities that never listed"),
+        "0.20.0",
+        _repair("sw_never_listed", "repair_sw_never_listed"),
+    ),
 )
 
 

@@ -162,3 +162,52 @@ def test_the_sw_delisted_migration_drops_only_shenwan_rows_after_delisting(tmp_p
     # Shenwan keeps the stock before delisting; EastMoney's observed row stays.
     assert held == {("sw", D1), ("eastmoney", D2)}
     assert repair_sw_delisted(cfg)["rows"] == 0
+
+
+def test_never_listed_sw_securities_are_dropped_recorded_and_still_reported(tmp_path):
+    from cnequity.query import load
+    from cnequity.storage.repairs.sw_never_listed import load_never_listed, repair_sw_never_listed
+
+    ghost = "002525.SZ"  # classed while its IPO was pending; never traded
+    rows = _snapshot(D1, system="sw") + [_member(ghost, D1, "111", system="sw")]
+    cfg = _lake(tmp_path, rows)
+
+    plan = repair_sw_never_listed(cfg)
+    assert (plan["rows"], plan["symbols"]) == (1, [ghost])
+    repair_sw_never_listed(cfg, apply=True)
+
+    assert ghost not in load("industry_members", config=cfg)["symbol"].to_list()
+    assert [r["symbol"] for r in load_never_listed(cfg)] == [ghost]
+    sw = industry_coverage_report(cfg, today=D1)["systems"]["sw"]
+    assert sw["excluded_never_listed"] == {"symbols": 1, "sample": [ghost]}
+    assert sw["unexpected_members"] == {}
+
+
+def test_a_security_missing_from_instruments_but_trading_is_kept(tmp_path):
+    from cnequity.storage.repairs.sw_never_listed import never_listed
+
+    traded = "600099.SH"
+    cfg = _lake(tmp_path, _snapshot(D1, system="sw") + [_member(traded, D1, "111", system="sw")])
+    bars = cfg.curated_root / "daily_bars" / "trade_date=2026-08"
+    bars.mkdir(parents=True)
+    pl.DataFrame(
+        [
+            {
+                "symbol": traded,
+                "trade_date": D1,
+                "open": 1.0,
+                "high": 1.0,
+                "low": 1.0,
+                "close": 1.0,
+                "pre_close": 1.0,
+                "volume": 100,
+                "amount": 100.0,
+                "source": "t",
+                "data_version": "v2",
+                "fetched_at": FETCHED,
+            }
+        ],
+        schema=DATASET_SCHEMAS["daily_bars"],
+    ).write_parquet(bars / "part.parquet")
+    _commit(cfg, "daily_bars")
+    assert never_listed(cfg, [traded, "002525.SZ"]) == {"002525.SZ"}

@@ -270,6 +270,15 @@ def industry_coverage_report(
             "industry_drops": drops,
             "reclassifications": reclassified,
         }
+        if system == "sw":
+            # Dropped from the snapshots, so only the record still shows them.
+            from cnequity.storage.repairs.sw_never_listed import load_never_listed
+
+            dropped = load_never_listed(config)
+            report["systems"][system]["excluded_never_listed"] = {
+                "symbols": len(dropped),
+                "sample": [r["symbol"] for r in dropped[:SAMPLE]],
+            }
         if gaps or drops or set(unexpected) - INFORMATIONAL:
             report["state"] = "gaps"
     return report
