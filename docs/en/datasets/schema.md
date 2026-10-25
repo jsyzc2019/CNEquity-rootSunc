@@ -190,11 +190,7 @@ inputs, publishes a new version and preserves the old one. Use annual or monthly
 windows. Strict historical universe reads still require independent ST evidence.
 
 **Reading an old lake does not fail.** Old rows encode ST as `status="st"`, and `validate_dataframe` upgrades them
-automatically on read (see `cnequity/domain/trading_status.py`). To bring the physical schema in line, run:
-
-```bash
-scripts/migrations/migrate_trading_status_risk_warning.py --config configs/cnequity.toml --apply
-```
+automatically on read (see `cnequity/domain/trading_status.py`); the physical files need no rewrite.
 
 The migration does **not** add `delisted` rows to history: a day's status is the fact observed at the time, and back-filling it with today's delisting date
 would invent point-in-time facts that did not exist then. To fix a stretch of history, rerun the daily update for that stretch.
@@ -226,14 +222,7 @@ Source data is converted uniformly at the collection boundary. TDX daily bars an
 
 Quality checks reconcile volume against price per source; data without turnover cannot be checked this way. Single-stock volume/price relationships do not apply to the index points in `index_bars` / `sector_bars`.
 
-**Migration (v1 → v2).** Existing rows in the lake are wrong under either interpretation and must be rewritten:
-
-```bash
-scripts/migrations/migrate_daily_bars_volume_v2.py --config configs/cnequity.toml --dry-run
-scripts/migrations/migrate_daily_bars_volume_v2.py --config configs/cnequity.toml --apply
-```
-
-Rows with `source ∈ {tdx_protocol, sina}` and `data_version=v1` get `volume ×100`; all other v1 rows are kept as they are (they were already in shares); every processed row is rewritten with `data_version=v2`. Rows already at v2 are skipped; the script is idempotent and can be interrupted and resumed. **`fetched_at` is not re-stamped**: these rows really were fetched at that time, and changing it would erase when the data was observed. The column that records this reinterpretation is `data_version`, which is exactly what it is for. `--apply` rewrites curated in place, so back it up first.
+**Migration (v1 → v2).** A lake written by 0.12 or earlier needs its v1 rows rewritten to shares; that one-off script has been removed, so migrate such a lake with 0.19 or earlier before upgrading.
 
 ##### Previous close (`pre_close`) {#previous-close}
 

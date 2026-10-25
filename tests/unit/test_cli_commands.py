@@ -1548,13 +1548,9 @@ def test_derive_trading_status_and_orphans(cfg_path, monkeypatch):
     assert summary["run_id"] == seen["run_id"]
     assert "compact" in summary
 
-    monkeypatch.setattr(
-        "cnequity.storage.repairs.valuation_orphans.purge_valuation_orphan_symbols",
-        lambda cfg: {"purged_symbols": 2},
-    )
+    # The one-off target is gone; a valuation_metrics backfill drops orphans itself.
     result = CliRunner().invoke(cli, ["derive", "valuation_orphans", "--config", cfg_path])
-    assert result.exit_code == 0, result.output
-    assert "purged_symbols" in result.output
+    assert result.exit_code != 0
 
 
 def test_derive_trading_status_failure_is_persisted_and_exits_nonzero(cfg_path, monkeypatch):
@@ -1657,19 +1653,21 @@ def test_shfe_annual_plan_is_offline_and_requires_partial_fields(cfg_path, tmp_p
         lambda *_args, **_kwargs: pytest.fail("plan must not import"),
     )
     base = [
-        "backfill",
-        "futures_bars",
-        "--shfe-annual-archive",
+        "import",
+        "shfe-archive",
         str(archive),
-        "--archive-year",
+        "--dataset",
+        "futures_bars",
+        "--year",
         "2026",
         "--config",
         cfg_path,
     ]
-    rejected = CliRunner().invoke(cli, [*base, "--plan"])
+    # A preview by default: the plan, never the import.
+    rejected = CliRunner().invoke(cli, base)
     assert rejected.exit_code != 0
     assert "--accept-partial-fields" in rejected.output
-    planned = CliRunner().invoke(cli, [*base, "--accept-partial-fields", "--plan"])
+    planned = CliRunner().invoke(cli, [*base, "--accept-partial-fields"])
     assert planned.exit_code == 0, planned.output
     assert '"network_requests": 0' in planned.output
     naive = CliRunner().invoke(
@@ -1677,9 +1675,8 @@ def test_shfe_annual_plan_is_offline_and_requires_partial_fields(cfg_path, tmp_p
         [
             *base,
             "--accept-partial-fields",
-            "--archive-downloaded-at",
+            "--downloaded-at",
             "2026-09-27T09:00:00",
-            "--plan",
         ],
     )
     assert naive.exit_code != 0
@@ -1782,13 +1779,10 @@ def test_backfill_trading_status_bj_reports_capability_limit(cfg_path, extra):
 
 
 @pytest.mark.usefixtures("chinese_output")
-def test_backfill_sector_bars_force_and_retry_mutex(cfg_path):
-    result = CliRunner().invoke(
-        cli,
-        ["backfill", "sector_bars", "--config", cfg_path, "--retry-failed", "--force"],
-    )
+def test_backfill_refetch_is_refused_where_it_has_no_meaning(cfg_path):
+    result = CliRunner().invoke(cli, ["backfill", "daily_bars", "--config", cfg_path, "--refetch"])
     assert result.exit_code != 0
-    assert "只能用一个" in result.output
+    assert "--refetch" in result.output
 
 
 def test_backfill_success_compacts(cfg_path, monkeypatch):

@@ -135,17 +135,18 @@ def test_affected_counts_nested_rows_and_settled_keys():
     assert affected({"rows": 100, "rows_changed": 3}) == 3
 
 
-def test_every_automatable_deprecated_repair_is_a_migration():
-    from cnequity.cli import repair_cmds
+def test_every_migration_still_resolves_its_repair():
+    """The one-off repair commands are gone; `cne migrate` is how an old lake reaches them."""
+    import inspect
 
-    deprecated = {
-        name
-        for name, command in repair_cmds.repair.commands.items()
-        if isinstance(command, repair_cmds.DeprecatedMigration)
-    }
-    # status-outages rebuilds an outage window only the operator knows.
-    expected = (deprecated - {"status-outages", "missing-values"}) | {
-        "missing-values-valuation",
-        "missing-values-index-weights",
-    }
-    assert {m.id for m in MIGRATIONS} == expected
+    for migration in MIGRATIONS:
+        closure = inspect.getclosurevars(migration.run)
+        module = closure.nonlocals.get("module")
+        name = closure.nonlocals.get("name")
+        if module is None:  # the missing-values pair calls its repair directly
+            continue
+        import importlib
+
+        assert callable(
+            getattr(importlib.import_module(f"cnequity.storage.repairs.{module}"), name)
+        ), migration.id

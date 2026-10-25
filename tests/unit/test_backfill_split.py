@@ -134,24 +134,6 @@ def test_backfill_help_lists_only_generic_options():
         assert gone not in page
 
 
-def test_moved_option_warning_names_the_replacement(monkeypatch, config):
-    monkeypatch.setattr(backfill_cmds, "_backfill_plan", lambda *a, **k: {"ok": True})
-    result = CliRunner().invoke(
-        cli,
-        [
-            "backfill",
-            "margin_trading",
-            "--margin-source",
-            "exchange",
-            "--plan",
-            "--config",
-            str(config.config_path),
-        ],
-    )
-    assert result.exit_code == 0, result.output
-    assert "`cne backfill --margin-source` has moved; use --source" in result.output
-
-
 def test_refetch_maps_per_dataset_and_rejects_others(config):
     result = CliRunner().invoke(
         cli, ["backfill", "daily_bars", "--refetch", "--plan", "--config", str(config.config_path)]

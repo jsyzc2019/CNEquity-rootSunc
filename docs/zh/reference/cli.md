@@ -431,7 +431,7 @@ diff 会把删列、改类型、改主键、单位/PIT/历史语义变化识别�
 | `--profile delisted` | 仅 `daily_bars`：以已确认退市名录为 universe，`--start` 对应旧命令的 `--since`；`--plan` 离线 |
 | `--plan` | 只读计划，不联网、不写湖 |
 
-**数据集专属的修复和导入已移出 `backfill`。** 它们用同一套回填机制（窗口、范围、下游派生跟进、计划输出），但遵循修复命令的约定：默认只预览，`--apply` 才运行。旧开关仍可用，输入时在 stderr 提示新命令：
+**数据集专属的修复和导入已移出 `backfill`。** 它们用同一套回填机制（窗口、范围、下游派生跟进、计划输出），但遵循修复命令的约定：默认只预览，`--apply` 才运行。旧开关已移除，请改用下表右列：
 
 | 旧写法 | 新命令 |
 |---|---|
@@ -447,7 +447,7 @@ diff 会把删列、改类型、改主键、单位/PIT/历史语义变化识别�
 | `--retry-failed`（`sector_bars`） | 不再需要：回填默认续跑 |
 | `--margin-source` | `--source` |
 
-`--eastmoney-bj-repair`、`--bj-amount-repair` 和 `--tdx-volume-repair` 已弃用，将在 0.20.0 移除：它们只修 0.17 及更早版本写入的数据（`--bj-amount-repair` 请改用 `cne repair bar-amounts`）。日更不会用到这些修复，新数据由写入时的规则保证：
+原来的 `--eastmoney-bj-repair`、`--bj-amount-repair` 和 `--tdx-volume-repair` 已移除：它们只修 0.17 及更早版本写入的数据（`--bj-amount-repair` 的替代是 `cne repair bar-amounts`）。日更不会用到这些修复，新数据由写入时的规则保证：
 
 | 以前靠修复开关处理的问题 | 现在的处理 |
 |---|---|
@@ -554,7 +554,6 @@ python scripts/delisted_ops.py coverage --start 2016-01-01 --universe all_a_sh_s
 cne derive trading_status --start 2001-01-01 --end 2001-12-31
 ```
 
-`cne derive bse_code_migration`（把北交所旧码合并到 920 新码）和 `cne derive valuation_orphans`（删除没有日线的证券的估值行）已弃用，将在 0.20.0 移除。它们只迁移 0.17 及更早版本写入的湖：新采集不会再把北交所改名记成退市，`valuation_metrics` 回填时也会自动清理孤立的估值行。运行时在 stderr 打印弃用警告。
 
 ## cne migrate
 
@@ -571,19 +570,19 @@ cne migrate --apply     # 按顺序运行并记录结果
 | `--only` | 逗号分隔的迁移 id；即使已记录也重新运行 |
 | `--json` | 机器可读输出 |
 
-每个迁移都持有湖的变更锁，经修复门禁发布，旧版本保留可读。一个迁移失败时停止，后面的不运行，也不记录。`fund-listing-dates` 会读取交易所官方基金列表，`misdated-valuation` 在有需要替换的行时读取东财数据中心，其余只读湖。`cne doctor` 会提示还没检查的迁移。仓库 `scripts/migrations/` 里的脚本针对 0.12 及更早版本写入的湖，只在源码 checkout 里有；`--apply` 时同样持有湖的变更锁。
+每个迁移都持有湖的变更锁，经修复门禁发布，旧版本保留可读。一个迁移失败时停止，后面的不运行，也不记录。`fund-listing-dates` 会读取交易所官方基金列表，`misdated-valuation` 在有需要替换的行时读取东财数据中心，其余只读湖。`cne doctor` 会提示还没检查的迁移。0.12 及更早版本写入的湖请先用 0.19 或更早版本迁移再升级。
 
 ## cne repair
 
 默认基于湖中已有数据输出计划；加 `--apply` 后以新版本发布，旧版本继续保留，可按版本读取。`corporate-action-gaps --apply` 会按缺口向数据源补取证据。
 
-**一次性迁移命令已弃用，将在 0.20.0 移除。** `missing-values`、`financial-announcements`、`fund-factors`、`daily-bar-coverage`、`fund-listing-dates`、`valuation-basis`、`orphan-symbols`、`stale-suspensions`、`status-outages`、`status-listing-window` 和 `misdated-valuation` 只修 0.17 及更早版本写入的数据，当前版本采集时已不再产生这些问题。新建的湖不需要运行；旧湖用 [`cne migrate`](#cne-migrate) 一次找出并运行（`status-outages` 需要指定停机窗口，仍须手工运行），请在升级到 0.20.0 之前完成。这些命令已从 `cne repair --help` 隐藏，仍可直接调用；运行时会在 stderr 打印弃用警告，stdout 的 JSON 报告不变。
 
 `--apply` 发布前会比较已提交版本与候选版本的离线质量检查。历史因子/公司行为矛盾单独记录为非阻断诊断。无效因子数值、损坏文件、主键错误等结构问题新增或恶化时会阻止发布，候选版本移入 `_quarantine`，报告写入 `meta/quality/publication/`。这项修复门禁不受 `[quality].publication_gate` 的普通日更发布设置影响。
 
 | 子命令 | 说明 |
 |------|------|
 | `layout DATASET` | 把分区数据集根目录或错误键目录中的文件并入登记分区。同一主键的多份观察只在非空值完全一致时互补填空；有冲突的键按规范规则整行保留一份。重复键的全部原始观察写入 `_quarantine`。发布新版本时若检测到这类布局，会提示运行此命令 |
+| `repartition [DATASET] [--all]` | 按登记的分区粒度改写数据集分区；不带参数只列出需要改写的数据集，带数据集时预览文件、分区和体积变化，`--apply` 在湖锁下改写并整体换上。只回收空间和文件句柄，不修正确性；审计发现粒度混用时会指向这里 |
 | `payment-dates` | `corporate_actions` 现金到账日：先用已审发行人公告，再用 Baostock 匹配；`--issuer-notices-only` 只用发行人公告并应用已审送转条款。需要 `--symbols`/`--start`/`--end` |
 | `delisted-actions --source baostock\|ths` | 补已退市证券的历史分红除权：`baostock` 用于沪深，`ths` 用于北交所 |
 | `ex-dates --ex-dates ...` | 按给定除权日逐日向东财请求历史除权行；只有它能取到 2015-09-29 之前的行 |
@@ -592,22 +591,13 @@ cne migrate --apply     # 按顺序运行并记录结果
 | `bse-tip-turnover --date D` | 用北交所行情板补最近一个交易日的北交所成交额，不重抓新浪 |
 | `valuation-outage` | 东财快照中断时，用东财数据中心估值报表补 `--start`/`--end` 窗口；只在取到全市场时写入 |
 | `corporate-action-gaps` | 补上新浪与 Baostock 因子都有台阶、湖里却没有记录的除权事件，依据最近一次 `cne derive adj_factor_source` 的证据。附近 10 天内日期错开的记录，若条款能解释台阶就移到台阶日；其余按证券和年份向 Baostock 取分红，按生效交易日匹配，只收条款能解释台阶的行；Baostock 也解释不了的，再到巨潮查发行人的重整转增公告，公告写明的除权参考价能解释台阶才记为 `reorg_transfer`。此命令的计划仍离线，`--apply` 才请求 Baostock 和巨潮 |
-| `orphan-symbols` | **已弃用。** 删除 `daily_bars` 中从未出现的证券在 `adj_factors` 与 `corporate_actions` 里的行：早年作为净值序列误入的场外基金（519xxx）行情已清理，因子和分红却残留；未采集行情的上市基金也在其列。这些行没有可复权的价格，只会被报成因子与公司行为矛盾。按数据集各发布一个新版本 |
-| `stale-suspensions` | **已弃用。** 删除 `trading_status` 中已被实际成交日线否定的推断停牌（`derived_bar_gap`）：某次运行漏抓行情时，缺口曾被误记为停牌；行情补齐后同一天有成交的日线即证明该行错误。独立来源的停牌不受影响 |
-| `status-outages --start --end` | **已弃用。** 按现行规则重建东财不可用期间写入的 `trading_status` 行（`eastmoney_cached`）。旧版兜底会沿用自己写的缓存行，长假会让缓存过期，并把没有记录的证券记成停牌。窗口内的缓存行全部删除；当天主源答复的证券不到前几个交易日一半的交易所，没有其他记录的证券沿用前 5 个交易日内最近的一手记录，并保留该记录的抓取时间，因此 Baostock 历史与日线缺口推断的停牌仍然优先。没有一手记录的证券不写行 |
-| `status-listing-window` | **已弃用。** 删除 `trading_status` 中落在证券上市日之前、或没有退市记录支撑的行。旧版合并曾把尚无日线的新证券推断为退市，状态步骤随后在它们上市后的头几个交易日写入 `derived_delisted`；东财也会把尚未上市的代码报成正常交易。`derived_delisted` 行只在当前 `instruments` 仍记有不早于上市日、且不晚于该行的退市日时保留；上市日之前的行一律删除，除非日线在上市日之前就有成交（这时上市日有误）。不补写行。发布新版本，旧版本保留 |
 | `status-traded --start --end` | 默认只读预览：用已提交日线的正成交量补已知上市期间、缺状态行的股票/ETF 键，来源 `derived_traded`，ST 保持 null。已有状态不覆盖；`--apply` 重新核对当前版本后发布并保留旧版本。建议按年或月分段 |
-| `fund-listing-dates` | **已弃用。** 从完整的上交所、深交所 ETF/LOF 当前目录补未知上市日期，独立于研究资格。预览也请求来源；`--apply` 归档响应、经修复门禁发布新版本，保留已有日期及旧版本，不把首根日线当上市日 |
 | `stock-listing-dates` | 用有成交但上市日期未知的股票首日定位巨潮 IPO 日历请求，也可用可重复的 `--event-date YYYY-MM-DD` 核验尚无日线的股票；只接受代码、日期匹配的明确上市事件，不能与更早成交矛盾。默认回放归档，`--refresh-sources` 联网采证，`--max-sessions` 分批；`--apply` 发布并保留已有日期和旧版本；若补入的官方上市日期晚于残留退市日期，同一修订清除该矛盾退市日期 |
 | `index-snapshots` | 回放官方带日期的完整成分、权重文件；`--refresh-sources` 更新归档，`--indices` 选择指数。`--apply` 替换整个指数快照，百分数转比例，成分与权重按各自日期保存，不倒推历史 |
 | `financial-originals` | `--symbols` 或 `--all-stocks` 选择股票，`--start-year/--end-year` 选择年份，`--quarter` 选择 Q1/Q2/Q3/Q4（默认年报），`--max-reports` 分批，`--after` 接续输出的 `next_cursor`。默认离线预览，`--refresh-sources` 归档巨潮完整查询和原始 PDF，`--apply` 追加可明确识别的合并报表当期数和累计数；`--reparse` 重放旧报告并保留未变行的首次观测时间；未识别布局或科目保留缺口，不回填采集时间 |
 | `adj-factors` | 统一股票因子与 ETF/LOF 份额折算修复。默认离线预览并保存计划；`--refresh-sources` 显式联网采证，`--apply` 复查输入后发布确定的修正。支持 `--symbols`、事件窗口 `--start/--end`、`--max-symbols` 和 `--plan`；未解决事件保留原值和提示。详见 [历史因子修复](../datasets/sources.md) |
-| `fund-factors` | **已弃用。** 离线预览 ETF/LOF 已记录拆分、转增的漏跳；从原始来源序列重建完整历史，保留其他来源台阶和现金分红口径。`--apply` 经修复门禁发布 `derived_fund_actions` 并保留旧版本。条款冲突或缺少原始序列时不猜补 |
 | `fund-volume` | 用上交所完整历史 K 线修复沪深场内基金零成交量、正成交额的行。`--refresh-sources` 归档来源，默认离线回放；`--apply` 仅替换上市窗口内、开高低收及舍入金额一致的行并保留旧版本。若湖中金额冲突，须有已归档的东财未复权日线同时证实价格和金额，才替换整行；东财整手成交量不参与补量。优先复用相符的原始响应归档，避免重复请求。不得用成交额倒算成交量。 后续重抓的零量正额行不会覆盖已恢复的有效成交量。 |
 | `fund-no-print` | 用深交所明确的零成交额，或上交所按证券和日期返回的零竞价开高低及正参考价，核对日线欠账。默认离线预览；`--refresh-sources` 联网归档报表，`--max-sessions` 限制交易日数；`--apply` 保存证明并刷新覆盖水位。缺失响应不构成证明，正常可交易不等于当日有成交；舍入量额为零本身不足以证明无成交；上交所覆盖证明表示未形成竞价日线，不能据此否认汇总口径成交，不生成日线或停牌行。证据失效会重新打开欠账，实际成交记录优先 |
-| `daily-bar-coverage` | **已弃用。** 逐证券复查 `bj_session_incomplete` 整日欠账；仅按已提交日线的正成交量或独立停牌证据结清已知上市区间。`--apply` 更新覆盖元数据和水位，保存输入版本及收据，不改日线。同样结清已提交且不与成交历史矛盾的上市日期所证明的上市前欠账；未知上市日期仍由逐证券覆盖报告列为未核实 |
-| `misdated-valuation` | **已弃用。** 替换 `valuation_metrics` 中盖错交易日的 push2 快照行。快照不带日期，只描述抓取时最近一个已收盘的交易日；抓取时刻对应的交易日与行上日期不同的行，`--apply` 时删除，并在同一版本中换成东财 datacenter 按该日期发布的估值；datacenter 没有的键不再保留错误的行。计划离线，`--apply` 才请求 datacenter |
-| `valuation-basis` | **已弃用。** 统一 `valuation_metrics` 口径：push2 动态市盈率移入 `pe_dynamic`；Baostock 流通市值由成交均价口径换算为收盘价口径，无法核对的保留原值并标为 `vwap_x_turn_implied_shares`；总市值按 `share_structure` 当日有效总股本重建，无记录的标为年末股本估算 |
 
 ```bash
 cne repair layout futures_bars

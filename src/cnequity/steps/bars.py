@@ -32,7 +32,6 @@ from cnequity.domain.rate_limit import (
 from cnequity.domain.symbols import (
     filter_ingest_universe,
     in_ingest_universe,
-    is_tdx_servable,
     parse_symbol,
     split_by_quote_source,
 )
@@ -943,42 +942,6 @@ def _repair_null_amounts_from_tdx(
     return result
 
 
-def repair_bj_amounts_from_tdx(
-    config: Config,
-    start: date,
-    end: date,
-    run_id: str,
-    symbols: list[str] | None,
-) -> dict:
-    """Supplement stored Beijing rows with the turnover Sina never carried.
-
-    Walks the window a year at a time: the whole board is half a million rows,
-    and one staging write of that is neither necessary nor kind to memory.
-    """
-    target = sorted(
-        s
-        for s in (
-            _resolve_daily_bar_scope(config, symbols)
-            if symbols
-            else filter_ingest_universe(load_symbols(config), config.ingest_universe)
-        )
-        if s.endswith(".BJ")
-    )
-    if not target:
-        raise RuntimeError("BJ amount repair needs at least one Beijing symbol in scope")
-    return _repair_null_amounts_from_tdx(
-        config,
-        start,
-        end,
-        run_id,
-        symbols=target,
-        select=lambda frame: frame.filter(pl.col("amount").is_null()),
-        batch_prefix="bj-amount-repair",
-        log_name="BJ amount repair",
-        subject="Beijing",
-    )
-
-
 def repair_sina_history_amounts_from_tdx(
     config: Config,
     start: date,
@@ -1003,189 +966,6 @@ def repair_sina_history_amounts_from_tdx(
         log_name="TDX amount repair",
         subject="Sina history",
     )
-
-
-_TDX_VOLUME_REPAIR_BATCH = 100
-# The pre-2026-09-17 ``get_volume`` inflated every decoded value below this.
-_TDX_DECODE_INFLATED_BELOW = 64.5
-
-
-def _tdx_volume_corrections(stored: pl.DataFrame, tdx: pl.DataFrame) -> tuple[pl.DataFrame, dict]:
-    """Stored TDX rows whose volume a fresh TDX read decodes differently.
-
-    The fresh row must describe the same session first: open/high/low/close to
-    the last digit, and turnover within a hundredth of a percent — unless the
-    fresh turnover is itself under 64.5 yuan, the range the same decoder
-    inflated, in which case the stored turnover is the artefact and is
-    rewritten too. A row that differs otherwise is a different observation and
-    is counted rather than touched.
-
-    Measured on 2026-09-27 over 941 funds: 71,843 volume artefacts (10,415 of
-    them a single lot stored as 32,768), 137 of which also carried an inflated
-    turnover; and 22 exact odd-lot volumes a first, looser rule rounded away.
-    """
-    joined = stored.join(
-        tdx.select(
-            "symbol",
-            "trade_date",
-            *[pl.col(c).alias(f"_tdx_{c}") for c in ("open", "high", "low", "close")],
-            pl.col("volume").alias("_tdx_volume"),
-            pl.col("amount").alias("_tdx_amount"),
-        ),
-        on=["symbol", "trade_date"],
-        how="left",
-    )
-    served = pl.col("_tdx_volume").is_not_null()
-    prices_match = pl.all_horizontal(
-        pl.col(c) == pl.col(f"_tdx_{c}") for c in ("open", "high", "low", "close")
-    )
-    amount_gap = (pl.col("amount") - pl.col("_tdx_amount")).abs()
-    amount_matches = amount_gap <= pl.col("amount").abs() * 1e-4
-    amount_artefact = (pl.col("_tdx_amount") < _TDX_DECODE_INFLATED_BELOW) & ~amount_matches
-    same_session = prices_match & (amount_matches | amount_artefact)
-    # TDX's history counts whole lots, but a stored row can hold the exact
-    # odd-lot figure; that is the finer answer, not an error. Every decode
-    # artefact measured was at least 15 lots and 45% off.
-    gap = (pl.col("volume") - pl.col("_tdx_volume")).abs()
-    volume_differs = (gap >= _BJ_AMOUNT_REPAIR_LOT) & (gap > pl.col("_tdx_volume").abs() * 0.01)
-    fixable = joined.filter(served & same_session & (volume_differs | amount_artefact))
-    corrected = fixable.with_columns(
-        pl.when(volume_differs)
-        .then(pl.col("_tdx_volume"))
-        .otherwise(pl.col("volume"))
-        .cast(stored.schema["volume"])
-        .alias("volume"),
-        pl.when(amount_artefact)
-        .then(pl.col("_tdx_amount"))
-        .otherwise(pl.col("amount"))
-        .cast(stored.schema["amount"])
-        .alias("amount"),
-    ).select(stored.columns)
-    counts = {
-        "rows_checked": joined.height,
-        "rows_unserved": joined.filter(~served).height,
-        "rows_disagreeing": joined.filter(served & ~same_session).height,
-        "rows_corrected": corrected.height,
-        "amounts_corrected": fixable.filter(amount_artefact).height,
-    }
-    return corrected, counts
-
-
-def repair_tdx_volumes(
-    config: Config,
-    start: date,
-    end: date,
-    run_id: str,
-    symbols: list[str] | None,
-) -> dict:
-    """Rewrite the volume of stored TDX rows that the old decoder got wrong.
-
-    Before 2026-09-17 ``get_volume`` inflated every value under 64.5 lots, so a
-    thin fund's 4-lot day was stored as 8,194. The fix stopped new damage but
-    left the history; a plain backfill cannot publish the correction for thin
-    ETFs and LOFs, whose no-trade days the interior-gap gate reads as holes.
-
-    This touches only keys the lake already holds, from ``tdx_protocol``, and
-    only their volume — no key is added, so no gap gate is involved.
-    """
-    from cnequity.adapters.tdx_protocol.client import fetch_daily_bars
-    from cnequity.query.parquet_scan import collect_parquet_root
-    from cnequity.steps.http_common import write_fetched
-
-    if not symbols:
-        raise RuntimeError("TDX volume repair needs an explicit --symbols scope")
-    target = sorted(s for s in _resolve_daily_bar_scope(config, symbols) if is_tdx_servable(s))
-    totals = dict.fromkeys(
-        (
-            "rows_checked",
-            "rows_unserved",
-            "rows_disagreeing",
-            "rows_corrected",
-            "amounts_corrected",
-        ),
-        0,
-    )
-    failed: list[str] = []
-    rows_written = 0
-    for index in range(0, len(target), _TDX_VOLUME_REPAIR_BATCH):
-        chunk = target[index : index + _TDX_VOLUME_REPAIR_BATCH]
-        stored = collect_parquet_root(
-            config.curated_root / "daily_bars",
-            partition_col="trade_date",
-            start=start,
-            end=end,
-            symbols=chunk,
-        )
-        if stored.is_empty():
-            continue
-        stored = dedupe_by_primary_key(stored, "daily_bars").filter(
-            pl.col("source") == "tdx_protocol"
-        )
-        if stored.is_empty():
-            continue
-        try:
-            fresh = fetch_daily_bars(chunk, start, end, config=config)
-        except Exception as exc:  # noqa: BLE001 — the stored rows stay as they are
-            logger.warning("TDX volume repair: no history for %d symbol(s): %s", len(chunk), exc)
-            failed.extend(chunk)
-            continue
-        corrected, counts = _tdx_volume_corrections(stored, fresh)
-        for key, value in counts.items():
-            totals[key] += value
-        if not corrected.is_empty():
-            out = write_fetched(
-                config,
-                run_id,
-                "daily_bars",
-                corrected,
-                source="tdx_protocol",
-                batch_id=f"tdx-volume-repair-{index // _TDX_VOLUME_REPAIR_BATCH:04d}",
-            )
-            rows_written += int(out.get("rows_written", 0))
-        logger.info(
-            "TDX volume repair %d/%d symbol(s): %d of %d row(s) corrected",
-            min(index + len(chunk), len(target)),
-            len(target),
-            counts["rows_corrected"],
-            counts["rows_checked"],
-        )
-
-    findings: list[dict] = [
-        {
-            "dataset": "daily_bars",
-            "severity": "info",
-            "check": "daily_bars_tdx_volume_repair",
-            "message": (
-                f"TDX volume repair over {start}..{end}: corrected "
-                f"{totals['rows_corrected']} of {totals['rows_checked']} stored TDX row(s)"
-            ),
-            "source": "tdx_protocol",
-            **totals,
-        }
-    ]
-    if totals["rows_disagreeing"] or failed:
-        findings.append(
-            {
-                "dataset": "daily_bars",
-                "severity": "warning",
-                "check": "daily_bars_tdx_volume_repair_skipped",
-                "message": (
-                    f"TDX volume repair left {totals['rows_disagreeing']} row(s) whose prices "
-                    f"or turnover disagree, and {len(failed)} symbol(s) TDX did not serve"
-                ),
-                "source": "tdx_protocol",
-                "rows_disagreeing": totals["rows_disagreeing"],
-                "failed_symbols": failed[:50],
-            }
-        )
-    result: dict = {
-        "rows_read": totals["rows_checked"],
-        "rows_written": rows_written,
-        "context_updates": {"audit_findings": findings},
-    }
-    if len(findings) > 1:
-        result["status"] = "warning"
-    return result
 
 
 # Baostock and the stored row must describe the same session: unadjusted
@@ -1881,16 +1661,6 @@ def _step_daily_bars(config: Config, trade_date: date, run_id: str, context: dic
 
     if getattr(config, "_tdx_amount_repair", False):
         return repair_sina_history_amounts_from_tdx(
-            config, start, end, run_id, getattr(config, "_backfill_symbols", None)
-        )
-
-    if getattr(config, "_bj_amount_repair", False):
-        return repair_bj_amounts_from_tdx(
-            config, start, end, run_id, getattr(config, "_backfill_symbols", None)
-        )
-
-    if getattr(config, "_tdx_volume_repair", False):
-        return repair_tdx_volumes(
             config, start, end, run_id, getattr(config, "_backfill_symbols", None)
         )
 

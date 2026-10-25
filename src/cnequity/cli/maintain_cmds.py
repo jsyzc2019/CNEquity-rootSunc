@@ -20,7 +20,6 @@ from cnequity.cli._shared import (
     attach_log_file,
     config_option,
     parse_date_option,
-    warn_deprecated_migration,
 )
 from cnequity.derive.adj_factors import compute_adj_factors
 from cnequity.domain.datasets import RESAMPLED_MINUTE_DATASETS
@@ -308,13 +307,7 @@ def _published_derive(cfg, dataset: str):
         raise
 
 
-@cli.command(
-    epilog=N_(
-        "Deprecated targets: bse_code_migration and valuation_orphans only migrate lakes written "
-        "by cnequity 0.17 or earlier and will be removed in 0.20.0; a valuation_metrics backfill "
-        "already drops orphan valuation rows."
-    )
-)
+@cli.command()
 @click.argument("name", default="adj_factors")
 @config_option
 @click.option(
@@ -353,7 +346,7 @@ def _published_derive(cfg, dataset: str):
     is_flag=True,
     help=(
         N_(
-            "bse_code_migration: actually rewrite partitions; adj_factor_source: write per-security source overrides and recompute factors for those securities (default: report only)."
+            "adj_factor_source: write per-security source overrides and recompute factors for those securities (default: report only)."
         )
     ),
 )
@@ -372,7 +365,7 @@ def derive(
     `derive_industry_index`); the suspension derivation for `trading_status` runs automatically after init
     and after `cne backfill daily_bars`, and `cne backfill corporate_actions` also recomputes factors for the affected securities.
     So running them here is a repair or covers an earlier window, not part of a normal day.
-    `sector_routing`, `sector_code_map` and `valuation_orphans` are run by no schedule and only by hand.
+    `sector_routing` and `sector_code_map` are run by no schedule and only by hand.
     `adj_factor_source` arbitrates conflicts between factors and corporate actions with Baostock; securities
     where Sina is shown wrong and Baostock agrees with the other events switch their whole factor to Baostock with `--apply`.
     `futures_continuous` and `option_greeks` update daily in the `derivatives` group.
@@ -385,8 +378,6 @@ def derive(
     # Derive targets are lower case in the registry, and command names are
     # already case-insensitive; a target typed in caps should resolve the same.
     name = name.lower()
-    if name in {"bse_code_migration", "valuation_orphans"}:
-        warn_deprecated_migration(f"cne derive {name}")
     cfg = _cfg(config_path)
     attach_log_file(cfg, "derive")
     start = parse_date_option(start_str, "--start")
@@ -485,18 +476,6 @@ def derive(
             summary = derive_sector_code_map(cfg)
         except RuntimeError as exc:  # missing input or source: the message says what to do
             raise click.ClickException(str(exc)) from exc
-        click.echo(json.dumps(summary, indent=2, default=str))
-    elif name == "valuation_orphans":
-        from cnequity.storage.repairs.valuation_orphans import purge_valuation_orphan_symbols
-
-        summary = purge_valuation_orphan_symbols(cfg)
-        click.echo(json.dumps(summary, indent=2, default=str))
-    elif name == "bse_code_migration":
-        from cnequity.storage.repairs.bse_code_migration import migrate_bse_legacy_codes
-
-        summary = migrate_bse_legacy_codes(cfg, apply=apply_changes)
-        if not apply_changes:
-            summary["note"] = "report only; re-run with --apply to rewrite the partitions"
         click.echo(json.dumps(summary, indent=2, default=str))
     else:
         raise click.ClickException(_("Unknown derive target: {name}").format(name=name))

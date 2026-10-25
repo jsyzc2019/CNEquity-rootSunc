@@ -301,17 +301,6 @@ def parse_date_option(value: str | None, flag: str) -> date | None:
         ) from None
 
 
-def warn_deprecated_migration(command: str) -> None:
-    """Say a one-time migration goes in 0.20.0; on stderr, so JSON on stdout stays parseable."""
-    click.echo(
-        _(
-            "Warning: `{command}` is deprecated and will be removed in 0.20.0; "
-            "it only migrates lakes written by cnequity 0.17 or earlier."
-        ).format(command=command),
-        err=True,
-    )
-
-
 def _run_status_exit_code(status: str) -> int:
     """Coverage limitations remain visible without failing usable execution."""
     from cnequity.orchestrator.outcomes import execution_exit_code

@@ -21,16 +21,8 @@
 | `dataset` | `—` | 必填；位置参数 |
 | `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 | `--profile` | `default` | daily_bars 可选 delisted：只回填已确认退市名录，沿用独立发现证据。 |
-| `--shfe-annual-archive` | `—` | 仅期货/期权日线：从已核验格式的本地上期所年度 ZIP 离线导入。 |
-| `--archive-year` | `—` | 年度 ZIP 对应的交易年份。 |
-| `--accept-partial-fields` | `False` | 明确接受年度包缺少日文件独有字段；已有完整日线不会被覆盖。 |
-| `--archive-url` | `—` | 可选：该 ZIP 在上期所网站上的原始 HTTPS 链接，仅写证据。 |
-| `--archive-downloaded-at` | `—` | 可选：已知的原始下载时间，带时区 ISO 8601。 |
 | `--plan` | `False` | 只输出来源、范围和抓取方式；衍生品另给请求预算。不取数、不写湖。 |
 | `--exchange` | `—` | 仅衍生品：限定交易所，可重复。INE 归入 SHF 路由；2018 期货另取 INE 日文件。 |
-| `--refresh` | `False` | 仅衍生品日线：忽略完成收据与响应缓存，重新核对指定区间；不绕过熔断。 |
-| `--retry-failed` | `False` | 续跑 sector_bars 回填（跳过 checkpoint 里已写过的板块）。 |
-| `--force` | `False` | 清掉 sector_bars 回填 checkpoint，重抓全部板块。 |
 | `--source` | `—` | 本次回填改用的来源，不修改配置。支持 margin_trading（exchange 或 eastmoney）。 |
 | `--refetch` | `False` | 忽略完成收据和 checkpoint，重新获取整个范围（sector_bars、futures_bars、option_bars）；熔断仍然生效。不加时回填从断点续跑。 |
 | `--start` | `—` | 回填区间起点（YYYY-MM-DD），包括 daily_bars、minute_bars、衍生品日线、日期/报告期推进及 sector_bars。sector_bars 默认往前 400 天；超过来源历史深度的范围保留为缺口，可取范围照常交付并提供补数指引。 |
@@ -38,21 +30,6 @@
 | `--outstanding` | `False` | 只修复被容忍缺口欠下的那些 key，范围和窗口都取自欠账台账，不看 --symbols/--start/--end。补上的 key 会销账，仍然缺的继续欠着。 |
 | `--symbols` | `—` | 限定范围的标的列表，逗号分隔：用于 intraday、trading_status、corporate_actions 的限定回填，以及 financial_statement_items、daily_bars、share_structure 的限定修复。trading_status 的 checkpoint 与覆盖证据会记下确切范围；daily_bars 会把这个显式范围写进 backfill 元数据。 |
 | `--workers` | `1` | 仅 margin_trading 的日期推进并发数。每个请求仍然走配置里共享的源限流器；其它数据集必须为 1。 |
-| `--margin-source` | `—` | 仅 margin_trading：本次回填使用的来源，不修改配置文件或来源限速。 |
-| `--payment-date-repair` | `False` | 仅 corporate_actions：先应用已审发行人公告，再用 Baostock 匹配真实派息日；早于除息日的付款日视为未知。 |
-| `--issuer-notice-repair` | `False` | 仅 corporate_actions：只用发行人实施公告（已审清单、巨潮、北交所）修复付款日和已审送转条款；未匹配事件保留缺口，不请求 Baostock。 |
-| `--baostock-repair` | `False` | 仅 corporate_actions：用 Baostock 显式修复已退市的沪深标的。 |
-| `--ths-repair` | `False` | 仅 corporate_actions：显式用同花顺历史分红除权补已退市的北交所标的。 |
-| `--eastmoney-bj-repair` | `False` | 已弃用，将在 0.20.0 移除：仅 corporate_actions，用于仍以北交所老代码存储的湖：通过现行的 920xxx 东财代码补这些老代码的历史分红除权。 |
-| `--eastmoney-date-repair` | `False` | 仅 corporate_actions：按 --ex-dates 指定的除权日向东财逐日要历史除权行。回补路径的主源是 TDX，东财只有日更的等值过滤能取到 2015-09-29 以前的行。 |
-| `--ex-dates` | `—` | 配合 --eastmoney-date-repair：逗号分隔的除权日 YYYY-MM-DD。 |
-| `--bse-tip-repair` | `False` | 仅 daily_bars：用北交所行情板补湖中已有当期交易日的 BJ 成交额，不重抓 Sina，例如日更时行情板不可用。行情板只提供当前快照，因此只适用于最近一个交易日。 |
-| `--bj-amount-repair` | `False` | 已弃用，将在 0.20.0 移除，请改用 --tdx-amount-repair：仅 daily_bars：从 TDX 补 Sina 从未发布过的北交所成交额，已存的价格和成交量一律不动。需要 --start/--end。 |
-| `--tdx-amount-repair` | `False` | 仅 daily_bars：新浪补上的沪深北历史行与通达信一起核对，只在开高低收一致且成交量差小于一手时补成交额；通达信没有的代码保留新浪行。已存的价格和成交量一律不动。需要 --start/--end。 |
-| `--tdx-volume-repair` | `False` | 已弃用，将在 0.20.0 移除：仅 daily_bars：重读 TDX，只改写已存 TDX 行的成交量（修 2026-09-17 前的解码错误）；价格须一致，64.5 元以下被放大的成交额一并改写；不新增行。需要 --symbols 和 --start/--end。 |
-| `--turnover-repair` | `False` | 仅 daily_bars：成交额缺失、为 0 或量额单位错位的沪深股票行，用 Baostock 同日行整行替换；开高低收须在半分钱内一致，不一致或未提供的保留原值。需要 --start/--end。 |
-| `--turnover-peer-review` | `False` | 与 --turnover-repair 同用：以交易所历史日线、通达信和东财复查价格冲突，一致证据才整行替换；不拼接交易所汇总量额。 |
-| `--fill-em-outage` | `False` | 仅 valuation_metrics：东财快照中断时，用东财 datacenter 估值报表补东财最后一个完整日之后、今天之前的 --start/--end 窗口；全市场取全才写入。 |
 
 ## `cne check`
 
@@ -149,7 +126,7 @@
 | `--full` | `False` | 重写 adj_factors / industry_index / option_greeks / minute_bars_15m\|30m\|60m 的全部分区（默认只补增量）。 |
 | `--start` | `—` | industry_index / trading_status / option_greeks / minute_bars_15m\|30m\|60m：只派生这个日期（YYYY-MM-DD）及之后的。 |
 | `--end` | `—` | industry_index / trading_status / option_greeks / minute_bars_15m\|30m\|60m：只派生这个日期（YYYY-MM-DD）及之前的。 |
-| `--apply` | `False` | bse_code_migration：真正重写分区；adj_factor_source：写入逐证券来源覆盖并重算这些证券的因子（默认只报告）。 |
+| `--apply` | `False` | adj_factor_source：写入逐证券来源覆盖并重算这些证券的因子（默认只报告）。 |
 
 ## `cne doctor`
 
@@ -291,13 +268,6 @@
 | `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 | `--apply` | `False` | 向 Baostock 补取并发布新版本；默认只离线输出计划。 |
 
-## `cne repair daily-bar-coverage`
-
-| 参数 | 默认值 | 说明 |
-|---|---|---|
-| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
-| `--apply` | `False` | 按已提交数据结清北交所整日欠账和已证明的上市前欠账；默认只预览。 |
-
 ## `cne repair delisted-actions`
 
 | 参数 | 默认值 | 说明 |
@@ -318,13 +288,6 @@
 | `--symbols` | `—` | 逗号分隔的证券代码。 |
 | `--apply` | `False` | 运行；不加只打印计划。 |
 
-## `cne repair financial-announcements`
-
-| 参数 | 默认值 | 说明 |
-|---|---|---|
-| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
-| `--apply` | `False` | 追加明确标记的原始公告日重建版本；默认只预览。 |
-
 ## `cne repair financial-originals`
 
 | 参数 | 默认值 | 说明 |
@@ -340,20 +303,6 @@
 | `--reparse` | `False` | 重新解析已有原文报告；内容未变的行保留原始观测时间。 |
 | `--refresh-sources` | `False` | 从巨潮取完整公告查询和原始定期报告；默认回放已归档来源。 |
 | `--apply` | `False` | 追加可核实的原文当期数，保留既有版本及真实采集时间。 |
-
-## `cne repair fund-factors`
-
-| 参数 | 默认值 | 说明 |
-|---|---|---|
-| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
-| `--apply` | `False` | 按已记录的拆分、转增条款发布修正因子，保留旧版本；默认只预览。 |
-
-## `cne repair fund-listing-dates`
-
-| 参数 | 默认值 | 说明 |
-|---|---|---|
-| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
-| `--apply` | `False` | 归档交易所目录并发布缺失的基金上市日期；默认只预览。 |
 
 ## `cne repair fund-no-print`
 
@@ -399,28 +348,6 @@
 | `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 | `--apply` | `False` | 写入并发布新版本；默认只输出计划。 |
 
-## `cne repair misdated-valuation`
-
-| 参数 | 默认值 | 说明 |
-|---|---|---|
-| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
-| `--apply` | `False` | 向东财 datacenter 取数并发布新版本；默认只离线输出计划。 |
-
-## `cne repair missing-values`
-
-| 参数 | 默认值 | 说明 |
-|---|---|---|
-| `dataset` | `—` | 必填；位置参数 |
-| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
-| `--apply` | `False` | 将缺失值占位零改为空值并发布新版本；默认只预览。 |
-
-## `cne repair orphan-symbols`
-
-| 参数 | 默认值 | 说明 |
-|---|---|---|
-| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
-| `--apply` | `False` | 核验后发布新版本；默认只输出计划。 |
-
 ## `cne repair payment-dates`
 
 | 参数 | 默认值 | 说明 |
@@ -432,28 +359,14 @@
 | `--issuer-notices-only` | `False` | 只用发行人实施公告（已审清单、巨潮、北交所）；匹配不到的事件保留为缺口，不请求 Baostock。 |
 | `--apply` | `False` | 运行；不加只打印计划。 |
 
-## `cne repair stale-suspensions`
+## `cne repair repartition`
 
 | 参数 | 默认值 | 说明 |
 |---|---|---|
+| `dataset` | `—` | 位置参数 |
 | `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
-| `--apply` | `False` | 核验后发布新版本；默认只输出计划。 |
-
-## `cne repair status-listing-window`
-
-| 参数 | 默认值 | 说明 |
-|---|---|---|
-| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
-| `--apply` | `False` | 核验后发布新版本；默认只输出计划。 |
-
-## `cne repair status-outages`
-
-| 参数 | 默认值 | 说明 |
-|---|---|---|
-| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
-| `--start` | `—` | 必填；窗口起点（YYYY-MM-DD）。 |
-| `--end` | `—` | 必填；窗口终点（YYYY-MM-DD）。 |
-| `--apply` | `False` | 核验后发布新版本；默认只输出计划。 |
+| `--all` | `False` | 所有布局需要改写的数据集。 |
+| `--apply` | `False` | 改写并换上分区；默认只预览。 |
 
 ## `cne repair status-traded`
 
@@ -473,13 +386,6 @@
 | `--refresh-sources` | `False` | 联网取巨潮 IPO 日历；默认回放已归档来源。 |
 | `--max-sessions` | `32` | — |
 | `--event-date` | `—` | 额外回放指定日的官方上市事件，可重复；不要求证券已有日线。 |
-
-## `cne repair valuation-basis`
-
-| 参数 | 默认值 | 说明 |
-|---|---|---|
-| `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
-| `--apply` | `False` | 写入并发布新版本；默认只输出计划。 |
 
 ## `cne repair valuation-outage`
 

@@ -184,11 +184,7 @@
 严格的历史股票池读取仍需独立 ST 证据，成交补行不会解除该要求。
 
 **读旧湖不会出错。** 旧行把 ST 编码成 `status="st"`，`validate_dataframe` 在读入时
-自动升级（见 `cnequity/domain/trading_status.py`）。把物理 schema 统一过来跑：
-
-```bash
-scripts/migrations/migrate_trading_status_risk_warning.py --config configs/cnequity.toml --apply
-```
+自动升级（见 `cnequity/domain/trading_status.py`），物理文件不需要改写。
 
 迁移**不会**给历史补 `delisted` 行：某一天的状态是当时观测到的事实，用今天的退市日期
 倒填会凭空造出当时并不存在的 point-in-time 事实。要修某段历史，重跑那段日更即可。
@@ -220,14 +216,7 @@ scripts/migrations/migrate_trading_status_risk_warning.py --config configs/cnequ
 
 质量检查按来源核对量价关系，缺少成交额的数据无法做此项检查。`index_bars` / `sector_bars` 的指数点位不适用个股量价关系。
 
-**迁移（v1 → v2）。** 湖里既有的行在任何一种口径下都是错的，必须重写：
-
-```bash
-scripts/migrations/migrate_daily_bars_volume_v2.py --config configs/cnequity.toml --dry-run
-scripts/migrations/migrate_daily_bars_volume_v2.py --config configs/cnequity.toml --apply
-```
-
-`source ∈ {tdx_protocol, sina}` 且 `data_version=v1` 的行 `volume ×100`；其余 v1 行原样保留（本就是股）；所有被处理的行改写为 `data_version=v2`。已是 v2 的行跳过，脚本幂等、可中断续跑。**`fetched_at` 不重新打戳**——这些行确实是当时抓的，改掉就抹掉了数据被观测到的时间；记录本次重新解释的列是 `data_version`，这正是它的用途。`--apply` 会就地改写 curated，请先备份。
+**迁移（v1 → v2）。** 0.12 及更早版本写入的湖需要把 v1 行改写为股；这个一次性脚本已移除，这样的湖请先用 0.19 或更早版本迁移后再升级。
 
 ##### 前收盘（`pre_close`）
 

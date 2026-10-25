@@ -20,10 +20,6 @@ from cnequity.adapters.cninfo.announcements import (
     fetch_announcement_index_range,
 )
 from cnequity.adapters.eastmoney.corporate_actions import fetch_corporate_actions_eastmoney
-from cnequity.adapters.eastmoney.corporate_actions_migration import (
-    fetch_corporate_actions_eastmoney_migrated_bj,
-    migrated_bj_request_scope,
-)
 from cnequity.adapters.eastmoney.earnings_disclosure import (
     _backfill_report_dates,
     fetch_earnings_disclosure_schedule,
@@ -1226,82 +1222,6 @@ def step_corporate_actions(config: Config, trade_date: date, run_id: str, contex
                     if df.is_empty()
                     else pl.concat([df, repair_df], how="diagonal_relaxed")
                 )
-        if getattr(config, "_corporate_actions_eastmoney_bj_repair", False):
-            if not config.sources.get("eastmoney", False):
-                raise RuntimeError(
-                    "corporate_actions: --eastmoney-bj-repair requires the eastmoney source"
-                )
-            repair_start = (
-                getattr(config, "_backfill_start", None) or CORPORATE_ACTIONS_BACKFILL_START
-            )
-            repair_end = getattr(config, "_backfill_end", None) or trade_date
-            repair_windows = _delisted_bj_windows(config, symbols, repair_start, repair_end)
-            repair_symbols = sorted(repair_windows)
-            repair_scope = migrated_bj_request_scope(repair_symbols, repair_start, repair_end)
-            logger.info(
-                "corporate_actions: EastMoney migrated-code repair scoped to %d delisted BJ symbol(s)",
-                len(repair_symbols),
-            )
-            if repair_symbols:
-                repair_df, repair_failed = fetch_corporate_actions_eastmoney_migrated_bj(
-                    repair_symbols,
-                    repair_start,
-                    repair_end,
-                    config=config,
-                    run_id=run_id,
-                    symbol_windows=repair_windows,
-                    request_scope=repair_scope,
-                )
-            else:
-                repair_df, repair_failed = pl.DataFrame(), []
-            failed_symbols.extend(repair_failed)
-            if not repair_df.is_empty():
-                repair_df = with_provenance(
-                    repair_df, source="eastmoney_migrated_bj", data_version="v1"
-                )
-                if manifest is not None:
-                    repair_batch_id = f"{batch_id or 'batch-0'}-eastmoney-bj-repair"
-                    write_fetched(
-                        config,
-                        run_id,
-                        "corporate_actions",
-                        repair_df,
-                        source="eastmoney_migrated_bj",
-                        batch_id=repair_batch_id,
-                        raw_archive_evidence=(
-                            verify_raw_archive(
-                                config,
-                                "corporate_actions",
-                                run_id,
-                                source="eastmoney_migrated_bj",
-                                request_scope=repair_scope,
-                            )
-                            if config.should_archive_raw("corporate_actions")
-                            else None
-                        ),
-                    )
-                    manifest.start_batch(
-                        run_id,
-                        repair_batch_id,
-                        task_id="corporate_actions_eastmoney_bj_repair",
-                        dataset="corporate_actions",
-                        symbols=repair_symbols,
-                        window_start=repair_start.isoformat(),
-                        window_end=repair_end.isoformat(),
-                        blocks_compaction=False,
-                    )
-                    manifest.finish_batch(
-                        run_id,
-                        repair_batch_id,
-                        "success",
-                        rows_read=repair_df.height,
-                        rows_written=repair_df.height,
-                    )
-                df = (
-                    repair_df
-                    if df.is_empty()
-                    else pl.concat([df, repair_df], how="diagonal_relaxed")
-                )
         repair_dates = list(getattr(config, "_corporate_actions_eastmoney_date_repair", None) or [])
         if repair_dates:
             if not config.sources.get("eastmoney", False):
@@ -1555,7 +1475,7 @@ def step_corporate_actions(config: Config, trade_date: date, run_id: str, contex
             # ingest universe — so an out-of-scope code arriving this way is
             # fetched anyway. This dataset carries 348 ETF/LOF codes today, and
             # a fund's bars are a NAV series with zero volume on every session:
-            # exactly the rows `migrate_drop_nav_series_bars.py` had to delete.
+            # exactly the rows the old NAV-series cleanup had to delete.
             # An `all_instruments` lake drops nothing here.
             rebackfill = filter_ingest_universe(
                 today["symbol"].unique().to_list(), config.ingest_universe

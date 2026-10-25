@@ -4,14 +4,19 @@
 
 ## [0.19.0] — 未发布
 
+- **移除不再使用的命令与开关（不兼容）：**
+  - 11 个一次性 `cne repair` 迁移命令（`missing-values`、`financial-announcements`、`daily-bar-coverage`、`fund-factors`、`fund-listing-dates`、`valuation-basis`、`orphan-symbols`、`stale-suspensions`、`status-outages`、`status-listing-window`、`misdated-valuation`）：0.17 及更早版本的湖用 `cne migrate` 修正；
+  - `cne derive bse_code_migration` 和 `cne derive valuation_orphans`（`valuation_metrics` 回填会自动清理孤立行）；
+  - `cne backfill` 的 `--eastmoney-bj-repair`、`--bj-amount-repair`、`--tdx-volume-repair`，以及已迁出的开关（`--payment-date-repair` 等改用 `cne repair <名称>`，`--shfe-annual-archive` 改用 `cne import shfe-archive`，`--refresh`/`--force` 改用 `--refetch`，`--margin-source` 改用 `--source`，`--retry-failed` 不再需要）；
+  - 仓库 `scripts/migrations/`：分区改写改为随包提供的 `cne repair repartition`（默认预览，`--apply` 改写）；0.12 及更早版本写入的湖请先用 0.19 或更早版本迁移再升级。
 - 期货/期权最新交易日截面可以证明完整了：交易所有当天的官方合约文件、且文件里当天在市的合约都有行情时判为 `OK`（此前即使一个不缺也只能是 UNVERIFIED，`cne check` 因此一直 ✗）。默认走新浪的大商所无法证明，作为限制写在结果旁，不判失败；缺当天官方文件时仍为 UNVERIFIED。
 - `cne run maintain` 检查最近收盘交易日各日更组的运行：`[job.maintenance] gate_groups`（默认 `core`）失败立即判失败，其他组连续失败 `soft_fail_max_days`（默认 3）个交易日才判失败，与旧日更脚本的规则一致并沿用其计数。
 - 配置用 `steps_remove` 或 `enabled = false` 有意移出调度、且没有别的组再跑的数据集，新鲜度显示为 `removed`（保留真实的最后日期），不再判为 STALE；`cne check`、`cne status --gate`、审计、`cne run maintain`、收尾补抓和控制台对此一致。把 step 加回调度后又会按期判断。
 - 新增 `[[job.events.schedules]]`：在配置里写多条事件流计划，每条有自己的事件组、间隔、随机延迟和北京时间静默时段，打包定时任务按计划运行（`cne schedule install --events`），控制台只读展示。没写计划时仍用控制台设置的单个事件组。
 - 新增 `[source_health] vantage`：在配置里写一次网络出口标签，源探针、源健康记录和 `cne run maintain` 都会带上它；`CNE_SOURCE_VANTAGE` 和 `--vantage` 仍可在单次运行时覆盖。
 - `fund_flow_ths` / `sector_fund_flow_ths` 默认仍是不判新鲜度的兜底表；配置的日更调度组里排了它们（push2 不可用时用 `steps_add` 换入）时，改为要求最近收盘交易日有数据，收尾补抓会重试缺的那天，新鲜度门禁也会报出来。
-- `cne backfill` 只保留通用选项（帮助里的选项从 32 个减到 11 个）。数据集专属的修复改为 `cne repair` 子命令，默认预览、`--apply` 运行：`payment-dates`、`delisted-actions`、`ex-dates`、`bar-amounts`、`bar-turnover`、`bse-tip-turnover`、`valuation-outage`；上期所年度包导入改为 `cne import shfe-archive`。新增通用的 `--refetch`（取代衍生品的 `--refresh` 和 `sector_bars` 的 `--force`）和 `--source`（取代 `--margin-source`）；`--retry-failed` 本来就是默认行为，不再需要。旧开关仍可用，输入时提示新写法。
-- 新增 `cne migrate`：一次找出并运行这个湖还欠的一次性数据迁移（默认预览，`--apply` 运行），结果记在 `meta/state/lake.json`。新建的湖会记下建湖版本，不欠早于它的迁移；`cne doctor` 会提示还没检查的迁移。弃用的一次性 `cne repair` 命令改由它统一运行，已从 `cne repair --help` 隐藏，仍可直接调用（0.20.0 移除）；`status-outages` 需要指定停机窗口，仍须手工运行。
+- `cne backfill` 只保留通用选项（帮助里的选项从 32 个减到 11 个）。数据集专属的修复改为 `cne repair` 子命令，默认预览、`--apply` 运行：`payment-dates`、`delisted-actions`、`ex-dates`、`bar-amounts`、`bar-turnover`、`bse-tip-turnover`、`valuation-outage`；上期所年度包导入改为 `cne import shfe-archive`。新增通用的 `--refetch`（取代衍生品的 `--refresh` 和 `sector_bars` 的 `--force`）和 `--source`（取代 `--margin-source`）；`--retry-failed` 本来就是默认行为，不再需要。旧开关已移除（见下文）。
+- 新增 `cne migrate`：一次找出并运行这个湖还欠的一次性数据迁移（默认预览，`--apply` 运行），结果记在 `meta/state/lake.json`。新建的湖会记下建湖版本，不欠早于它的迁移；`cne doctor` 会提示还没检查的迁移。弃用的一次性 `cne repair` 命令改由它统一运行（命令本身已移除，见下文）。
 - 仓库 `scripts/migrations/` 的脚本在 `--apply` 时持有湖的变更锁，不再可能与正在发布同一数据集的运行交错写入。
 - 新增 `cne schedule install|status|remove`：在命令行为当前用户安装、查看、移除定时任务（macOS launchd、Linux crontab、Windows 任务计划程序），与 `cne serve` 操作页是同一个任务；没给出的选项保留面板里的设置。
 - 新增 `cne run maintain`，定时任务在每个交易日日更后自动运行：运行审计（`[job.maintenance] full_audit_weekday` 那天做全湖审计）、新鲜度门禁、源探针与 SLO、运行证据核验、元数据备份和过期预览。此前只有仓库脚本做元数据备份，用 `cne init --schedule` 或控制台装定时任务的湖没有 manifest 备份；备份改用 SQLite 备份接口，不再依赖 `sqlite3` 命令。

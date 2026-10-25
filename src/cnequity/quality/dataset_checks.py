@@ -945,7 +945,7 @@ def check_mixed_partition_granularity(
     put. Whole-layer scans then see the same primary key twice — once in
     ``trade_date=2016-01-04`` and again inside ``trade_date=2016`` — and the
     sampled ``pk_unique`` check (current period only) never notices.
-    ``scripts/migrations/repartition.py`` (with PK dedupe) is the fix.
+    ``cne repair repartition`` (with PK dedupe) is the fix.
     """
     if partition_col is None or not dataset_has_parquet(root):
         return None
@@ -988,7 +988,7 @@ def check_mixed_partition_granularity(
         f"{stale_count} partition(s) still at {[g for g in on_disk if g != configured]} "
         f"while registry wants {configured!r} (on disk: {on_disk}). "
         "Overlapping periods republish the same primary key across granularities; "
-        f"quarantine the finer leftovers and run `python scripts/migrations/repartition.py {dataset}` "
+        f"quarantine the finer leftovers and run `cne repair repartition {dataset} --apply` "
         "(a source-checkout script; the PyPI package does not install it)"
     )
     if pk_dupes:
@@ -1017,7 +1017,7 @@ def check_partition_fragmentation(
     Guards the granularity choice in the registry: a new dataset added with the
     default day partitioning, or an existing one whose volume never grew into
     it, otherwise quietly accumulates thousands of near-empty files that every
-    scan has to open. ``scripts/migrations/repartition.py`` is the fix.
+    scan has to open. ``cne repair repartition`` is the fix.
     """
     if partition_col is None or not dataset_has_parquet(root):
         return None
@@ -1043,7 +1043,7 @@ def check_partition_fragmentation(
             f"{total_bytes / 1e6:.1f}MB across {len(files)} files) — mostly parquet "
             f"metadata. Reads are unaffected. Configured granularity is {granularity!r}; "
             "a source checkout can coarsen it in the registry and run "
-            f"`python scripts/migrations/repartition.py {dataset}`"
+            f"`cne repair repartition {dataset} --apply`"
         ),
         "partitions": len(partitions),
         "rows": rows,
