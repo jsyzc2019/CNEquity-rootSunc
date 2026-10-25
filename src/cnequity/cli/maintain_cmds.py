@@ -367,6 +367,8 @@ def derive(
     So running them here is a repair or covers an earlier window, not part of a normal day.
     `sector_routing` and `sector_code_map` are run by no schedule and only by hand.
     `industry_taxonomy` writes one stable identity per industry (`system:version:code`, e.g. `sw:2021:480101`) to meta, also by hand.
+    `industry_crosswalk` adds member-overlap evidence between Shenwan and EastMoney industries for the latest day both have a full
+    snapshot (or the latest on or before `--end`); nothing is merged.
     `adj_factor_source` arbitrates conflicts between factors and corporate actions with Baostock; securities
     where Sina is shown wrong and Baostock agrees with the other events switch their whole factor to Baostock with `--apply`.
     `futures_continuous` and `option_greeks` update daily in the `derivatives` group.
@@ -486,6 +488,14 @@ def derive(
         except RuntimeError as exc:  # missing input: the message says what to do
             raise click.ClickException(str(exc)) from exc
         click.echo(json.dumps(summary, indent=2, default=str))
+    elif name == "industry_crosswalk":
+        from cnequity.derive.industry_crosswalk import derive_industry_crosswalk
+
+        try:
+            summary = derive_industry_crosswalk(cfg, as_of=end)
+        except RuntimeError as exc:  # no same-day evidence yet: the message says what to run
+            raise click.ClickException(str(exc)) from exc
+        click.echo(json.dumps(summary, indent=2, default=str, ensure_ascii=False))
     else:
         raise click.ClickException(_("Unknown derive target: {name}").format(name=name))
 
