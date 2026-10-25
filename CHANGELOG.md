@@ -2,8 +2,9 @@
 
 这里记录面向用户的主要功能、修复与兼容性变化。历史版本中的命令名反映当时的接口；当前用法以 [CLI 参考](docs/zh/reference/cli.md)为准。升级前阅读[升级与兼容性](docs/zh/getting-started/installation.md#升级与兼容性)。
 
-## [0.20.0] — 未发布
+## [0.20.0] — 2026-10-25
 
+- **升级步骤：** `pip install -U cnequity` 后重启 `cne serve` 和已在运行的 `cne mcp`。数据集契约只有兼容变更：`industry_members` 升到 schema 版本 2，新增 6 列层级列（见下文），新写入的东财行 `industry_code` 固定为三级行业；按固定层级统计请读 `l1_*`..`l3_*`。旧湖运行 `cne migrate` 预览、再 `cne migrate --apply`，补齐本版四步一次性迁移：`industry-levels`（在线读取东财当前板块层级）、`sw-delisted`、`offshore-final`（在线读取新浪 COMEX 黄金最终日线）和 `sw-never-listed`。基金派生状态行要标为非 ST 的，另按窗口运行 `cne repair status-traded --start … --end … --apply`。时点读取的截点改按北京时间日期判定，`as_of=T` 不再包含 T 日公告。EquityLab 等下游的消费契约无需改动。
 - `load_profile` 新增 `pit_mode="published"`：只认记录了发布时间的值，不用公告日或入湖日代替，且不早于值生效日；`cutoff` 指定截至日的北京时间截点（收盘信号用 15:00），过了截点的发布从下一天起可见。另加 `canonical`（按当日生效代码匹配）、`data_root` 和 `revision_map`（固定版本读取）。
 - 新增 `cnequity.query.load_profile`：一次取多只证券、多个截至日的多项时点资料（上市、交易状态与 ST、股本、股东户数、财报科目、申万/东财各级行业），每个值带它描述的日期、最早可知日、来源和时点质量（`strict` / `reconstructed` / `snapshot_only`），缺失的值给出原因（上市前、退市后、超出覆盖、尚未公布、值未知、无时点证据、无记录），过旧的值标 `stale`。每个数据集只读一次，全市场 12 个截至日 8 个字段约 19 秒。
 - 申万行业快照不再包含从未上市的证券：申万在 IPO 审核阶段就给公司定行业，且文件没有剔除日期，IPO 未完成的公司会一直留在之后每个月的快照里。本湖有 12 个这样的代码（2010–2023 年定类，如 002525.SZ、601206.SH、874090.BJ），在证券主表、日线、交易状态和公告里都没有任何记录，东财也不列出。只有四类记录全都没有才剔除；回填时剔除，旧湖用 `cne migrate --apply` 删除。剔除的证券记在 `meta/sw_never_listed.json`，`cne verify --industry` 以 `excluded_never_listed` 继续列出。
