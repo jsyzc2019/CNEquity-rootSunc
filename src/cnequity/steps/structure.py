@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from calendar import monthrange
 from datetime import date
 
 import polars as pl
@@ -20,6 +21,7 @@ from cnequity.adapters.sw.industry_history import (
     fetch_sw_industry_intervals,
 )
 from cnequity.config import Config
+from cnequity.domain.market_time import last_closed_session
 from cnequity.orchestrator.outcomes import SourceUnavailableError
 from cnequity.orchestrator.registry import register_step
 from cnequity.orchestrator.source_gaps import record_source_gap
@@ -44,14 +46,23 @@ _MIN_DAILY_INDUSTRY_CODES = 50
 
 
 def _month_end_trading_days(config: Config, start: date, end: date) -> list[date]:
-    """Last trading day of each calendar month in [start, end]."""
-    days = list_trading_dates(config, start, end)
-    if not days:
+    """Last trading day of each calendar month in [start, end] that has closed.
+
+    The calendar is read to the end of ``end``'s month, so an unfinished month
+    contributes nothing: reading only to ``end`` made its last session so far
+    a "month end", and a backfill run on a Sunday wrote a snapshot dated the
+    next (unopened) session. Nothing after the last closed session counts.
+    """
+    closed = last_closed_session()
+    cap = min(end, closed) if closed else end
+    if cap < start:
         return []
+    month_last = date(cap.year, cap.month, monthrange(cap.year, cap.month)[1])
+    days = list_trading_dates(config, start, month_last)
     by_month: dict[tuple[int, int], date] = {}
     for d in days:
         by_month[(d.year, d.month)] = d
-    return [by_month[k] for k in sorted(by_month)]
+    return [by_month[k] for k in sorted(by_month) if by_month[k] <= cap]
 
 
 def _existing_as_of_dates(
