@@ -4,6 +4,7 @@
 
 ## [0.19.0] — 未发布
 
+- `cne run maintain` 检查最近收盘交易日各日更组的运行：`[job.maintenance] gate_groups`（默认 `core`）失败立即判失败，其他组连续失败 `soft_fail_max_days`（默认 3）个交易日才判失败，与旧日更脚本的规则一致并沿用其计数。
 - 新鲜度门禁（`cne status --gate --groups`、`cne run maintain`）不再因配置用 `steps_remove` 或 `enabled = false` 有意移除的数据集失败；它们仍列为 STALE。
 - 新增 `[[job.events.schedules]]`：在配置里写多条事件流计划，每条有自己的事件组、间隔、随机延迟和北京时间静默时段，打包定时任务按计划运行（`cne schedule install --events`），控制台只读展示。没写计划时仍用控制台设置的单个事件组。
 - 新增 `[source_health] vantage`：在配置里写一次网络出口标签，源探针、源健康记录和 `cne run maintain` 都会带上它；`CNE_SOURCE_VANTAGE` 和 `--vantage` 仍可在单次运行时覆盖。

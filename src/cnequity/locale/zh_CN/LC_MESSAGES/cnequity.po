@@ -1922,20 +1922,23 @@ msgid ""
 "\n"
 "\n"
 "The scheduled timer runs this once after each session's daily update. In order:\n"
-"the run audit (the whole lake on [job.maintenance].full_audit_weekday), the freshness gate,\n"
+"the session's daily group runs ([job.maintenance].gate_groups fail at once, others after\n"
+"soft_fail_max_days sessions in a row), the run audit (the whole lake on\n"
+"[job.maintenance].full_audit_weekday), the freshness gate,\n"
 "source probes and SLO, run evidence over 20 sessions, a metadata backup\n"
 "(manifest DB, receipts, quality findings; never curated Parquet), and `cne run clean`'s preview.\n"
-"Exits 1 when the audit, the freshness gate or the backup fails; source and run-evidence\n"
-"findings are reported without failing."
+"Exits 1 when a group run, the audit, the freshness gate or the backup fails; source and\n"
+"run-evidence findings are reported without failing."
 msgstr ""
 "检查当天的日更，备份无法重建的数据，并预览过期文件。\n"
 "\n"
 "\n"
 "定时任务在每个交易日日更后运行一次。依次是：\n"
-"运行审计（[job.maintenance].full_audit_weekday 那天改为全湖审计）、新鲜度门禁、\n"
-"源探针与 SLO、最近 20 个交易日的运行证据、元数据备份\n"
+"当个交易日各日更组的运行结果（[job.maintenance].gate_groups 失败立即判失败，其他组\n"
+"连续失败 soft_fail_max_days 个交易日才判失败）、运行审计（[job.maintenance].full_audit_weekday\n"
+"那天改为全湖审计）、新鲜度门禁、源探针与 SLO、最近 20 个交易日的运行证据、元数据备份\n"
 "（manifest 数据库、收据、质量结论；不含 curated Parquet），以及 `cne run clean` 的预览。\n"
-"审计、新鲜度门禁或备份失败时退出 1；源探针和运行证据的发现只报告，不判失败。"
+"日更组、审计、新鲜度门禁或备份失败时退出 1；源探针和运行证据的发现只报告，不判失败。"
 
 #: cnequity/cli/setup_cmds.py
 msgid ""
@@ -2249,6 +2252,10 @@ msgstr "日线兜底。关掉后不再用新浪补日线。"
 #, python-brace-format
 msgid "Daily bars run {value}: status={value2} rows_written≈{value3}"
 msgstr "日线 run {value}：status={value2} rows_written≈{value3}"
+
+#: cnequity/cli/schedule_cmds.py
+msgid "Daily group runs"
+msgstr "日更组运行"
 
 #: cnequity/serve/ops/catalog.py
 msgid "Daily update"
@@ -6897,6 +6904,16 @@ msgstr "cron 的路径不能包含换行或反斜杠，请换用普通路径。"
 #: cnequity/cli/backfill_cmds.py cnequity/cli/init_summary.py
 msgid "daily bars"
 msgstr "日线"
+
+#: cnequity/cli/schedule_cmds.py
+#, python-brace-format
+msgid "daily group {group} failed {days} session(s) in a row"
+msgstr "日更组 {group} 连续 {days} 个交易日失败"
+
+#: cnequity/cli/schedule_cmds.py
+#, python-brace-format
+msgid "daily group {group} {status}"
+msgstr "日更组 {group} {status}"
 
 #: cnequity/cli/demo.py
 #, python-brace-format

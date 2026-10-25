@@ -25,14 +25,15 @@ cne schedule remove         # 停用并注销；正在运行的任务继续
 
 定时任务在每个交易日的日更之后跑一次 `cne run maintain`，手工也可以运行：
 
-1. 运行审计；`[job.maintenance] full_audit_weekday`（默认周六）改为全湖审计 `audit --full --quality-only`，它读全部 Parquet，大湖可能要几个小时；
-2. 新鲜度门禁 `status --datasets --gate`，只对定时日更实际跑的调度组判失败（`--groups` 可改）；
-3. 源探针 `sources probe --stale-only`（带上 `[source_health] vantage` 出口标签）与 `sources slo`；
-4. 最近 20 个交易日的运行证据 `verify --runs --days 20`；
-5. 元数据备份：manifest 数据库（用 SQLite 备份接口取一致副本）、增量状态、修订与来源收据、质量结论，写成 `meta-<时间>.tar.gz`，放在 `[job.maintenance] backup_dir`（默认 `{data.root}/backups`），按 `backup_retention_days` / `backup_retention_count` 轮换；
-6. `cne run clean` 的过期文件预览。
+1. 最近收盘交易日各日更组的运行结果：`[job.maintenance] gate_groups`（默认 `core`）失败立即判失败；其他组失败只报告，连续失败 `soft_fail_max_days`（默认 3）个交易日后判失败，计数在 `meta/state/soft_streak/`，旧脚本的计数会被沿用；
+2. 运行审计；`[job.maintenance] full_audit_weekday`（默认周六）改为全湖审计 `audit --full --quality-only`，它读全部 Parquet，大湖可能要几个小时；
+3. 新鲜度门禁 `status --datasets --gate`，只对定时日更实际跑的调度组判失败（`--groups` 可改）；
+4. 源探针 `sources probe --stale-only`（带上 `[source_health] vantage` 出口标签）与 `sources slo`；
+5. 最近 20 个交易日的运行证据 `verify --runs --days 20`；
+6. 元数据备份：manifest 数据库（用 SQLite 备份接口取一致副本）、增量状态、修订与来源收据、质量结论，写成 `meta-<时间>.tar.gz`，放在 `[job.maintenance] backup_dir`（默认 `{data.root}/backups`），按 `backup_retention_days` / `backup_retention_count` 轮换；
+7. `cne run clean` 的过期文件预览。
 
-审计、新鲜度门禁或备份失败时退出 1；源探针和运行证据的问题只报告，不判失败。macOS 上定时任务加 `--notify`，有问题时弹出桌面通知。
+核心组失败、其他组连续失败达到上限、审计、新鲜度门禁或备份失败时退出 1；源探针和运行证据的问题只报告，不判失败。macOS 上定时任务加 `--notify`，有问题时弹出桌面通知。
 
 ## 旧版仓库脚本（已弃用） {#legacy-scripts}
 

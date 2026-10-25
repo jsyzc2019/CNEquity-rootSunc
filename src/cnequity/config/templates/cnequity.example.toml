@@ -555,6 +555,10 @@ full_audit_weekday = 6
 # backup_dir = "/path/to/backups"
 backup_retention_days = 14
 backup_retention_count = 30
+# A failed run of these daily groups fails maintenance at once. Any other group
+# only warns, until it has failed this many sessions in a row (0 = never).
+gate_groups = ["core"]
+soft_fail_max_days = 3
 
 # Per-group fetch frequency (docs/zh/getting-started/configuration.md, 取数频率):
 #   cadence = "daily"   (default) or "weekly"

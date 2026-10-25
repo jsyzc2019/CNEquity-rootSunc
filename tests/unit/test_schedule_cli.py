@@ -234,3 +234,84 @@ def test_an_invalid_vantage_fails_validation(config):
 
     config.source_vantage = "bad label!"
     assert any("source_health.vantage" in e for e in validate_config(config))
+
+
+def _runs(config, session, statuses):
+    import json
+    import sqlite3
+    from contextlib import closing
+
+    config.manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    with closing(sqlite3.connect(config.manifest_path)) as conn:
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS ingestion_runs "
+            "(job_name TEXT, status TEXT, metadata_json TEXT, started_at TEXT)"
+        )
+        for group, status in statuses.items():
+            conn.execute(
+                "INSERT INTO ingestion_runs VALUES (?, ?, ?, ?)",
+                (f"daily:{group}", status, json.dumps({"trade_date": str(session)}), str(session)),
+            )
+        conn.commit()
+
+
+@pytest.fixture
+def grouped(config, monkeypatch):
+    from cnequity.config.loader import ScheduleGroup
+
+    config.schedule_groups = {
+        name: ScheduleGroup(at="16:00", steps=["compact"]) for name in ("core", "fundamentals")
+    }
+    config.maintenance_gate_groups = ("core",)
+    config.maintenance_soft_fail_max_days = 3
+    days = iter([date(2026, 10, 21), date(2026, 10, 22), date(2026, 10, 23)])
+    current = {}
+
+    def session():
+        return current["day"]
+
+    def advance():
+        current["day"] = next(days)
+        return current["day"]
+
+    monkeypatch.setattr("cnequity.domain.market_time.last_closed_session", session)
+    return config, advance
+
+
+def test_a_failed_gate_group_is_a_problem_at_once(grouped):
+    from cnequity.cli.schedule_cmds import _check_daily_groups
+
+    config, advance = grouped
+    _runs(config, advance(), {"core": "failed", "fundamentals": "degraded"})
+    problems, notes = _check_daily_groups(config)
+    assert problems == ["daily group core failed"] and notes == []
+
+
+def test_a_soft_group_escalates_after_consecutive_failures_and_resets(grouped):
+    from cnequity.cli.schedule_cmds import _check_daily_groups
+
+    config, advance = grouped
+    for expected_days in (1, 2):
+        _runs(config, advance(), {"core": "success", "fundamentals": "failed"})
+        problems, notes = _check_daily_groups(config)
+        assert problems == [] and str(expected_days) in notes[0]
+    # Checking the same session twice does not count it twice.
+    assert "2 session" in _check_daily_groups(config)[1][0]
+    day = advance()
+    _runs(config, day, {"core": "success", "fundamentals": "failed"})
+    problems, _ = _check_daily_groups(config)
+    assert problems == ["daily group fundamentals failed 3 session(s) in a row"]
+    _runs(config, day, {"fundamentals": "success"})  # a later rerun the same day
+    assert _check_daily_groups(config) == ([], [])
+
+
+def test_the_shell_pipelines_streak_carries_over(grouped):
+    from cnequity.cli.schedule_cmds import _check_daily_groups
+
+    config, advance = grouped
+    legacy = config.data_root / "state" / "soft_streak" / "fundamentals"
+    legacy.parent.mkdir(parents=True)
+    legacy.write_text("2026-10-20 2\n", encoding="utf-8")
+    _runs(config, advance(), {"core": "success", "fundamentals": "failed"})
+    problems, _ = _check_daily_groups(config)
+    assert problems == ["daily group fundamentals failed 3 session(s) in a row"]

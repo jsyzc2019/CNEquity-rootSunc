@@ -313,6 +313,8 @@ Settings of `cne run maintain`, which the timer `cne schedule install` installs 
 | `backup_dir` | string | `{data.root}/backups` | Metadata backup directory; a relative path resolves against the config file's directory. Another disk is best |
 | `backup_retention_days` | int | `14` | Delete backups older than this many days; 0 disables the age limit |
 | `backup_retention_count` | int | `30` | Keep only this many newest backups; 0 disables the count limit |
+| `gate_groups` | list | `["core"]` | A failed run of these daily groups fails maintenance at once |
+| `soft_fail_max_days` | int | `3` | Any other failed daily group only warns, until it has failed this many sessions in a row; 0 never escalates |
 
 ## Event-stream schedule groups (24/7)
 

@@ -59,6 +59,86 @@ def _scheduled_groups(cfg) -> list[str]:
     return list(cfg.schedule_groups)
 
 
+def _group_failures(cfg, session) -> tuple[dict[str, str], set[str]]:
+    """Failed groups (``group -> status``) and every group that ran for *session*.
+
+    "Failed" is what fails the command (`orchestrator.outcomes.execution_exit_code`):
+    ``degraded`` and ``warning`` runs delivered and are not counted.
+    """
+    import sqlite3
+    from contextlib import closing
+
+    from cnequity.orchestrator.outcomes import execution_exit_code
+
+    path = Path(cfg.manifest_path)
+    if not path.exists():
+        return {}, set()
+    query = (
+        "SELECT job_name, status FROM ingestion_runs "
+        "WHERE job_name LIKE 'daily:%' AND json_extract(metadata_json, '$.trade_date') = ? "
+        "ORDER BY started_at"
+    )
+    latest: dict[str, str] = {}
+    with closing(sqlite3.connect(f"file:{path}?mode=ro", uri=True)) as conn:
+        for job_name, status in conn.execute(query, (session.isoformat(),)):
+            group = job_name.removeprefix("daily:")
+            if group in cfg.schedule_groups:
+                latest[group] = str(status)
+    return {g: s for g, s in latest.items() if execution_exit_code(s)}, set(latest)
+
+
+def _streak_path(cfg, group: str) -> Path:
+    return Path(cfg.meta_root) / "state" / "soft_streak" / group
+
+
+def _bump_streak(cfg, group: str, session) -> int:
+    """Consecutive failed sessions of *group*, counting *session* once.
+
+    Same ``<date> <count>`` file the shell pipeline kept under
+    ``<data root>/state/soft_streak``, which is read once when the new one is absent.
+    """
+    path = _streak_path(cfg, group)
+    legacy = Path(cfg.data_root) / "state" / "soft_streak" / group
+    source = path if path.exists() else legacy
+    last_day, count = "", 0
+    try:
+        parts = source.read_text(encoding="utf-8").split()
+        last_day, count = parts[0], int(parts[1])
+    except (OSError, IndexError, ValueError):
+        pass
+    if last_day != session.isoformat():
+        count += 1
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(f"{session.isoformat()} {count}\n", encoding="utf-8")
+    return count
+
+
+def _check_daily_groups(cfg) -> tuple[list[str], list[str]]:
+    """(problems, notes) from the last closed session's daily group runs."""
+    from cnequity.domain.market_time import last_closed_session
+
+    session = last_closed_session()
+    if session is None:
+        return [], []
+    failed, seen = _group_failures(cfg, session)
+    problems: list[str] = []
+    notes: list[str] = []
+    limit = cfg.maintenance_soft_fail_max_days
+    for group in sorted(seen - set(failed)):
+        _streak_path(cfg, group).unlink(missing_ok=True)
+        (Path(cfg.data_root) / "state" / "soft_streak" / group).unlink(missing_ok=True)
+    for group, status in sorted(failed.items()):
+        if group in cfg.maintenance_gate_groups:
+            problems.append(_("daily group {group} {status}").format(group=group, status=status))
+            continue
+        days = _bump_streak(cfg, group, session)
+        label = _("daily group {group} failed {days} session(s) in a row").format(
+            group=group, days=days
+        )
+        (problems if limit and days >= limit else notes).append(label)
+    return problems, notes
+
+
 def _notify(title: str, message: str) -> None:
     """A desktop notification on macOS; nothing elsewhere."""
     if sys.platform != "darwin":
@@ -88,11 +168,13 @@ def maintain(config_path: str, groups: str | None, notify: bool):
 
     \b
     The scheduled timer runs this once after each session's daily update. In order:
-    the run audit (the whole lake on [job.maintenance].full_audit_weekday), the freshness gate,
+    the session's daily group runs ([job.maintenance].gate_groups fail at once, others after
+    soft_fail_max_days sessions in a row), the run audit (the whole lake on
+    [job.maintenance].full_audit_weekday), the freshness gate,
     source probes and SLO, run evidence over 20 sessions, a metadata backup
     (manifest DB, receipts, quality findings; never curated Parquet), and `cne run clean`'s preview.
-    Exits 1 when the audit, the freshness gate or the backup fails; source and run-evidence
-    findings are reported without failing.
+    Exits 1 when a group run, the audit, the freshness gate or the backup fails; source and
+    run-evidence findings are reported without failing.
 
     """
     from cnequity.diagnostics.source_health import effective_vantage
@@ -109,8 +191,10 @@ def maintain(config_path: str, groups: str | None, notify: bool):
         else (N_("Run audit"), ("audit",), True)
     )
     gate_groups = groups if groups is not None else " ".join(_scheduled_groups(cfg))
-    problems: list[str] = []
-    notes: list[str] = []
+    click.echo(f"--- {_('Daily group runs')} ---", err=True)
+    problems, notes = _check_daily_groups(cfg)
+    for line in [*problems, *notes]:
+        click.echo(f"  {line}", err=True)
     for label, args, gating in (audit, *_CHECKS):
         argv = list(args)
         if args[0] == "status" and gate_groups:

@@ -188,6 +188,10 @@ class Config:
     maintenance_backup_dir: Path | None = None
     maintenance_backup_retention_days: int = 14
     maintenance_backup_retention_count: int = 30
+    # Daily groups whose failed run fails maintenance at once; any other failed
+    # group fails it after this many consecutive sessions (0 never escalates).
+    maintenance_gate_groups: tuple[str, ...] = ("core",)
+    maintenance_soft_fail_max_days: int = 3
     # [source_health].vantage: the egress label probes and health records carry.
     source_vantage: str | None = None
     # Continuous event streams. Same shape as a daily schedule group, but the
@@ -1169,6 +1173,10 @@ def load_config(path: str | Path) -> Config:
         maintenance_backup_dir=maintenance_backup_dir,
         maintenance_backup_retention_days=int(maintenance_raw.get("backup_retention_days", 14)),
         maintenance_backup_retention_count=int(maintenance_raw.get("backup_retention_count", 30)),
+        maintenance_gate_groups=tuple(
+            str(g) for g in maintenance_raw.get("gate_groups", ["core"]) or []
+        ),
+        maintenance_soft_fail_max_days=int(maintenance_raw.get("soft_fail_max_days", 3)),
         source_vantage=str((raw.get("source_health") or {}).get("vantage") or "").strip() or None,
         events_groups=events_groups,
         event_schedules=event_schedules,
@@ -1314,7 +1322,18 @@ def validate_config(cfg: Config) -> list[str]:
             errors.append(f"source_health.vantage: {exc}")
     if not 0 <= int(getattr(cfg, "maintenance_full_audit_weekday", 6)) <= 7:
         errors.append("job.maintenance.full_audit_weekday must be 0 (never) or an ISO weekday 1-7")
-    for key in ("backup_retention_days", "backup_retention_count"):
+    unknown_gate = sorted(
+        set(getattr(cfg, "maintenance_gate_groups", ()) or ())
+        - set(getattr(cfg, "schedule_groups", {}) or {})
+    )
+    # The default names `core`; only a list someone wrote is held to the schedule.
+    explicit_gate = tuple(getattr(cfg, "maintenance_gate_groups", ())) != ("core",)
+    if unknown_gate and explicit_gate and getattr(cfg, "schedule_groups", None):
+        errors.append(
+            "job.maintenance.gate_groups names groups the schedule does not have: "
+            + ", ".join(unknown_gate)
+        )
+    for key in ("backup_retention_days", "backup_retention_count", "soft_fail_max_days"):
         if int(getattr(cfg, f"maintenance_{key}", 0)) < 0:
             errors.append(f"job.maintenance.{key} must be 0 (no limit) or positive")
     for name, group in (getattr(cfg, "schedule_groups", None) or {}).items():

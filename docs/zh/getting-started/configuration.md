@@ -313,6 +313,8 @@ weekday = 5          # 每周组在哪天之前的最后一个交易日跑，ISO
 | `backup_dir` | string | `{data.root}/backups` | 元数据备份目录；相对路径按配置文件所在目录解析，最好放在另一块盘 |
 | `backup_retention_days` | int | `14` | 删除早于这么多天的备份；0 不按天数删 |
 | `backup_retention_count` | int | `30` | 只保留最新的这么多份；0 不按份数删 |
+| `gate_groups` | list | `["core"]` | 这些日更组的运行失败时，维护立即判失败 |
+| `soft_fail_max_days` | int | `3` | 其他日更组失败只告警，连续失败这么多个交易日后判失败；0 表示从不升级 |
 
 ## 事件流调度组（7x24）
 
