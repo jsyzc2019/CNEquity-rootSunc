@@ -37,6 +37,11 @@ PIT quality
 later (backfills, derived rows). ``snapshot_only`` — a dated snapshot with no
 publication time. ``pit_mode="strict"`` drops everything but ``strict`` and
 says ``no_pit_evidence`` where that is the only reason a value is missing.
+``pit_mode="published"`` goes further: a value is visible only from a recorded
+publication time (``available_at``), cut at ``cutoff``, and never from an
+announcement or ingestion date; industry snapshots, which have none, are then
+``no_pit_evidence``. Listing and trading status are session facts and read the
+same in every mode.
 
 Missing reasons
 ---------------
@@ -50,13 +55,14 @@ exists and leaves the value unknown, such as ST on a derived status row),
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Sequence
-from datetime import date
+from collections.abc import Iterable, Mapping, Sequence
+from datetime import date, time, timedelta
+from pathlib import Path
+from typing import Literal
 
 import polars as pl
 
 from cnequity.config import Config
-from cnequity.domain.pit import PitMode
 
 SHARE_FIELDS = {
     "shares.total": "total_shares",
@@ -91,6 +97,19 @@ OUT_SCHEMA = {
     "age_days": pl.Int64,
     "missing_reason": pl.Utf8,
 }
+
+
+ProfileMode = Literal["best_effort", "strict", "published"]
+#: Per-dataset date column for ``canonical=True`` (its historically effective code).
+_DATE_COLUMNS = {
+    "share_structure": "change_date",
+    "shareholder_counts": "count_date",
+    "financial_statement_items": "announce_date",
+    "industry_members": "as_of_date",
+    "trading_status": "trade_date",
+}
+#: Fields whose rows make no publication claim; every mode reads them alike.
+_SESSION_FIELDS = (*("status.trading", "status.st"), "listed")
 
 
 class ProfileError(ValueError):
@@ -137,6 +156,22 @@ def _day(column: str) -> pl.Expr:
     return pl.col(column).dt.convert_time_zone("Asia/Shanghai").dt.date()
 
 
+def _published_day(frame: pl.DataFrame, cutoff: time | None) -> pl.Expr:
+    """The first ``as_of`` date by whose ``cutoff`` a recorded ``available_at`` had passed.
+
+    Published after the cutoff on day D, a row is first visible on D+1; with no
+    cutoff, on D itself. Null when the source recorded no publication time.
+    """
+    if "available_at" not in frame.columns:
+        return pl.lit(None, dtype=pl.Date).alias("_published")
+    local = pl.col("available_at").dt.convert_time_zone("Asia/Shanghai")
+    day = local.dt.date()
+    if cutoff is None:
+        return day.alias("_published")
+    late = local.dt.time() > pl.lit(cutoff)
+    return pl.when(late).then(day + timedelta(days=1)).otherwise(day).alias("_published")
+
+
 def _period_end(period: pl.Expr) -> pl.Expr:
     year = period.str.slice(0, 4).cast(pl.Int32, strict=False)
     quarter = period.str.slice(5, 1).cast(pl.Int32, strict=False)
@@ -146,16 +181,40 @@ def _period_end(period: pl.Expr) -> pl.Expr:
 
 
 def _candidates(
-    config: Config, fields: Sequence[str], symbols: list[str], last: date
+    config: Config,
+    fields: Sequence[str],
+    symbols: list[str],
+    last: date,
+    *,
+    cutoff: time | None,
+    read_kwargs: dict,
+    canonical: bool,
 ) -> pl.DataFrame:
     """``[symbol, field, visible_from, field_date, value_num, value_str, label, source, _observed, _first_hand, _rank]``."""
     from cnequity.query.reader import ReaderError, load
 
+    wanted = set(symbols)
+    if canonical:
+        from cnequity.domain.security_identifiers import identifier_aliases
+
+        for symbol in symbols:
+            wanted |= identifier_aliases(symbol)
+
     def read(dataset: str, **kwargs) -> pl.DataFrame:
         try:
-            return load(dataset, config=config, symbols=symbols, **kwargs)
+            frame = load(dataset, config=config, symbols=sorted(wanted), **read_kwargs, **kwargs)
         except ReaderError:
             return pl.DataFrame()
+        if canonical and not frame.is_empty():
+            from cnequity.domain.schemas import PRIMARY_KEYS
+            from cnequity.domain.security_identifiers import canonicalize_dated_identifiers
+
+            frame = canonicalize_dated_identifiers(
+                frame,
+                date_col=_DATE_COLUMNS[dataset],
+                key_columns=[c for c in PRIMARY_KEYS[dataset] if c in frame.columns],
+            )
+        return frame
 
     parts: list[pl.DataFrame] = []
     common = ["symbol", "field", "visible_from", "field_date", "value_num", "value_str", "label"]
@@ -171,10 +230,13 @@ def _candidates(
             .replace_strict(_SOURCE_RANK, default=9, return_dtype=pl.Int8)
             .alias("_rank"),
         )
+        for name in ("_effective", "_published"):
+            if name not in frame.columns:
+                frame = frame.with_columns(pl.lit(None, dtype=pl.Date).alias(name))
         parts.append(
-            frame.select(*common, "source", "_observed", "_first_hand", "_rank").cast(
-                {"value_num": pl.Float64, "value_str": pl.Utf8, "label": pl.Utf8}
-            )
+            frame.select(
+                *common, "source", "_observed", "_effective", "_published", "_first_hand", "_rank"
+            ).cast({"value_num": pl.Float64, "value_str": pl.Utf8, "label": pl.Utf8})
         )
 
     wanted_shares = [f for f in fields if f in SHARE_FIELDS]
@@ -184,6 +246,8 @@ def _candidates(
             base = ss.with_columns(
                 pl.max_horizontal("change_date", "announce_date").alias("visible_from"),
                 pl.col("change_date").alias("field_date"),
+                pl.col("change_date").alias("_effective"),
+                _published_day(ss, cutoff),
                 _observed_day(ss),
             )
             for field in wanted_shares:
@@ -198,6 +262,8 @@ def _candidates(
                         pl.lit(None, dtype=pl.Utf8).alias("label"),
                         "source",
                         "_observed",
+                        "_effective",
+                        "_published",
                     ).filter(pl.col("value_num").is_not_null())
                 )
 
@@ -215,6 +281,8 @@ def _candidates(
                     pl.lit(None, dtype=pl.Utf8).alias("label"),
                     "source",
                     _observed_day(hc),
+                    pl.col("count_date").alias("_effective"),
+                    _published_day(hc, cutoff),
                 ).filter(pl.col("value_num").is_not_null())
             )
 
@@ -228,11 +296,8 @@ def _candidates(
             items=items,
         )
         if not fsi.is_empty():
-            avail = (
-                pl.max_horizontal(pl.col("announce_date"), _day("available_at"))
-                if "available_at" in fsi.columns
-                else pl.col("announce_date")
-            )
+            fsi = fsi.with_columns(_published_day(fsi, cutoff))
+            avail = pl.max_horizontal(pl.col("announce_date"), pl.col("_published"))
             add(
                 fsi.select(
                     "symbol",
@@ -244,6 +309,7 @@ def _candidates(
                     pl.lit(None, dtype=pl.Utf8).alias("label"),
                     "source",
                     _observed_day(fsi),
+                    "_published",
                 ).filter(pl.col("value_num").is_not_null())
             )
 
@@ -314,9 +380,11 @@ def _candidates(
     return pl.concat(parts, how="vertical_relaxed").drop_nulls(["symbol", "visible_from"])
 
 
-def _quality(field: str) -> pl.Expr:
+def _quality(field: str, mode: ProfileMode) -> pl.Expr:
     if field.startswith("industry."):
         return pl.lit("snapshot_only")
+    if mode == "published" and field not in _SESSION_FIELDS:
+        return pl.lit("strict")
     strict = (
         pl.col("_first_hand")
         & pl.col("_observed").is_not_null()
@@ -325,7 +393,7 @@ def _quality(field: str) -> pl.Expr:
     return pl.when(strict).then(pl.lit("strict")).otherwise(pl.lit("reconstructed"))
 
 
-def _asof(grid: pl.DataFrame, cand: pl.DataFrame, field: str, mode: PitMode) -> pl.DataFrame:
+def _asof(grid: pl.DataFrame, cand: pl.DataFrame, field: str, mode: ProfileMode) -> pl.DataFrame:
     """Latest visible value per ``(symbol, as_of)`` for one field, with quality.
 
     The value known on a date is the one for the latest ``field_date`` among
@@ -336,7 +404,13 @@ def _asof(grid: pl.DataFrame, cand: pl.DataFrame, field: str, mode: PitMode) -> 
     """
     rows = cand.filter(pl.col("field") == field)
     snapshot = field.startswith("industry.")
-    if mode == "strict" and not snapshot:
+    if mode == "published" and field not in _SESSION_FIELDS:
+        # Known only from a recorded publication time, and not before the
+        # date it took effect; announcement and ingestion dates never stand in.
+        rows = rows.filter(pl.col("_published").is_not_null() & ~pl.lit(snapshot)).with_columns(
+            pl.max_horizontal("_effective", "_published").alias("visible_from")
+        )
+    elif mode == "strict" and not snapshot:
         # Strictly known only from the day this lake itself observed it.
         rows = rows.filter(pl.col("_first_hand") & pl.col("_observed").is_not_null()).with_columns(
             pl.max_horizontal("visible_from", "_observed").alias("visible_from")
@@ -370,7 +444,7 @@ def _asof(grid: pl.DataFrame, cand: pl.DataFrame, field: str, mode: PitMode) -> 
         )
         .filter(pl.col("visible_from").is_not_null())
     )
-    return picked.with_columns(_quality(field).alias("pit_quality")).select(
+    return picked.with_columns(_quality(field, mode).alias("pit_quality")).select(
         "symbol",
         "as_of",
         pl.lit(field).alias("field"),
@@ -384,11 +458,11 @@ def _asof(grid: pl.DataFrame, cand: pl.DataFrame, field: str, mode: PitMode) -> 
     )
 
 
-def _listed(config: Config, grid: pl.DataFrame) -> pl.DataFrame:
+def _listed(config: Config, grid: pl.DataFrame, read_kwargs: dict) -> pl.DataFrame:
     from cnequity.query.reader import ReaderError, load
 
     try:
-        inst = load("instruments", config=config)
+        inst = load("instruments", config=config, **read_kwargs)
     except ReaderError:
         inst = pl.DataFrame(
             schema={"symbol": pl.Utf8, "list_date": pl.Date, "delist_date": pl.Date}
@@ -411,13 +485,25 @@ def load_profile(
     symbols: Iterable[str],
     as_of_dates: Iterable[date],
     *,
-    pit_mode: PitMode = "best_effort",
+    pit_mode: ProfileMode = "best_effort",
+    cutoff: time | None = None,
+    canonical: bool = False,
     config: Config | None = None,
+    data_root: str | Path | None = None,
+    revision_map: Mapping[str, object] | None = None,
 ) -> pl.DataFrame:
-    """One row per ``(symbol, as_of, field)``; see the module docstring."""
+    """One row per ``(symbol, as_of, field)``; see the module docstring.
+
+    ``cutoff`` is the Shanghai time of day by which a recorded publication
+    time must have passed to count on ``as_of`` (``time(15)`` for a close
+    signal); without it the whole day counts. ``canonical`` re-keys each
+    source row onto its historically effective code before matching, as
+    ``canonicalize_dated_identifiers`` does. ``data_root`` and
+    ``revision_map`` go to every read, so a pinned build reads pinned data.
+    """
     from cnequity.query.reader import resolve_config
 
-    if pit_mode not in ("strict", "best_effort"):
+    if pit_mode not in ("strict", "best_effort", "published"):
         raise ProfileError(f"unsupported pit_mode {pit_mode!r}")
     fields = list(dict.fromkeys(fields))
     symbols = sorted(set(symbols))
@@ -425,12 +511,21 @@ def load_profile(
     _check_fields(fields)
     if not fields or not symbols or not dates:
         return pl.DataFrame(schema=OUT_SCHEMA)
-    cfg = config or resolve_config()
+    cfg = config or resolve_config(data_root=data_root)
+    read_kwargs = {"revision_map": dict(revision_map)} if revision_map else {}
     grid = pl.DataFrame({"symbol": symbols}).join(
         pl.DataFrame({"as_of": dates}, schema={"as_of": pl.Date}), how="cross"
     )
-    life = _listed(cfg, grid)
-    cand = _candidates(cfg, [f for f in fields if f != "listed"], symbols, dates[-1])
+    life = _listed(cfg, grid, read_kwargs)
+    cand = _candidates(
+        cfg,
+        [f for f in fields if f != "listed"],
+        symbols,
+        dates[-1],
+        cutoff=cutoff,
+        read_kwargs=read_kwargs,
+        canonical=canonical,
+    )
     out: list[pl.DataFrame] = []
     for field in fields:
         if field == "listed":
@@ -474,7 +569,7 @@ def load_profile(
     )
 
 
-def _explain(full: pl.DataFrame, cand: pl.DataFrame, field: str, mode: PitMode) -> pl.DataFrame:
+def _explain(full: pl.DataFrame, cand: pl.DataFrame, field: str, mode: ProfileMode) -> pl.DataFrame:
     """Add ``age_days`` and ``missing_reason`` to one field's rows."""
     rows = cand.filter(pl.col("field") == field) if not cand.is_empty() else pl.DataFrame()
     stale = STALE_DAYS.get(_family(field))
@@ -530,7 +625,10 @@ def _explain(full: pl.DataFrame, cand: pl.DataFrame, field: str, mode: PitMode) 
         .then(pl.lit("value_unknown"))
         .when(pl.col("_first").is_null() | (pl.col("as_of") < pl.col("_first")))
         .then(pl.lit("outside_coverage"))
-        .when(pl.lit(mode == "strict") & pl.col("_any_visible").fill_null(False))
+        .when(
+            pl.lit(mode in ("strict", "published") and field not in _SESSION_FIELDS)
+            & pl.col("_any_visible").fill_null(False)
+        )
         .then(pl.lit("no_pit_evidence"))
         .when(pl.col("_earlier").fill_null(False))
         .then(pl.lit("not_yet_published"))

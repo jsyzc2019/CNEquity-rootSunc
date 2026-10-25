@@ -178,3 +178,155 @@ def test_old_values_are_returned_marked_stale(lake):
 def test_unknown_fields_are_rejected(lake):
     with pytest.raises(ProfileError, match="unknown profile field"):
         load_profile(["industry.citic.l1"], [S], [date(2024, 4, 26)], config=lake)
+
+
+def _published_lake(tmp_path):
+    """Share counts with and without a recorded publication time."""
+    from zoneinfo import ZoneInfo
+
+    sh = ZoneInfo("Asia/Shanghai")
+    cfg = Config(data_root=tmp_path / "lake")
+
+    def at(day, hour):
+        return datetime(day.year, day.month, day.day, hour, tzinfo=sh).astimezone(timezone.utc)
+
+    rows = [
+        # Published 16:00 on 04-26, effective 04-25: after a 15:00 cutoff it counts from 04-29.
+        {
+            "symbol": S,
+            "change_date": date(2024, 4, 25),
+            "total_shares": 100.0,
+            "float_shares": 80.0,
+            "restricted_shares": None,
+            "free_float_shares": None,
+            "change_reason": None,
+            "announce_date": date(2024, 4, 26),
+            **_meta("eastmoney", EARLY),
+            "available_at": at(date(2024, 4, 26), 16),
+        },
+        # Published early but effective only on 05-06.
+        {
+            "symbol": S,
+            "change_date": date(2024, 5, 6),
+            "total_shares": 120.0,
+            "float_shares": 90.0,
+            "restricted_shares": None,
+            "free_float_shares": None,
+            "change_reason": None,
+            "announce_date": date(2024, 4, 30),
+            **_meta("eastmoney", EARLY),
+            "available_at": at(date(2024, 4, 30), 9),
+        },
+        # No recorded publication time: never visible in published mode.
+        {
+            "symbol": S,
+            "change_date": date(2024, 6, 3),
+            "total_shares": 150.0,
+            "float_shares": 99.0,
+            "restricted_shares": None,
+            "free_float_shares": None,
+            "change_reason": None,
+            "announce_date": date(2024, 6, 3),
+            **_meta("eastmoney", EARLY),
+            "available_at": None,
+        },
+    ]
+    schema = {**DATASET_SCHEMAS["share_structure"], "available_at": pl.Datetime("us", "UTC")}
+    root = cfg.curated_root / "share_structure" / "change_date=2024"
+    root.mkdir(parents=True)
+    pl.DataFrame(rows, schema=schema).write_parquet(root / "part.parquet")
+    RevisionStore(cfg.meta_root, cfg.curated_root, cfg.derived_root).commit(
+        "share_structure",
+        run_id="seed",
+        changed_files=[root / "part.parquet"],
+        schema_version=1,
+        contract_fingerprint="contract",
+    )
+    return cfg
+
+
+def test_published_mode_uses_only_recorded_publication_times_cut_at_the_close(tmp_path):
+    from datetime import time
+
+    cfg = _published_lake(tmp_path)
+    days = [date(2024, 4, 26), date(2024, 4, 29), date(2024, 5, 6), date(2024, 6, 28)]
+    p = load_profile(["shares.float"], [S], days, pit_mode="published", cutoff=time(15), config=cfg)
+    got = {r["as_of"]: (r["value_num"], r["missing_reason"]) for r in p.iter_rows(named=True)}
+    assert got[days[0]] == (None, "no_pit_evidence")  # published after that close
+    assert got[days[1]] == (80.0, None)
+    assert got[days[2]] == (90.0, None)  # visible once effective, not when announced
+    # The June change has no publication time; the May value stands.
+    assert got[days[3]] == (90.0, None)
+    whole_day = load_profile(["shares.float"], [S], [days[0]], pit_mode="published", config=cfg)
+    assert whole_day["value_num"].to_list() == [80.0]
+    loose = load_profile(["shares.float"], [S], [days[3]], config=cfg)
+    assert loose["value_num"].to_list() == [99.0]
+
+
+def test_published_mode_has_no_industry_and_leaves_status_alone(lake):
+    root = lake.curated_root / "industry_members" / "as_of_date=2024-04-26"
+    root.mkdir(parents=True)
+    pl.DataFrame(
+        [
+            {
+                "symbol": S,
+                "classification_system": "sw",
+                "industry_code": "340501",
+                "industry_name": "340501",
+                "l1_code": "340000",
+                "l1_name": None,
+                "l2_code": "340500",
+                "l2_name": None,
+                "l3_code": "340501",
+                "l3_name": None,
+                "as_of_date": date(2024, 4, 26),
+                **_meta("sw", EARLY),
+            }
+        ],
+        schema=DATASET_SCHEMAS["industry_members"],
+    ).write_parquet(root / "part.parquet")
+    RevisionStore(lake.meta_root, lake.curated_root, lake.derived_root).commit(
+        "industry_members",
+        run_id="seed",
+        changed_files=[root / "part.parquet"],
+        schema_version=2,
+        contract_fingerprint="contract",
+    )
+    day = date(2024, 4, 26)
+    p = load_profile(
+        ["industry.sw.l3", "status.trading"], [S], [day], pit_mode="published", config=lake
+    )
+    assert _value(p, "industry.sw.l3", day)["missing_reason"] == "no_pit_evidence"
+    assert _value(p, "status.trading", day)["value_num"] == 1.0
+
+
+def test_canonical_reads_a_renamed_security_under_its_code_on_the_date(tmp_path):
+    old, new = "601313.SH", "601360.SH"  # renamed 2018-02-28
+    cfg = Config(data_root=tmp_path / "lake")
+    root = cfg.curated_root / "trading_status" / "trade_date=2018-01"
+    root.mkdir(parents=True)
+    pl.DataFrame(
+        [
+            {
+                "symbol": new,
+                "trade_date": date(2018, 1, 31),
+                "is_trading": True,
+                "status": "normal",
+                "risk_warning": False,
+                **_meta("baostock", EARLY),
+            }
+        ],
+        schema=DATASET_SCHEMAS["trading_status"],
+    ).write_parquet(root / "part.parquet")
+    RevisionStore(cfg.meta_root, cfg.curated_root, cfg.derived_root).commit(
+        "trading_status",
+        run_id="seed",
+        changed_files=[root / "part.parquet"],
+        schema_version=1,
+        contract_fingerprint="contract",
+    )
+    day = date(2018, 1, 31)
+    plain = load_profile(["status.trading"], [old], [day], config=cfg)
+    assert plain["value_num"].to_list() == [None]
+    mapped = load_profile(["status.trading"], [old], [day], canonical=True, config=cfg)
+    assert mapped["value_num"].to_list() == [1.0]

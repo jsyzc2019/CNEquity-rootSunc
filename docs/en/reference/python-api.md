@@ -148,6 +148,11 @@ Columns: `value_num`, `value_str`, `label`, `field_date` (the date the value des
 `value_unknown` (a record exists but leaves the value unknown, e.g. ST on a derived status row), `no_pit_evidence` (`strict` only) and `no_record`;
 a value older than the field's age limit is returned with `stale`. Nothing is returned outside a listed life.
 
+`pit_mode="published"` accepts only values with a recorded publication time (`available_at`); announcement and ingestion dates never count, and a value is not visible before the date it took effect (e.g. a share change).
+`cutoff=time(15)` requires that time to fall before 15:00 Shanghai on the as-of date, otherwise the value counts from the next day; without it the whole day counts.
+Industry snapshots have no publication time and are `no_pit_evidence` in that mode; listing and trading status are session facts and read the same in every mode.
+`canonical=True` first re-keys each row onto the code effective on its date (as `canonicalize_dated_identifiers` does); `data_root` and `revision_map` go to every read.
+
 ## scan()
 
 Returns a raw `pl.LazyFrame`, suited to custom lazy pipelines over large windows. It only does date-partition and

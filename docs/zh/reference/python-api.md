@@ -148,6 +148,11 @@ p = load_profile(
 `value_unknown`（有记录但值未知，如派生状态行的 ST）、`no_pit_evidence`（只在 `strict` 下）、`no_record`；
 值比该字段的时效上限更旧时照常返回值并标 `stale`。上市期外不返回任何值。
 
+`pit_mode="published"` 只认记录了发布时间（`available_at`）的值，公告日和入湖日都不算；同时不早于值生效的日期
+（如股本变动日）。`cutoff=time(15)` 表示发布时间须在截至日北京时间 15:00 之前，否则从下一天起才可见；不给则整天都算。
+行业快照没有发布时间，在该模式下为 `no_pit_evidence`；上市与交易状态是当日事实，各模式相同。
+`canonical=True` 先把每行换到当日实际生效的代码（同 `canonicalize_dated_identifiers`）；`data_root`、`revision_map` 传给每次读取。
+
 ## scan()
 
 返回原始 `pl.LazyFrame`，适合大窗口的自定义 lazy 管道。它只做日期分区和
