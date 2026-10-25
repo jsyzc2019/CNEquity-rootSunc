@@ -388,3 +388,32 @@ def test_same_announce_date_correction_preserves_original_and_first_observation(
         )
         == 0
     )
+
+
+def test_source_times_are_dated_in_shanghai_not_utc():
+    """A row available from T+1 00:00 Shanghai is T 16:00 UTC; it must not pass as_of=T."""
+    from datetime import datetime, timedelta, timezone
+
+    from cnequity.domain.market_time import SHANGHAI_TZ
+    from cnequity.domain.pit import classify_pit_rows
+
+    day = date(2024, 3, 15)
+    next_midnight = datetime.combine(day + timedelta(days=1), datetime.min.time(), SHANGHAI_TZ)
+    frame = pl.DataFrame(
+        {
+            "announcement_id": ["a", "b"],
+            "symbol": ["600000.SH", "600000.SH"],
+            "announce_date": [day, day],
+            "source": ["cninfo", "cninfo"],
+            "fetched_at": [datetime(2024, 3, 15, 6, tzinfo=timezone.utc)] * 2,
+            "available_at": [next_midnight.astimezone(timezone.utc), None],
+            "source_published_at": [None, next_midnight.astimezone(timezone.utc)],
+        }
+    )
+    for mode in ("strict", "best_effort"):
+        on_day = classify_pit_rows(frame, "announcement_index", as_of=day, pit_mode=mode)
+        assert on_day.height == 0
+        after = classify_pit_rows(
+            frame, "announcement_index", as_of=day + timedelta(days=1), pit_mode=mode
+        )
+        assert sorted(after["announcement_id"]) == ["a", "b"]
