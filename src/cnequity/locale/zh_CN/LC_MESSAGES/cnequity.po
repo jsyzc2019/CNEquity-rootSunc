@@ -1112,6 +1112,10 @@ msgstr "--http：每个请求都要带这个令牌（Bearer 头、/mcp/<令牌> 
 msgid "--if-stale recomputes the whole lake; drop --dataset, or drop --if-stale"
 msgstr "--if-stale 会重算整个湖；请去掉 --dataset，或者去掉 --if-stale"
 
+#: cnequity/cli/quality_cmds.py
+msgid "--industry takes only --start and --end"
+msgstr "--industry 只接受 --start 和 --end"
+
 #: cnequity/cli/backfill_cmds.py
 msgid "--margin-source only applies to margin_trading"
 msgstr "--margin-source 只适用于 margin_trading"
@@ -2004,22 +2008,30 @@ msgid ""
 "\n"
 "\n"
 "`--bars` and `--runs` ask the same question at two other grains: \"security × session\" instead of \"dataset × session\",\n"
-"and \"one run per session\" instead of rows in the lake."
+"and \"one run per session\" instead of rows in the lake.\n"
+"\n"
+"\n"
+"`--industry` asks it of a classification: each snapshot against the stocks listed that day, and each industry against\n"
+"the previous snapshot, so a classification that silently loses a slice of the market or a whole industry shows."
 msgstr ""
 "拿这个湖应该有的东西，对一对它实际有的东西。\n"
 "\n"
-"\n"
+"\n"
 "`cne audit` 问的是落进来的数据对不对。这条问的是该落的有没有落 ——\n"
 "这是另一种失败，也是一碰就抛的 step 会造成的那种。没有它，一个数据集可以连着几周每次 run 都失败，\n"
 "而每一次 run 都只是记一条 failed batch。\n"
 "\n"
-"\n"
+"\n"
 "缺口按「能不能补」分开：`by_date` 数据集少一个交易日是故障，snapshot 数据集少一个是它本来的形态，\n"
 "任何回填都补不诚实。`--repair` 只会去跑前一种。\n"
 "\n"
-"\n"
+"\n"
 "`--bars` 和 `--runs` 在另外两个粒度上问同一个问题：一个是「证券 × 交易日」而不是「数据集 × 交易日」，\n"
-"另一个是「每个交易日一次 run」而不是湖里的行。"
+"另一个是「每个交易日一次 run」而不是湖里的行。\n"
+"\n"
+"\n"
+"`--industry` 对行业分类问同一个问题：每个快照对照当天上市的股票，每个行业对照上一个快照，\n"
+"分类悄悄少了一块市场或整个行业时就能看出来。"
 
 #: cnequity/config/drift.py
 #, python-brace-format
@@ -4335,6 +4347,10 @@ msgstr "只读验收衍生品研究窗口；需 --dataset、--start、--end。"
 #: cnequity/serve/ops/catalog.py
 msgid "Read-only check of lake coverage. Exit code 1 means findings, not a command error."
 msgstr "只读校验湖的覆盖。退出码 1 表示有发现，不是命令出错。"
+
+#: cnequity/cli/quality_cmds.py
+msgid "Read-only completeness of industry_members by classification system, level and snapshot date; --start/--end narrow it."
+msgstr "只读检查 industry_members 按分类体系、层级、快照日的完整性；可用 --start/--end 缩小范围。"
 
 #: cnequity/serve/ops/catalog.py
 msgid "Rebuild derived data"

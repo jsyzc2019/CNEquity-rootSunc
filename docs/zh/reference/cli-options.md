@@ -762,6 +762,7 @@
 |---|---|---|
 | `--config` | `configs/cnequity.toml, else ~/.config/cnequity/config.toml` | 配置文件路径。 |
 | `--derivatives` | `False` | 只读验收衍生品研究窗口；需 --dataset、--start、--end。 |
+| `--industry` | `False` | 只读检查 industry_members 按分类体系、层级、快照日的完整性；可用 --start/--end 缩小范围。 |
 | `--bars` | `False` | 改为检查「证券 × 交易日」，含窗口内一行都没有的证券。需要 --start。 |
 | `--runs` | `False` | 改为检查连续交易日的运行证据，不补任何缺口。 |
 | `--dataset` | `—` | 只校验这些数据集（逗号分隔）；默认校验注册表里的全部。 |

@@ -701,6 +701,13 @@ def _verify_mode(bars: bool, runs: bool, given: dict) -> str:
     ),
 )
 @click.option(
+    "--industry",
+    is_flag=True,
+    help=N_(
+        "Read-only completeness of industry_members by classification system, level and snapshot date; --start/--end narrow it."
+    ),
+)
+@click.option(
     "--bars",
     is_flag=True,
     help=N_(
@@ -759,6 +766,7 @@ def _verify_mode(bars: bool, runs: bool, given: dict) -> str:
 )
 def verify(
     config_path: str,
+    industry: bool,
     bars: bool,
     runs: bool,
     derivatives: bool,
@@ -786,8 +794,25 @@ def verify(
     `--bars` and `--runs` ask the same question at two other grains: "security × session" instead of "dataset × session",
     and "one run per session" instead of rows in the lake.
 
+    \b
+    `--industry` asks it of a classification: each snapshot against the stocks listed that day, and each industry against
+    the previous snapshot, so a classification that silently loses a slice of the market or a whole industry shows.
+
     """
     from cnequity.quality.verify import verify_lake
+
+    if industry:
+        if bars or runs or derivatives or repair or kinds or only or days or as_of or enforce:
+            raise click.UsageError(_("--industry takes only --start and --end"))
+        start_date = parse_date_option(start, "--start") if start else None
+        end_date = parse_date_option(end, "--end") if end else None
+        if start_date and end_date and start_date > end_date:
+            raise click.UsageError(_("--start must be on or before --end"))
+        from cnequity.quality.industry_coverage import industry_coverage_report
+
+        report = industry_coverage_report(_cfg(config_path), start=start_date, end=end_date)
+        click.echo(json.dumps(report, ensure_ascii=False, indent=2, default=str))
+        raise SystemExit(1 if report["state"] == "gaps" else 0)
 
     if derivatives:
         if bars or runs or repair or kinds or days or as_of or enforce:
