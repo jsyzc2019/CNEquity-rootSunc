@@ -191,7 +191,7 @@ def maintain(config_path: str, groups: str | None, notify: bool):
         else (N_("Run audit"), ("audit",), True)
     )
     gate_groups = groups if groups is not None else " ".join(_scheduled_groups(cfg))
-    click.echo(f"--- {_('Daily group runs')} ---", err=True)
+    click.echo("--- " + _("Daily group runs") + " ---", err=True)
     problems, notes = _check_daily_groups(cfg)
     for line in [*problems, *notes]:
         click.echo(f"  {line}", err=True)

@@ -78,7 +78,7 @@ def migrate(config_path: str, apply: bool, only: str | None, as_json: bool):
         return
     for migration in chosen:
         if not as_json:
-            note = f" ({_('reads')} {_(migration.reads)})" if migration.reads else ""
+            note = " (" + _("reads") + f" {_(migration.reads)})" if migration.reads else ""
             click.echo(f"--- {migration.id}: {_(migration.title)}{note}", err=True)
         try:
             report = migration.apply(cfg, apply=apply)
