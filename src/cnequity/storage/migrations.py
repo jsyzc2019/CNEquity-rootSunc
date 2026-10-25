@@ -156,6 +156,13 @@ MIGRATIONS: tuple[Migration, ...] = (
         "0.20.0",
         _repair("sw_delisted", "repair_sw_delisted"),
     ),
+    Migration(
+        "offshore-final",
+        N_("Replace COMEX gold bars stored before their session closed"),
+        "0.20.0",
+        _repair("offshore_final", "repair_offshore_final"),
+        N_("Sina's COMEX gold daily bars"),
+    ),
 )
 
 

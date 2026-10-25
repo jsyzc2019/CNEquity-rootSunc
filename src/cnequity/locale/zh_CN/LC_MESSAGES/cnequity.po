@@ -4491,6 +4491,10 @@ msgstr "修复已存数据：默认只预览，--apply 核验后发布并保留�
 msgid "Reparse existing original reports; unchanged facts retain their original observation times."
 msgstr "重新解析已有原文报告；内容未变的行保留原始观测时间。"
 
+#: cnequity/storage/migrations.py
+msgid "Replace COMEX gold bars stored before their session closed"
+msgstr "替换在交易时段结束前存入的 COMEX 黄金日线"
+
 #: cnequity/cli/backfill_cmds.py
 msgid ""
 "Replace Shanghai/Shenzhen daily_bars rows whose turnover is missing, zero or misaligned.\n"
@@ -5186,6 +5190,10 @@ msgstr "新浪日线"
 #: cnequity/diagnostics/source_health.py
 msgid "Sina futures (continuous / overseas daily bars)"
 msgstr "新浪期货（主连 / 外盘日线）"
+
+#: cnequity/storage/migrations.py
+msgid "Sina's COMEX gold daily bars"
+msgstr "新浪 COMEX 黄金日线"
 
 #: cnequity/serve/lake.py
 msgid "Single-file merge: only the current state, with no notion of fetching by date."
