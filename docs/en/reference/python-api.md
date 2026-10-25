@@ -113,6 +113,41 @@ bulk research should still use the Python API. This endpoint requires every read
 
 `ReaderError` (a subclass of `ValueError`): unknown dataset, no data, strict_adj failure, and so on.
 
+## load_profile()
+
+Fetch what could be known about many securities on many dates, for several fields at once, as a long table with one row per `(symbol, as_of, field)`.
+Each source dataset is read once and joined as-of per security, so more dates cost a join, not another read.
+
+```python
+from datetime import date
+from cnequity.query import load_profile
+
+p = load_profile(
+    ["listed", "status.trading", "status.st", "shares.total", "holders.count",
+     "fsi:net_profit", "industry.sw.l1", "industry.eastmoney.l3"],
+    symbols=["600519.SH"],
+    as_of_dates=[date(2024, 4, 30)],
+    pit_mode="best_effort",   # or "strict"
+)
+```
+
+| Field | Source | Meaning |
+|---|---|---|
+| `listed` | instruments | 1 while listed on the date |
+| `status.trading` / `status.st` | trading_status | Latest row on or before the date; a null ST is unknown, not "not ST" |
+| `shares.total` / `shares.float` / `shares.free_float` | share_structure | Known once both the change date and the announcement have passed |
+| `holders.count` | shareholder_counts | Known from its announcement |
+| `fsi:<item_code>` | financial_statement_items | Latest report period visible on the date; `value_str` is the period, `field_date` its end |
+| `industry.<sw\|eastmoney>.l<1\|2\|3>` | industry_members | Industry code at that level in the latest snapshot on or before the date; `label` is its name |
+
+Columns: `value_num`, `value_str`, `label`, `field_date` (the date the value describes), `visible_from` (earliest date it could be known), `source`,
+`pit_quality` (`strict`: first-hand and observed by this lake by the date; `reconstructed`: known by its announcement but recovered later; `snapshot_only`: a snapshot date only),
+`age_days` and `missing_reason`.
+
+`missing_reason`: `before_listing`, `after_delisting`, `outside_coverage` (the date precedes anything the dataset holds), `not_yet_published`,
+`value_unknown` (a record exists but leaves the value unknown, e.g. ST on a derived status row), `no_pit_evidence` (`strict` only) and `no_record`;
+a value older than the field's age limit is returned with `stale`. Nothing is returned outside a listed life.
+
 ## scan()
 
 Returns a raw `pl.LazyFrame`, suited to custom lazy pipelines over large windows. It only does date-partition and

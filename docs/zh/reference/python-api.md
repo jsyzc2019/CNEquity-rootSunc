@@ -113,6 +113,41 @@ PIT 模式/质量、请求窗口与实际行的日期边界。`receipt_id` 是�
 
 `ReaderError`（`ValueError` 子类）：未知数据集、无数据、strict_adj 失败等。
 
+## load_profile()
+
+一次取多只证券、多个截至日、多个字段在当时能知道的值，返回长表，每行是 `(symbol, as_of, field)`。
+每个源数据集只读一次，按证券做截至日连接，所以多加截至日只多一次连接。
+
+```python
+from datetime import date
+from cnequity.query import load_profile
+
+p = load_profile(
+    ["listed", "status.trading", "status.st", "shares.total", "holders.count",
+     "fsi:net_profit", "industry.sw.l1", "industry.eastmoney.l3"],
+    symbols=["600519.SH"],
+    as_of_dates=[date(2024, 4, 30)],
+    pit_mode="best_effort",   # 或 "strict"
+)
+```
+
+| 字段 | 来源 | 说明 |
+|---|---|---|
+| `listed` | instruments | 截至日在上市期内为 1 |
+| `status.trading` / `status.st` | trading_status | 截至日及之前最近一行；ST 为空表示未知，不是“非 ST” |
+| `shares.total` / `shares.float` / `shares.free_float` | share_structure | 变动日和公告日都过了才可知 |
+| `holders.count` | shareholder_counts | 公告后可知 |
+| `fsi:<item_code>` | financial_statement_items | 截至日可见的最新报告期；`value_str` 为报告期，`field_date` 为期末日 |
+| `industry.<sw\|eastmoney>.l<1\|2\|3>` | industry_members | 截至日及之前最近快照中该层级的行业代码，`label` 为名称 |
+
+返回列：`value_num`、`value_str`、`label`、`field_date`（值描述的日期）、`visible_from`（最早可知日）、`source`、
+`pit_quality`（`strict` 一手来源且本湖在截至日前已观察到；`reconstructed` 按公告日可知但事后补录；`snapshot_only` 只有快照日）、
+`age_days`、`missing_reason`。
+
+`missing_reason`：`before_listing`、`after_delisting`、`outside_coverage`（截至日早于该数据集最早记录）、`not_yet_published`、
+`value_unknown`（有记录但值未知，如派生状态行的 ST）、`no_pit_evidence`（只在 `strict` 下）、`no_record`；
+值比该字段的时效上限更旧时照常返回值并标 `stale`。上市期外不返回任何值。
+
 ## scan()
 
 返回原始 `pl.LazyFrame`，适合大窗口的自定义 lazy 管道。它只做日期分区和
