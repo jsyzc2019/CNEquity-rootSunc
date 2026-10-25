@@ -315,3 +315,20 @@ def test_the_shell_pipelines_streak_carries_over(grouped):
     _runs(config, advance(), {"core": "success", "fundamentals": "failed"})
     problems, _ = _check_daily_groups(config)
     assert problems == ["daily group fundamentals failed 3 session(s) in a row"]
+
+
+def test_maintain_retries_the_debt_ledger_without_failing_on_it(maintain_env):
+    from cnequity.storage.state import StateStore
+
+    config, calls, failing = maintain_env
+    StateStore(config.meta_root).record_outstanding_keys(
+        "daily_bars", [("600000.SH", date(2026, 10, 19))], run_id="r1", reason="test"
+    )
+    failing.add("backfill")
+
+    result = _maintain(config)
+
+    assert result.exit_code == 0, result.output
+    assert ["backfill", "daily_bars", "--outstanding"] == calls[0][:3]
+    assert calls[1][0] == "audit"  # the audit and gate see what the retry settled
+    assert "Outstanding keys: daily_bars" in result.output

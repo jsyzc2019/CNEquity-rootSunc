@@ -139,6 +139,19 @@ def _check_daily_groups(cfg) -> tuple[list[str], list[str]]:
     return problems, notes
 
 
+def _owed_datasets(cfg) -> list[str]:
+    """Datasets whose debt ledger still lists keys a tolerated gap left unfilled."""
+    from cnequity.domain.datasets import DATASETS
+    from cnequity.storage.state import StateStore
+
+    store = StateStore(cfg.meta_root)
+    return sorted(
+        path.stem
+        for path in store.root.glob("*.json")
+        if path.stem in DATASETS and store.get_outstanding_keys(path.stem)
+    )
+
+
 def _notify(title: str, message: str) -> None:
     """A desktop notification on macOS; nothing elsewhere."""
     if sys.platform != "darwin":
@@ -169,12 +182,13 @@ def maintain(config_path: str, groups: str | None, notify: bool):
     \b
     The scheduled timer runs this once after each session's daily update. In order:
     the session's daily group runs ([job.maintenance].gate_groups fail at once, others after
-    soft_fail_max_days sessions in a row), the run audit (the whole lake on
+    soft_fail_max_days sessions in a row), a retry of keys in the debt ledger
+    (`cne backfill <dataset> --outstanding`), the run audit (the whole lake on
     [job.maintenance].full_audit_weekday), the freshness gate,
     source probes and SLO, run evidence over 20 sessions, a metadata backup
     (manifest DB, receipts, quality findings; never curated Parquet), and `cne run clean`'s preview.
-    Exits 1 when a group run, the audit, the freshness gate or the backup fails; source and
-    run-evidence findings are reported without failing.
+    Exits 1 when a group run, the audit, the freshness gate or the backup fails; source,
+    debt-retry and run-evidence findings are reported without failing.
 
     """
     from cnequity.diagnostics.source_health import effective_vantage
@@ -195,6 +209,16 @@ def maintain(config_path: str, groups: str | None, notify: bool):
     problems, notes = _check_daily_groups(cfg)
     for line in [*problems, *notes]:
         click.echo(f"  {line}", err=True)
+    # Nothing else revisits the debt ledger: a key a source could not answer
+    # yet (Baostock posts halts about a week late) stayed owed until someone
+    # ran the repair by hand.
+    for dataset in _owed_datasets(cfg):
+        click.echo(
+            "--- " + _("Outstanding keys: {dataset}").format(dataset=dataset) + " ---", err=True
+        )
+        argv = _cne("backfill", dataset, "--outstanding", "--config", path)
+        if subprocess.run(argv, check=False).returncode:
+            notes.append(_("Outstanding keys: {dataset}").format(dataset=dataset))
     for label, args, gating in (audit, *_CHECKS):
         argv = list(args)
         if args[0] == "status" and gate_groups:
