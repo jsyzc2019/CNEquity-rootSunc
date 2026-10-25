@@ -366,6 +366,7 @@ def derive(
     and after `cne backfill daily_bars`, and `cne backfill corporate_actions` also recomputes factors for the affected securities.
     So running them here is a repair or covers an earlier window, not part of a normal day.
     `sector_routing` and `sector_code_map` are run by no schedule and only by hand.
+    `industry_taxonomy` writes one stable identity per industry (`system:version:code`, e.g. `sw:2021:480101`) to meta, also by hand.
     `adj_factor_source` arbitrates conflicts between factors and corporate actions with Baostock; securities
     where Sina is shown wrong and Baostock agrees with the other events switch their whole factor to Baostock with `--apply`.
     `futures_continuous` and `option_greeks` update daily in the `derivatives` group.
@@ -475,6 +476,14 @@ def derive(
         try:
             summary = derive_sector_code_map(cfg)
         except RuntimeError as exc:  # missing input or source: the message says what to do
+            raise click.ClickException(str(exc)) from exc
+        click.echo(json.dumps(summary, indent=2, default=str))
+    elif name == "industry_taxonomy":
+        from cnequity.derive.industry_taxonomy import derive_industry_taxonomy
+
+        try:
+            summary = derive_industry_taxonomy(cfg)
+        except RuntimeError as exc:  # missing input: the message says what to do
             raise click.ClickException(str(exc)) from exc
         click.echo(json.dumps(summary, indent=2, default=str))
     else:

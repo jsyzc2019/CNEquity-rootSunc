@@ -886,6 +886,10 @@ EastMoney rows with `data_version=v1` (written before 0.20) kept one of the thre
 The `industry-levels` step of `cne migrate` fills the level columns for the stored board and the levels above it; the levels below stay null and `industry_code` is unchanged.
 For counts by level, read `l1_*`..`l3_*`, not `industry_code` on those rows.
 
+An industry code is not an identity on its own: Shenwan reused its old code strings when it replaced its taxonomy on 2021-07-30.
+`cne derive industry_taxonomy` writes each industry as `industry_id = system:version:code` (e.g. `sw:2014:480101`, `sw:2021:480101`, `eastmoney:board:1279`)
+to `meta/industry_taxonomy.parquet`, with its level, name, `parent_id`, first and last snapshot date and largest member count; the Shenwan version follows the snapshot date.
+
 #### macro_indicators
 
 | Column | Type | Description |

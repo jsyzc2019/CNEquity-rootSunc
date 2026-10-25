@@ -879,6 +879,10 @@ PIT 查询过滤 `announce_date <= as_of`。
 `cne migrate` 的 `industry-levels` 为这些行补上所存板块本身及其上级的层级列，下级保持为空，`industry_code` 不改；
 按层级统计请读 `l1_*`..`l3_*`，不要读这些行的 `industry_code`。
 
+行业代码本身不是身份：申万 2021-07-30 换代时复用了旧代码字符串。`cne derive industry_taxonomy` 把每个行业写成
+`industry_id = 体系:版本:代码`（如 `sw:2014:480101`、`sw:2021:480101`、`eastmoney:board:1279`）存到
+`meta/industry_taxonomy.parquet`，含层级、名称、上级 `parent_id`、首末出现的快照日和最大成员数；申万版本按快照日判定。
+
 #### macro_indicators
 
 | 列 | 类型 | 说明 |
