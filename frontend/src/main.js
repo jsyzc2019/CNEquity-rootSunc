@@ -430,7 +430,7 @@ async function renderDatasets() {
   const rows = (items) =>
     items
       .map(
-        (d) => `<tr class="dataset-row"><td><span class="dot ${d.freshness === "fresh" ? "fresh" : d.freshness === "stale" ? "stale" : "empty"}"></span>${dsLink(d.dataset)}</td><td>${esc(tierText(d.tier, d.tier_label))}</td><td>${esc(historyText(d.history_mode))}</td><td>${esc(partitionText(d.granularity))}</td><td>${esc(d.watermark || "-")}</td><td class="n">${fmt(d.row_count)}</td><td class="n">${mb(d.bytes)}</td></tr>`,
+        (d) => `<tr class="dataset-row"><td><span class="dot ${d.freshness === "fresh" ? "fresh" : d.freshness === "stale" ? "stale" : "empty"}"></span>${dsLink(d.dataset)}${removedNote(d)}</td><td>${esc(tierText(d.tier, d.tier_label))}</td><td>${esc(historyText(d.history_mode))}</td><td>${esc(partitionText(d.granularity))}</td><td>${esc(d.watermark || "-")}</td><td class="n">${fmt(d.row_count)}</td><td class="n">${mb(d.bytes)}</td></tr>`,
       )
       .join("");
   setPage(`<section class="page-heading"><div class="heading-row"><h1>${tr("数据集", "Datasets")}</h1>
@@ -452,12 +452,15 @@ async function renderDatasets() {
   render();
 }
 
+// A dataset the config took out of its schedule on purpose: real last date, not owed.
+const removedNote = (d) => (d.freshness === "removed" ? ` <span class="muted" title="${tr("配置用 steps_remove / enabled = false 移出了调度", "Removed from the schedule by steps_remove / enabled = false")}">${tr("已移出调度", "removed in config")}</span>` : "");
+
 function membersTable(rows) {
   const body = rows.map((d) => {
     const cls = d.freshness === "fresh" ? "fresh" : d.freshness === "stale" ? "stale" : "empty";
     const cover = d.coverage_start ? `${d.coverage_start} → ${d.coverage_end}` : "-";
     const opt = d.required ? "" : ` <span class="muted">${tr("可选", "optional")}</span>`;
-    return `<tr class="data-row"><td><span class="dot ${cls}"></span>${dsLink(d.dataset)}${opt}</td>
+    return `<tr class="data-row"><td><span class="dot ${cls}"></span>${dsLink(d.dataset)}${opt}${removedNote(d)}</td>
       <td>${esc(historyText(d.history_mode))}</td><td>${esc(partitionText(d.granularity))}</td><td class="cell-time">${cover}</td>
       <td class="cell-time">${d.watermark || "-"}</td><td class="n">${fmt(d.row_count)}</td>
       <td class="n">${mb(d.bytes)}</td></tr>`;
@@ -768,7 +771,7 @@ async function renderDetail(name, tab) {
   const cls = d.freshness === "fresh" ? "fresh" : d.freshness === "stale" ? "stale" : "empty";
   setPage(`
     <section class="page-heading">
-      <div class="heading-row"><div><div class="page-title-with-status"><h1>${dsMarkup(d.dataset)}</h1>${statusPill(cls)}</div>
+      <div class="heading-row"><div><div class="page-title-with-status"><h1>${dsMarkup(d.dataset)}</h1>${statusPill(cls)}${removedNote(d)}</div>
         <p class="meta-row"><span>${esc(tierText(d.tier, d.tier_label))}</span><span>${esc(d.layer)}</span><span>${esc(historyText(d.history_mode))}</span>${d.required ? "" : `<span>${tr("可选", "Optional")}</span>`}</p></div>
         <div class="action-row">${datasetActionButtons(d)}</div>
       </div>

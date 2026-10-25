@@ -42,3 +42,20 @@ def test_the_gate_skips_a_dataset_the_config_removed_on_purpose(config):
     assert _gates_on_dataset(config, "fund_flow", {"capital"})  # unknown owner still gates
     opted = replace(config, opted_out_steps=frozenset({"fund_flow"}))
     assert not _gates_on_dataset(opted, "fund_flow", {"capital"})
+
+
+def test_a_dataset_removed_on_purpose_is_a_separate_state_not_stale(config):
+    from dataclasses import replace
+
+    from cnequity.domain.datasets import freshness_state
+
+    _with_groups(config, ["fund_flow_ths", "compact"])
+    old, anchor = date(2026, 9, 21), date(2026, 10, 23)
+    # Unscheduled without an explicit opt-out: still owed, still stale.
+    assert freshness_state("fund_flow", old, anchor, config) == "stale"
+    removed = replace(config, opted_out_steps=frozenset({"fund_flow"}))
+    assert freshness_state("fund_flow", old, anchor, removed) == "removed"
+    assert not is_stale("fund_flow", old, anchor, removed)
+    # Another group running it again makes it due.
+    _with_groups(removed, ["fund_flow", "compact"])
+    assert freshness_state("fund_flow", old, anchor, removed) == "stale"

@@ -88,7 +88,9 @@ def _gates_on_dataset(cfg, dataset: str, wanted_groups: set[str] | None) -> bool
         return True
     by_group = stale_datasets_by_group(cfg, [dataset])
     owners = {group for group, names in by_group.items() if dataset in names}
-    if owners == {"(unscheduled)"} and dataset in getattr(cfg, "opted_out_steps", ()):
+    from cnequity.domain.datasets import removed_from_schedule
+
+    if removed_from_schedule(cfg, dataset):
         return False
     if not owners:
         return True
@@ -1092,8 +1094,8 @@ def status(
         from cnequity.domain.datasets import (
             DATASETS,
             empty_freshness_label,
+            freshness_state,
             is_dataset_enabled,
-            is_stale,
         )
         from cnequity.query.reader import list_datasets
 
@@ -1125,7 +1127,8 @@ def status(
             if retired is not None and mark is not None and mark >= retired:
                 return "retired"
             # Per-dataset tolerance (T+1, quarterly …) — inherent lag is not STALE.
-            return "STALE" if is_stale(row["dataset"], mark, anchor, cfg) else "fresh"
+            state = freshness_state(row["dataset"], mark, anchor, cfg)
+            return {"stale": "STALE", "removed": "removed"}.get(state, state)
 
         df = df.with_columns(
             pl_mod.Series("freshness", [_freshness(r) for r in df.iter_rows(named=True)])
@@ -1325,24 +1328,15 @@ def status(
             # apart — it reads as a total outage either way.
             by_group = stale_datasets_by_group(cfg, stale_rows["dataset"].to_list())
             if by_group:
-                opted = set(getattr(cfg, "opted_out_steps", ()))
-                shown: dict[str, int] = {}
-                for group, names in by_group.items():
-                    for name in names:
-                        label = (
-                            _("(removed in config)")
-                            if group == "(unscheduled)" and name in opted
-                            else group
-                        )
-                        shown[label] = shown.get(label, 0) + 1
-                summary = ", ".join(f"{group} {count}" for group, count in sorted(shown.items()))
+                summary = ", ".join(
+                    f"{group} {len(names)}" for group, names in sorted(by_group.items())
+                )
                 click.echo(_("By schedule group: {summary}").format(summary=summary))
-                if set(shown) - {_("(removed in config)")}:
-                    click.echo(
-                        _(
-                            "A schedule group you have not scheduled is a scheduling gap, not a failure; run it with `cne run daily --group <name>`."
-                        )
+                click.echo(
+                    _(
+                        "A schedule group you have not scheduled is a scheduling gap, not a failure; run it with `cne run daily --group <name>`."
                     )
+                )
             # ...and until this flag existed, the gate said exactly that and then
             # failed anyway. A host scheduling `core` alone has twenty-odd
             # datasets no job ever fetches, so the freshness gate failed every
@@ -1362,14 +1356,8 @@ def status(
                     for group, names in by_group.items()
                     if group in wanted or group == "(unscheduled)"
                     for name in names
-                    if _gates_on_dataset(cfg, name, wanted)
                 )
-                removed = sorted(
-                    name
-                    for name in by_group.get("(unscheduled)", [])
-                    if name in getattr(cfg, "opted_out_steps", ())
-                )
-                skipped = stale - len(gating) - len(removed)
+                skipped = stale - len(gating)
                 if skipped:
                     click.echo(
                         _(
@@ -1377,13 +1365,6 @@ def status(
                         ).format(
                             value=", ".join(sorted(wanted)), value2=len(gating), skipped=skipped
                         )
-                    )
-                if removed:
-                    click.echo(
-                        _(
-                            "Not gated: {names} — the config removes them from its schedule "
-                            "(steps_remove / enabled = false)."
-                        ).format(names=", ".join(removed))
                     )
                 if gating and gate:
                     raise SystemExit(1)

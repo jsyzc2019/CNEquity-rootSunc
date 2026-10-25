@@ -927,10 +927,6 @@ msgstr "%s：工作进程池崩溃（多半是负载下内存不足），改为�
 msgid "(all)"
 msgstr "（全部）"
 
-#: cnequity/cli/quality_cmds.py
-msgid "(removed in config)"
-msgstr "（配置中已移除）"
-
 #: cnequity/cli/init_summary.py cnequity/cli/quality_cmds.py
 #: cnequity/cli/run_cmds.py cnequity/cli/setup_cmds.py
 #: cnequity/diagnostics/health_page.py cnequity/research/packs.py
@@ -3823,11 +3819,6 @@ msgstr "尚未配置。"
 #: cnequity/cli/setup_cmds.py
 msgid "Not created yet; `cne init` or `cne config create` writes it here."
 msgstr "尚未创建；`cne init` 或 `cne config create` 会写到这里。"
-
-#: cnequity/cli/quality_cmds.py
-#, python-brace-format
-msgid "Not gated: {names} — the config removes them from its schedule (steps_remove / enabled = false)."
-msgstr "不计入门禁：{names} —— 配置已把它们移出调度（steps_remove / enabled = false）。"
 
 #: cnequity/diagnostics/source_health.py
 msgid "Not probed this time (disabled in the config, excluded by --only, or a costly endpoint that must be selected explicitly)."

@@ -1707,6 +1707,26 @@ def scheduled_steps(config) -> frozenset[str]:
     return frozenset(step for group in groups.values() for step in group.steps)
 
 
+def removed_from_schedule(config, dataset: str) -> bool:
+    """Whether the config took *dataset*'s step out of its schedule on purpose.
+
+    ``steps_remove`` or ``enabled = false`` removed it and no other daily group
+    still runs it. Such a dataset is not owed: its last date is real, nothing
+    on this host will move it, and calling it stale every day only teaches the
+    reader to ignore the word. Adding the step back makes it due again.
+    """
+    if config is None or dataset not in (getattr(config, "opted_out_steps", None) or ()):
+        return False
+    return dataset not in scheduled_steps(config)
+
+
+def freshness_state(dataset: str, mark, anchor, config=None) -> str:
+    """``"fresh"``, ``"stale"`` or ``"removed"`` (see `removed_from_schedule`)."""
+    if removed_from_schedule(config, dataset):
+        return "removed"
+    return "stale" if is_stale(dataset, mark, anchor, config) else "fresh"
+
+
 def is_stale(dataset: str, mark, anchor, config=None) -> bool:
     """Whether *dataset*'s freshest date (*mark*) lags *anchor* beyond tolerance.
 
@@ -1726,6 +1746,8 @@ def is_stale(dataset: str, mark, anchor, config=None) -> bool:
     (``storage/observation.py``).
     """
     if mark is None or anchor is None:
+        return False
+    if removed_from_schedule(config, dataset):
         return False
     if config is not None:
         from cnequity.storage.observation import freshness_mark

@@ -37,9 +37,9 @@ from cnequity.domain.datasets import (
     TIER_LABELS,
     TIERS,
     empty_freshness_label,
+    freshness_state,
     history_mode_for,
     is_dataset_enabled,
-    is_stale,
 )
 from cnequity.domain.market_time import is_session_final, shanghai_today
 from cnequity.domain.partitions import parse_partition
@@ -338,7 +338,7 @@ class LakeView:
         if not row["watermarked"]:
             return "n/a"
         mark = row["watermark"] or row["coverage_end"]
-        return "stale" if is_stale(row["dataset"], mark, anchor, self.config) else "fresh"
+        return freshness_state(row["dataset"], mark, anchor, self.config)
 
     def _rows(self) -> list[dict]:
         """One enriched dict per registered dataset."""
