@@ -2,8 +2,9 @@
 
 这里记录面向用户的主要功能、修复与兼容性变化。历史版本中的命令名反映当时的接口；当前用法以 [CLI 参考](docs/zh/reference/cli.md)为准。升级前阅读[升级与兼容性](docs/zh/getting-started/installation.md#升级与兼容性)。
 
-## [0.19.0] — 未发布
+## [0.19.0] — 2026-10-25
 
+- **升级步骤：** `pip install -U cnequity` 后重启 `cne serve` 和已在运行的 `cne mcp`。数据集契约没有变化。旧湖先运行 `cne migrate` 预览、再 `cne migrate --apply` 补齐一次性迁移（取代已移除的 11 个 `cne repair` 迁移命令）；调度或脚本里用到下文已移除命令和 `cne backfill` 开关的，按对应替代改写。现有完整配置照旧可用，可用 `cne config upgrade --minimize --dry-run` 预览改为继承默认值；用 `scripts/scheduler/` 的，先运行 `uninstall_scheduler.sh` 再 `cne schedule install`。不在项目目录运行时，配置可放在 `~/.config/cnequity/config.toml`，`cne config path` 显示实际使用的配置。
 - **移除不再使用的命令与开关（不兼容）：**
   - 11 个一次性 `cne repair` 迁移命令（`missing-values`、`financial-announcements`、`daily-bar-coverage`、`fund-factors`、`fund-listing-dates`、`valuation-basis`、`orphan-symbols`、`stale-suspensions`、`status-outages`、`status-listing-window`、`misdated-valuation`）：0.17 及更早版本的湖用 `cne migrate` 修正；
   - `cne derive bse_code_migration` 和 `cne derive valuation_orphans`（`valuation_metrics` 回填会自动清理孤立行）；
@@ -17,7 +18,6 @@
 - `fund_flow_ths` / `sector_fund_flow_ths` 默认仍是不判新鲜度的兜底表；配置的日更调度组里排了它们（push2 不可用时用 `steps_add` 换入）时，改为要求最近收盘交易日有数据，收尾补抓会重试缺的那天，新鲜度门禁也会报出来。
 - `cne backfill` 只保留通用选项（帮助里的选项从 32 个减到 11 个）。数据集专属的修复改为 `cne repair` 子命令，默认预览、`--apply` 运行：`payment-dates`、`delisted-actions`、`ex-dates`、`bar-amounts`、`bar-turnover`、`bse-tip-turnover`、`valuation-outage`；上期所年度包导入改为 `cne import shfe-archive`。新增通用的 `--refetch`（取代衍生品的 `--refresh` 和 `sector_bars` 的 `--force`）和 `--source`（取代 `--margin-source`）；`--retry-failed` 本来就是默认行为，不再需要。旧开关已移除（见下文）。
 - 新增 `cne migrate`：一次找出并运行这个湖还欠的一次性数据迁移（默认预览，`--apply` 运行），结果记在 `meta/state/lake.json`。新建的湖会记下建湖版本，不欠早于它的迁移；`cne doctor` 会提示还没检查的迁移。弃用的一次性 `cne repair` 命令改由它统一运行（命令本身已移除，见下文）。
-- 仓库 `scripts/migrations/` 的脚本在 `--apply` 时持有湖的变更锁，不再可能与正在发布同一数据集的运行交错写入。
 - 新增 `cne schedule install|status|remove`：在命令行为当前用户安装、查看、移除定时任务（macOS launchd、Linux crontab、Windows 任务计划程序），与 `cne serve` 操作页是同一个任务；没给出的选项保留面板里的设置。
 - 新增 `cne run maintain`，定时任务在每个交易日日更后自动运行：运行审计（`[job.maintenance] full_audit_weekday` 那天做全湖审计）、新鲜度门禁、源探针与 SLO、运行证据核验、元数据备份和过期预览。此前只有仓库脚本做元数据备份，用 `cne init --schedule` 或控制台装定时任务的湖没有 manifest 备份；备份改用 SQLite 备份接口，不再依赖 `sqlite3` 命令。
 - `scripts/scheduler/` 弃用，打包定时任务覆盖它的全部功能（多条事件流计划、出口标签、按日核对的兜底表）并经过真实湖验证后才移除；迁移时先运行 `uninstall_scheduler.sh`，再 `cne schedule install`。`backup_meta.sh` 已改为调用同一份备份代码。
