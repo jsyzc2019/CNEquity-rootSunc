@@ -4,6 +4,7 @@
 
 ## [0.19.0] — 未发布
 
+- 期货/期权最新交易日截面可以证明完整了：交易所有当天的官方合约文件、且文件里当天在市的合约都有行情时判为 `OK`（此前即使一个不缺也只能是 UNVERIFIED，`cne check` 因此一直 ✗）。默认走新浪的大商所无法证明，作为限制写在结果旁，不判失败；缺当天官方文件时仍为 UNVERIFIED。
 - `cne run maintain` 检查最近收盘交易日各日更组的运行：`[job.maintenance] gate_groups`（默认 `core`）失败立即判失败，其他组连续失败 `soft_fail_max_days`（默认 3）个交易日才判失败，与旧日更脚本的规则一致并沿用其计数。
 - 配置用 `steps_remove` 或 `enabled = false` 有意移出调度、且没有别的组再跑的数据集，新鲜度显示为 `removed`（保留真实的最后日期），不再判为 STALE；`cne check`、`cne status --gate`、审计、`cne run maintain`、收尾补抓和控制台对此一致。把 step 加回调度后又会按期判断。
 - 新增 `[[job.events.schedules]]`：在配置里写多条事件流计划，每条有自己的事件组、间隔、随机延迟和北京时间静默时段，打包定时任务按计划运行（`cne schedule install --events`），控制台只读展示。没写计划时仍用控制台设置的单个事件组。

@@ -1241,9 +1241,12 @@ def status(
                     else ""
                 )
                 if report.get("unverifiable_exchanges"):
+                    # A limitation of the route, stated beside the result; it does
+                    # not fail the gate (the data on it is not shown to be short).
                     owed_note += _(
-                        "; {exchanges} go through a vendor route (no rows on days without "
-                        "trades) and are outside the proof"
+                        "; limitation, not counted: {exchanges} — vendor route with no rows on "
+                        "days without trades, so it cannot be proven "
+                        '(an official route, [futures].dce_route = "official", can be)'
                     ).format(exchanges=_(", ").join(report["unverifiable_exchanges"]))
                 click.echo(
                     _(

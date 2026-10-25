@@ -1289,13 +1289,13 @@ msgstr "；"
 
 #: cnequity/cli/quality_cmds.py
 #, python-brace-format
-msgid "; ranges each source has: {offered}"
-msgstr "；各源现有区间：{offered}"
+msgid "; limitation, not counted: {exchanges} — vendor route with no rows on days without trades, so it cannot be proven (an official route, [futures].dce_route = \"official\", can be)"
+msgstr "；限制，不计入：{exchanges} —— 第三方路由在无成交日没有行，无法证明（改用官方路由 [futures].dce_route = \"official\" 可以证明）"
 
 #: cnequity/cli/quality_cmds.py
 #, python-brace-format
-msgid "; {exchanges} go through a vendor route (no rows on days without trades) and are outside the proof"
-msgstr "；{exchanges} 走供应商路线（无成交日缺行），不在证明之内"
+msgid "; ranges each source has: {offered}"
+msgstr "；各源现有区间：{offered}"
 
 #: cnequity/serve/app.py
 #, python-brace-format

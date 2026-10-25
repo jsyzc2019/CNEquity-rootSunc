@@ -38,7 +38,7 @@ cne backfill option_bars --config configs/cnequity.futures.toml --exchange SHF -
 cne status --config configs/cnequity.futures.toml --datasets --groups derivatives --all-columns
 ```
 
-独立期货湖用 `--groups derivatives` 限定状态门禁，不要求先采集 A 股。若状态为 `UNVERIFIED` 并退出 2，表示缺少完整在市合约清单等证据；它与已发现缺口的退出 1 不同，具体范围用下文的窗口验收查看。
+独立期货湖用 `--groups derivatives` 限定状态门禁，不要求先采集 A 股。最新交易日的截面按交易所证明：某交易所有当天的官方合约文件（`meta/derivatives/references/` 下，按期货/期权分开），且文件里当天在市的合约都有行情，该交易所就算已证明完整，全部可证明的交易所都满足时显示 `OK`。走第三方路由的交易所（默认 `dce_route = "sina"` 的大商所，无成交日没有行）无法证明，作为限制写在结果旁，不判失败；改用官方路由可以证明。缺当天官方文件时状态为 `UNVERIFIED` 并退出 2，表示证据不足；它与已发现缺口的退出 1 不同，具体范围用下文的窗口验收查看。
 
 `--plan` 不联网、不创建湖，报告交易所、源端历史下限、日期、冷缓存请求估算、限速及后续步骤。行情估算不含重试；参考请求另列上界，不是耗时承诺。DCE 新浪以“合约整段历史”为请求单位，一个日期也可能枚举约 299 个候选代码；跨月或长窗口涉及更多代码。`--exchange` 可重复；INE 归入 SHF 路由，2018 年 3 月 26 日起的期货需同时请求上期所与能源中心日文件，冷缓存估算计入这两个请求。显式回填一个衍生品数据集会开启本次调用所需开关，不改配置文件。
 
