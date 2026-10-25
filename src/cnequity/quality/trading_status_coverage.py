@@ -30,7 +30,7 @@ def traded_status_evidence(
     exclusions, and never become derived trading rows.
     """
     context = read_context or ReadContext.capture(
-        config, ("daily_bars", "instruments", "trading_status"), {}
+        config, ("daily_bars", "instruments", "trading_status", "announcement_index"), {}
     )
     bars_root = read_root(config, "daily_bars", context)
     if not dataset_has_parquet(bars_root, committed=False):
