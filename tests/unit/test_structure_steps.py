@@ -359,7 +359,7 @@ def test_industry_members_backfill_delivers_thin_month(cfg, monkeypatch):
             "as_of_date": [date(2024, 1, 31)] * 5,
         }
     )
-    monkeypatch.setattr(st, "expand_sw_industry_as_of", lambda intervals, todo: thin)
+    monkeypatch.setattr(st, "expand_sw_industry_as_of", lambda intervals, todo, delist=None: thin)
     from cnequity.orchestrator.source_gaps import source_gap_scope
 
     with source_gap_scope(cfg) as gaps:
@@ -396,7 +396,9 @@ def test_industry_members_backfill_keeps_both_thin_and_healthy_months(cfg, monke
     )
     thin = healthy.head(5).with_columns(pl.lit(thin_date).alias("as_of_date"))
     monkeypatch.setattr(
-        st, "expand_sw_industry_as_of", lambda intervals, todo: pl.concat([thin, healthy])
+        st,
+        "expand_sw_industry_as_of",
+        lambda intervals, todo, delist=None: pl.concat([thin, healthy]),
     )
 
     from cnequity.orchestrator.source_gaps import source_gap_scope

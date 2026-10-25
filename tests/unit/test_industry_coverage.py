@@ -128,3 +128,37 @@ def test_a_taxonomy_replacement_is_reported_apart_from_drops(tmp_path, moved):
         # An ordinary reassignment: 111 keeps half its members, not a drop.
         assert sw["reclassifications"] == []
         assert sw["industry_drops"] == []
+
+
+def test_rows_outside_a_listed_life_are_unexpected_members(tmp_path):
+    rows = _snapshot(D1) + [
+        _member("600099.SH", D1, "111"),  # not in instruments
+    ]
+    cfg = _lake(tmp_path, rows)
+    report = industry_coverage_report(cfg, today=D1)
+    unexpected = report["systems"]["eastmoney"]["unexpected_members"]
+    assert unexpected == {"unknown_security": {"rows": 1, "symbols": 1, "sample": ["600099.SH"]}}
+    assert report["state"] == "gaps"
+
+
+def test_the_sw_delisted_migration_drops_only_shenwan_rows_after_delisting(tmp_path):
+    from cnequity.storage.repairs.sw_delisted import repair_sw_delisted
+
+    rows = _snapshot(D1, system="sw") + _snapshot(D2, system="sw") + _snapshot(D2)
+    cfg = _lake(tmp_path, rows)
+    inst = cfg.curated_root / "instruments" / "part.parquet"
+    frame = pl.read_parquet(inst).with_columns(
+        pl.when(pl.col("symbol") == STOCKS[0]).then(D2).otherwise(None).alias("delist_date")
+    )
+    frame.write_parquet(inst)
+    _commit(cfg, "instruments")
+
+    assert repair_sw_delisted(cfg)["rows"] == 1
+    repair_sw_delisted(cfg, apply=True)
+    from cnequity.query import load
+
+    after = load("industry_members", config=cfg).filter(pl.col("symbol") == STOCKS[0])
+    held = {(r["classification_system"], r["as_of_date"]) for r in after.iter_rows(named=True)}
+    # Shenwan keeps the stock before delisting; EastMoney's observed row stays.
+    assert held == {("sw", D1), ("eastmoney", D2)}
+    assert repair_sw_delisted(cfg)["rows"] == 0

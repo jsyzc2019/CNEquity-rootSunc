@@ -394,7 +394,7 @@ def _backfill_industry_members(config: Config, trade_date: date, run_id: str) ->
         if "unexpected keyword argument 'config'" not in str(exc):
             raise
         intervals = fetch_sw_industry_intervals()
-    df = expand_sw_industry_as_of(intervals, todo)
+    df = expand_sw_industry_as_of(intervals, todo, _delist_dates(config))
     if df.is_empty():
         raise SourceUnavailableError("industry_members backfill: Shenwan expansion produced 0 rows")
     # A month with far fewer names than typical means the XLS window does not
@@ -449,6 +449,16 @@ def _backfill_industry_members(config: Config, trade_date: date, run_id: str) ->
             }
         ]
     return result
+
+
+def _delist_dates(config: Config) -> pl.DataFrame | None:
+    from cnequity.query.reader import ReaderError, load
+
+    try:
+        inst = load("instruments", config=config)
+    except ReaderError:
+        return None
+    return inst.filter(pl.col("delist_date").is_not_null()).select("symbol", "delist_date")
 
 
 def _existing_sw_as_of_dates(config: Config, *, min_rows: int | None = None) -> set[date]:

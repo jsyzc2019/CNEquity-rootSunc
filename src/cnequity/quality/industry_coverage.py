@@ -27,6 +27,10 @@ MIN_MEMBERS = 5
 #: Losing more than this share of its members between snapshots is a drop.
 MAX_SHRINK = 0.5
 SAMPLE = 10
+#: Listed equity that a classification covers: CDRs (e.g. 689009.SH) are classified too.
+CLASSIFIED_TYPES = ("stock", "cdr")
+#: Shenwan assigns an IPO's class before its first session; reported, not a gap.
+INFORMATIONAL = frozenset({"before_listing"})
 #: When more than this share of stocks change level-3 industry between two
 #: snapshots, the taxonomy itself was replaced (Shenwan 2014 -> 2021 moved 66%
 #: on 2021-07-30; its yearly July reassignments move 1-5%).
@@ -39,13 +43,47 @@ def _group() -> pl.Expr:
     )
 
 
-def _listed_stocks(config: Config) -> pl.DataFrame:
+def _instruments(config: Config) -> pl.DataFrame:
     from cnequity.query.reader import load
 
-    inst = load("instruments", config=config)
+    return load("instruments", config=config).select(
+        "symbol", "asset_type", "list_date", "delist_date"
+    )
+
+
+def _listed_stocks(inst: pl.DataFrame) -> pl.DataFrame:
     return inst.filter(
-        (pl.col("asset_type") == "stock") & pl.col("list_date").is_not_null()
+        pl.col("asset_type").is_in(CLASSIFIED_TYPES) & pl.col("list_date").is_not_null()
     ).select("symbol", "list_date", "delist_date")
+
+
+def _unexpected(members: pl.DataFrame, inst: pl.DataFrame) -> dict:
+    """Rows for securities that were not listed stocks on the snapshot date, by reason."""
+    rows = members.select("symbol", "as_of_date").unique().join(inst, on="symbol", how="left")
+    reason = (
+        pl.when(pl.col("asset_type").is_null())
+        .then(pl.lit("unknown_security"))
+        .when(~pl.col("asset_type").is_in(CLASSIFIED_TYPES))
+        .then(pl.lit("not_a_stock"))
+        .when(pl.col("delist_date").is_not_null() & (pl.col("as_of_date") >= pl.col("delist_date")))
+        .then(pl.lit("after_delisting"))
+        .when(pl.col("list_date").is_null())
+        .then(pl.lit("unknown_listing_date"))
+        .when(pl.col("as_of_date") < pl.col("list_date"))
+        .then(pl.lit("before_listing"))
+    )
+    hits = rows.with_columns(reason.alias("reason")).filter(pl.col("reason").is_not_null())
+    return {
+        r["reason"]: {"rows": r["rows"], "symbols": r["symbols"], "sample": r["sample"]}
+        for r in hits.group_by("reason")
+        .agg(
+            pl.len().alias("rows"),
+            pl.col("symbol").n_unique().alias("symbols"),
+            pl.col("symbol").unique().sort().head(SAMPLE).alias("sample"),
+        )
+        .sort("reason")
+        .iter_rows(named=True)
+    }
 
 
 def _expected(listed: pl.DataFrame, days: list[date]) -> pl.DataFrame:
@@ -185,7 +223,8 @@ def industry_coverage_report(
     from cnequity.query.reader import load
 
     members = load("industry_members", config=config, start=start, end=end)
-    listed = _listed_stocks(config)
+    inst = _instruments(config)
+    listed = _listed_stocks(inst)
     anchor = today or last_closed_session()
     report: dict = {
         "dataset": "industry_members",
@@ -206,6 +245,7 @@ def industry_coverage_report(
         coverage = _coverage(part, listed)
         gaps = [r for r in coverage if r["coverage"] < MIN_COVERAGE]
         drops, reclassified = _industry_drops(part, set(partial))
+        unexpected = _unexpected(part, inst)
         last = part["as_of_date"].max()
         levels = {f"L{n}": int(part[f"l{n}_code"].drop_nulls().n_unique()) for n in (1, 2, 3)}
         report["systems"][system] = {
@@ -226,9 +266,10 @@ def industry_coverage_report(
             },
             "coverage_min": min((r["coverage"] for r in coverage), default=None),
             "coverage_gaps": gaps,
+            "unexpected_members": unexpected,
             "industry_drops": drops,
             "reclassifications": reclassified,
         }
-        if gaps or drops:
+        if gaps or drops or set(unexpected) - INFORMATIONAL:
             report["state"] = "gaps"
     return report

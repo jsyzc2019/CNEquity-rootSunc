@@ -150,6 +150,12 @@ MIGRATIONS: tuple[Migration, ...] = (
         _repair("industry_levels", "repair_industry_levels"),
         N_("EastMoney datacenter industry boards, when EastMoney rows need levels"),
     ),
+    Migration(
+        "sw-delisted",
+        N_("Drop Shenwan industry rows dated on or after the stock's delisting"),
+        "0.20.0",
+        _repair("sw_delisted", "repair_sw_delisted"),
+    ),
 )
 
 
