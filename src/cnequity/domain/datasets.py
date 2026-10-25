@@ -1097,6 +1097,9 @@ _SPECS = [
         # The keyed 同花顺 API is the arbitration peer and fills what the
         # EastMoney datacenter reports omit.
         supplementary_sources=("ths_official",),
+        # `cne repair financial-originals` publishes CNINFO's original-filing
+        # figures; never an automatic route.
+        repair_sources=("cninfo",),
         tier="L3",
         partition_col="report_period",
         partition_granularity="quarter",
@@ -1296,6 +1299,8 @@ _SPECS = [
         # CNI adjustment history reconstructs 399001/399006 from ~2021-12;
         # CSI indices still accumulate via daily EM snapshots only.
         backfill_source="cni",
+        # `cne repair index-snapshots` replays dated exchange index books.
+        repair_sources=("exchange",),
     ),
     DatasetSpec(
         "industry_members",
@@ -1486,6 +1491,9 @@ _SPECS = [
         # implied step agreed to 3e-6, which is the rounding in Baostock's
         # two-decimal adjusted closes.
         backup_source="baostock",
+        # BJ stocks and LOF/ETF share actions have no vendor factor; the daily
+        # derivation computes them from corporate actions.
+        supplementary_sources=("derived",),
         tier="L1",
         layer="derived",
         partition_col="trade_date",

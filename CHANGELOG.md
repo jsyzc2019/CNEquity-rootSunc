@@ -2,6 +2,10 @@
 
 这里记录面向用户的主要功能、修复与兼容性变化。历史版本中的命令名反映当时的接口；当前用法以 [CLI 参考](docs/zh/reference/cli.md)为准。升级前阅读[升级与兼容性](docs/zh/getting-started/installation.md#升级与兼容性)。
 
+## [0.20.0] — 未发布
+
+- 数据集来源登记补齐：`adj_factors` 的派生因子（北交所与基金份额变动）登记为补充来源，`financial_statement_items` 的巨潮原始报表与 `index_constituents` 的交易所指数快照登记为修复来源。审计不再对它们报 `unrouted_source`，`cne sources` 列出的条款也包含这些写入方。
+
 ## [0.19.0] — 2026-10-25
 
 - **升级步骤：** `pip install -U cnequity` 后重启 `cne serve` 和已在运行的 `cne mcp`。数据集契约没有变化。旧湖先运行 `cne migrate` 预览、再 `cne migrate --apply` 补齐一次性迁移（取代已移除的 11 个 `cne repair` 迁移命令）；调度或脚本里用到下文已移除命令和 `cne backfill` 开关的，按对应替代改写。现有完整配置照旧可用，可用 `cne config upgrade --minimize --dry-run` 预览改为继承默认值；用 `scripts/scheduler/` 的，先运行 `uninstall_scheduler.sh` 再 `cne schedule install`。不在项目目录运行时，配置可放在 `~/.config/cnequity/config.toml`，`cne config path` 显示实际使用的配置。
