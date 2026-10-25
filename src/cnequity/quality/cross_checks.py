@@ -1955,11 +1955,10 @@ def balance_sheet_identity_findings(config: Config) -> list[dict]:
     root = config.curated_root / "financial_statement_items"
     if not dataset_has_parquet(root):
         return []
+    # Not the canonical dedupe: it picks one source per item, which is the
+    # cross-source mix this check must not judge.
     frame = (
-        dedupe_lazy_by_primary_key(
-            scan_parquet_root(root, partition_col="report_period"),
-            "financial_statement_items",
-        )
+        scan_parquet_root(root, partition_col="report_period")
         .filter(
             (pl.col("statement_type") == "balance")
             & pl.col("item_code").is_in(["total_assets", "total_liabilities", "total_equity"])
@@ -1971,13 +1970,17 @@ def balance_sheet_identity_findings(config: Config) -> list[dict]:
 
     # The primary key carries announce_date and every observed vintage is
     # kept, so a restated period holds several rows per item; compare the
-    # latest reading of each, in disclosure then observation order.
+    # latest reading of each, in disclosure then observation order, within
+    # one source. Across sources the three totals can be different vintages:
+    # 600301.SH's 2022 filing shows assets of 466m, the vendors' restatement
+    # after its 2023 reverse acquisition 6.64bn, and pairing one's assets
+    # with the other's equity is a breach of nothing.
     order = [c for c in ("announce_date", "observed_at", "fetched_at") if c in frame.columns]
     latest = (
-        frame.sort(["symbol", "report_period", "item_code", *order], nulls_last=False)
-        .group_by("symbol", "report_period", "item_code", maintain_order=True)
-        .agg(pl.col("item_value").last().alias("value"), pl.col("source").last().alias("source"))
-        .pivot(on="item_code", index=["symbol", "report_period"], values="value")
+        frame.sort(["symbol", "report_period", "source", "item_code", *order], nulls_last=False)
+        .group_by("symbol", "report_period", "source", "item_code", maintain_order=True)
+        .agg(pl.col("item_value").last().alias("value"))
+        .pivot(on="item_code", index=["symbol", "report_period", "source"], values="value")
     )
     for column in ("total_assets", "total_liabilities", "total_equity"):
         if column not in latest.columns:
@@ -1996,12 +1999,18 @@ def balance_sheet_identity_findings(config: Config) -> list[dict]:
     ).filter(pl.col("_rel") > BALANCE_IDENTITY_TOLERANCE)
     if breached.is_empty():
         return []
+    # Counted per period: a period two sources both break is one defect.
+    breached = breached.sort("_rel", descending=True).unique(
+        ["symbol", "report_period"], keep="first", maintain_order=True
+    )
+    periods_checked = checked.select("symbol", "report_period").unique().height
 
     def _sample(frame: pl.DataFrame) -> list[dict]:
         return [
             {
                 "symbol": row["symbol"],
                 "report_period": row["report_period"],
+                "source": row["source"],
                 "total_assets": row["total_assets"],
                 "total_liabilities": row["total_liabilities"],
                 "total_equity": row["total_equity"],
@@ -2054,12 +2063,12 @@ def balance_sheet_identity_findings(config: Config) -> list[dict]:
                 "severity": "warning",
                 "check": "balance_sheet_identity",
                 "message": (
-                    f"{modern.height} of {checked.height} balance-sheet periods from "
+                    f"{modern.height} of {periods_checked} balance-sheet periods from "
                     f"{MODERN_STATEMENT_YEAR} on break assets = liabilities + equity by more "
                     "than a basis point"
                 ),
                 "rows": modern.height,
-                "checked": checked.height,
+                "checked": periods_checked,
                 "since_year": MODERN_STATEMENT_YEAR,
                 "sample": _sample(modern),
                 # Every breached period, so a refetch can name exactly these;
@@ -2083,7 +2092,7 @@ def balance_sheet_identity_findings(config: Config) -> list[dict]:
                     "than chased"
                 ),
                 "rows": historical.height,
-                "checked": checked.height,
+                "checked": periods_checked,
                 "before_year": MODERN_STATEMENT_YEAR,
                 "source_limited": True,
                 "by_report_year": by_era,
@@ -2102,7 +2111,7 @@ def balance_sheet_identity_findings(config: Config) -> list[dict]:
                     "partial, so they are counted rather than chased"
                 ),
                 "rows": pre_listing.height,
-                "checked": checked.height,
+                "checked": periods_checked,
                 "source_limited": True,
                 "sample": _sample(pre_listing),
             }
