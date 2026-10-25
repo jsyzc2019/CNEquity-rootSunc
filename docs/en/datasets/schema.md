@@ -171,7 +171,9 @@ the [SZSE ETF list](https://fund.szse.cn/marketdata/etf/) and the [SZSE fund lis
 `derived_traded` means committed daily bars prove a print on that date (positive volume),
 rather than a first-hand status snapshot. It fills only stock/ETF keys with a known
 listed life and no existing status row, setting `normal`, `is_trading=true`, and
-`risk_warning=null`. `normal` does not mean confirmed non-ST. Authoritative session
+`risk_warning=null` for stocks or `risk_warning=false` for ETFs/funds (ST does not
+apply to funds, so it is not unknown). On a stock row `normal` does not mean
+confirmed non-ST. Authoritative session
 records take precedence; these derived rows are excluded from the EastMoney outage
 carry and do not establish historical ST coverage. Zero or unknown volume, unknown
 listing dates, and bars outside the listed life cannot generate these rows. Existing
