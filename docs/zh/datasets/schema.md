@@ -858,12 +858,26 @@ PIT 查询过滤 `announce_date <= as_of`。
 |--------|------|-------|
 | symbol | string |  |
 | classification_system | string | 如 ``sw``、``eastmoney`` |
-| industry_code | string |  |
-| industry_name | string |  |
+| industry_code | string | 三级（末级）行业代码；`data_version=v1` 的东财行见下文 |
+| industry_name | string | 三级行业名称；申万行等于代码 |
+| l1_code | string | 一级行业代码，可为空 |
+| l1_name | string | 一级行业名称，可为空 |
+| l2_code | string | 二级行业代码，可为空 |
+| l2_name | string | 二级行业名称，可为空 |
+| l3_code | string | 三级行业代码，可为空 |
+| l3_name | string | 三级行业名称，可为空 |
 | as_of_date | date | 分类快照日 |
 | source | string | 溯源 |
 | data_version | string | 溯源 |
 | fetched_at | timestamp | 溯源 |
+
+每只证券每个分类体系每个快照日一行。东财数据中心把每只股票同时列在一、二、三级三个行业板块下，且不标层级：
+板块越大层级越高；一级只有一个下级时两者成员相同，靠名称后缀（`Ⅱ`/`Ⅲ`）区分。
+申万行只有六位三级代码，一、二级代码由它补零得到（`480101` → `480100` → `480000`），申万文件不发布名称，名称列为空。
+
+`data_version=v1`（0.20 之前写入）的东财行只保存了三个板块中的一个，由来源分页顺序决定，层级逐日不定。
+`cne migrate` 的 `industry-levels` 为这些行补上所存板块本身及其上级的层级列，下级保持为空，`industry_code` 不改；
+按层级统计请读 `l1_*`..`l3_*`，不要读这些行的 `industry_code`。
 
 #### macro_indicators
 

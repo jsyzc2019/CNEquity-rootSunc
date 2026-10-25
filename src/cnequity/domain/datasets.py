@@ -1304,6 +1304,8 @@ _SPECS = [
     ),
     DatasetSpec(
         "industry_members",
+        # v2: level columns; industry_code is the level-3 leaf.
+        schema_version=2,
         primary_source="eastmoney",
         tier="L5",
         partition_col="as_of_date",

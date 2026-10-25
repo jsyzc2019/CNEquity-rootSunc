@@ -30,6 +30,8 @@ DEFAULT_DATA_VERSION = "v1"
 # `cnequity.domain.units` and docs/zh/datasets/schema.md.
 DATASET_DATA_VERSION = {
     "daily_bars": "v2",
+    # v2: industry_code is the level-3 leaf and the level columns are filled.
+    "industry_members": "v2",
 }
 
 
@@ -39,7 +41,9 @@ def data_version_for(dataset: str) -> str:
 
 # Columns a writer may leave out; validation adds them as null. Older rows and
 # sources that do not publish the value read the same way.
-OPTIONAL_COLUMNS = frozenset({"pre_close"})
+OPTIONAL_COLUMNS = frozenset(
+    {"pre_close", "l1_code", "l1_name", "l2_code", "l2_name", "l3_code", "l3_name"}
+)
 
 DAILY_BARS_SCHEMA = {
     "symbol": pl.Utf8,
@@ -642,8 +646,16 @@ INDEX_CONSTITUENTS_SCHEMA = {
 INDUSTRY_MEMBERS_SCHEMA = {
     "symbol": pl.Utf8,
     "classification_system": pl.Utf8,
+    # v2: the level-3 leaf. v1 EastMoney rows hold whichever level the source
+    # page order left last; read ``l1_*``..``l3_*`` for a fixed level.
     "industry_code": pl.Utf8,
     "industry_name": pl.Utf8,
+    "l1_code": pl.Utf8,
+    "l1_name": pl.Utf8,
+    "l2_code": pl.Utf8,
+    "l2_name": pl.Utf8,
+    "l3_code": pl.Utf8,
+    "l3_name": pl.Utf8,
     "as_of_date": pl.Date,
     "source": pl.Utf8,
     "data_version": pl.Utf8,

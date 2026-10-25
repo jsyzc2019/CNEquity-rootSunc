@@ -865,12 +865,26 @@ and `actual_date` is filled in after actual disclosure (null before then).
 |--------|------|-------|
 | symbol | string |  |
 | classification_system | string | e.g. ``sw``, ``eastmoney`` |
-| industry_code | string |  |
-| industry_name | string |  |
+| industry_code | string | Level-3 (leaf) industry code; see below for EastMoney rows with `data_version=v1` |
+| industry_name | string | Level-3 industry name; equals the code on Shenwan rows |
+| l1_code | string | Level-1 industry code, nullable |
+| l1_name | string | Level-1 industry name, nullable |
+| l2_code | string | Level-2 industry code, nullable |
+| l2_name | string | Level-2 industry name, nullable |
+| l3_code | string | Level-3 industry code, nullable |
+| l3_name | string | Level-3 industry name, nullable |
 | as_of_date | date | Classification snapshot date |
 | source | string | Provenance |
 | data_version | string | Provenance |
 | fetched_at | timestamp | Provenance |
+
+One row per security, classification system and snapshot date. The EastMoney datacenter lists every stock under its level 1, 2 and 3 industry boards without saying which is which:
+a bigger board is a higher level, and where a level has a single child the two have the same members and the name suffix (`Ⅱ`/`Ⅲ`) tells them apart.
+Shenwan rows carry only the six-digit level-3 code; the level-1 and level-2 codes are that code zero-filled (`480101` → `480100` → `480000`). The Shenwan file publishes no names, so the name columns are null.
+
+EastMoney rows with `data_version=v1` (written before 0.20) kept one of the three boards, chosen by the source's page order, so the level varies from day to day.
+The `industry-levels` step of `cne migrate` fills the level columns for the stored board and the levels above it; the levels below stay null and `industry_code` is unchanged.
+For counts by level, read `l1_*`..`l3_*`, not `industry_code` on those rows.
 
 #### macro_indicators
 

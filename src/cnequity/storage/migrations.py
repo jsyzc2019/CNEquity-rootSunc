@@ -143,6 +143,13 @@ MIGRATIONS: tuple[Migration, ...] = (
         "0.18.0",
         _repair("daily_bar_coverage", "repair_daily_bar_coverage"),
     ),
+    Migration(
+        "industry-levels",
+        N_("Fill industry level columns on industry_members rows written before 0.20"),
+        "0.20.0",
+        _repair("industry_levels", "repair_industry_levels"),
+        N_("EastMoney datacenter industry boards, when EastMoney rows need levels"),
+    ),
 )
 
 

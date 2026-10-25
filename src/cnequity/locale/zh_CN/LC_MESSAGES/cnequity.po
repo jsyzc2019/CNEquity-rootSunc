@@ -2466,6 +2466,10 @@ msgid "EastMoney datacenter (report API)"
 msgstr "东财 datacenter（报表接口）"
 
 #: cnequity/storage/migrations.py
+msgid "EastMoney datacenter industry boards, when EastMoney rows need levels"
+msgstr "东财数据中心行业板块（东财行需要补层级时）"
+
+#: cnequity/storage/migrations.py
 msgid "EastMoney datacenter, when there are rows to replace"
 msgstr "东财数据中心（有需要替换的行时）"
 
@@ -2697,6 +2701,10 @@ msgstr "从 Baostock 或同花顺补已退市证券的历史分红除权。"
 #, python-brace-format
 msgid "Fill in {value}."
 msgstr "请填写{value}。"
+
+#: cnequity/storage/migrations.py
+msgid "Fill industry level columns on industry_members rows written before 0.20"
+msgstr "为 0.20 之前写入的 industry_members 行补行业层级列"
 
 #: cnequity/cli/repair_cmds.py
 msgid ""
